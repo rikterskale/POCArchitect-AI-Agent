@@ -53,18 +53,21 @@ C. Pass on command line
 
 --api-key xai-XXXXXXXXXXXXXXXX
 
-###Usage Examples
+## Usage Examples
 
-Single PoC
+### Single PoC (recommended formatting)
 
-pocarchitect --url https://github.com/some/exploit \
-             --provider xai \
-             --model grok-4
+```bash
+pocarchitect \
+  --url https://github.com/some/exploit \
+  --provider xai \
+  --model grok-4
 
 Batch mode
 
-pocarchitect --url example_usage/batch_urls.txt \
-             --provider xai
+pocarchitect \
+  --url example_usage/batch_urls.txt \
+  --provider xai
 
 - Full help
 pocarchitect --help
