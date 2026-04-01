@@ -19,97 +19,51 @@ Every report contains build instructions, execution playbook, risk assessment, a
 - Beautiful, consistent output format every time
 
 ---
-## 🚀 Installation
+## 🚀 Installation & Quick Start
 
 ### Prerequisites
-- Python 3.9 or higher
-- An xAI (Grok), OpenAI, or any OpenAI-compatible API key
+- Python 3.9+
+- xAI (Grok), OpenAI, or any OpenAI-compatible API key
 
 ### 1. Install the CLI (Recommended)
 
 - git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 - cd POCArchitect-AI-Agent
 - pip install -e .
-This installs the pocarchitect command globally in your environment.
 
-### 2. Verify installation
-
+### 2. Verify
 - pocarchitect --help
-You should see the full CLI help output.
+  
+- Alternative (no clone)
+- pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
 
-- Alternative: One-liner install (no cloning needed)
-pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
-
-- API Key Setup
-Option A: Environment variable (recommended)
+API Key Setup (pick one)
+A. Environment variable (recommended)
 Bashexport XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
 
-Option B: Using a .env file (create .env in the project root)
-- envXAI_API_KEY=xai-XXXXXXXXXXXXXXXX
+B. .env file (create .env in project root)
+envXAI_API_KEY=xai-XXXXXXXXXXXXXXXX
 
-Option C: Pass directly in every command
-- pocarchitect --url <URL> --api-key xai-XXXXXXXXXXXXXXXX
+C. Pass on command line
+Bash--api-key xai-XXXXXXXXXXXXXXXX
 
-## Usage examples:
-### Single PoC
-- pocarchitect --url https://github.com/some/exploit --provider xai --api-key xai-xxx --model grok-4
-
-### Batch mode
-- pocarchitect --url example_usage/batch_urls.txt --provider xai --api-key xai-xxx
-
-### Full help
-- pocarchitect --help
-All output goes to ./reports/ (or your --output-dir).
-
-### 2. Run it
-- pocarchitect --url https://github.com/some/exploit \
+- Usage Examples
+Single PoC
+pocarchitect --url https://github.com/some/exploit \
              --provider xai \
-             --api-key xai-XXXXXXXXXXXXXXXX \
-             --model grok-4
+             --model grok-4  
 
-- That’s it. The report lands in POCArchitect_Report_YYYY-MM-DD.md.
+Batch mode
+pocarchitect --url example_usage/batch_urls.txt \
+             --provider xai
 
-### CLI Usage
-#### Single URL
-- pocarchitect --url <URL> --provider xai --api-key <key>
+- Full help
+pocarchitect --help
 
-#### Batch mode
-- pocarchitect --url batch_urls.txt --provider openai --api-key <key>
+- All reports are saved to ./reports/ (or your --output-dir).
 
-#### Full options
-- pocarchitect --help
-
-#### Flags
-
-- url → Single URL or path to batch_urls.txt (one URL per line)
-- provider → xai or openai (default: xai)
-- api-key → Your API key
-- model → e.g. grok-4, gpt-5-turbo, claude-3-5-sonnet-20241022
-- output-dir → Custom output folder (default: current directory)
-- temperature → Default 0.0 (recommended for reproducibility)
-
-#### Prompt-Only Mode (No CLI)
-- If you prefer manual use in Grok / ChatGPT / Claude:
-
-#### Copy the entire content of POC_Architect_Prompt.md
-- Paste it as the System Prompt
-- Send a single URL or the contents of batch_urls.txt as the user message
-
-### Example Output
-- See example_usage/ for real generated reports.
-  - Example filename:
-  POCArchitect_CVE-2024-21413-Outlook-RCE.md
-
-POCArchitect AI Agent File Structure
-- POCArchitect-AI-Agent/
-├── pocarchitect/
-│   ├── __init__.py
-│   └── cli.py
-├── POC_Architect_Prompt.md          # ← your existing prompt (unchanged)
-├── pyproject.toml
-├── README.md
-├── requirements.txt                 # optional, pyproject.toml is enough
-└── example_usage/
+- Prompt-only mode (no CLI)
+Copy the entire content of POC_Architect_Prompt.md as your system prompt and send a URL (or batch_urls.txt content) as the user message
 
 Why This Exists
 Red teamers and pentesters waste hours turning messy POCs into usable artifacts. POCArchitect does it in seconds with military-grade consistency.
