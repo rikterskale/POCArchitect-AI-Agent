@@ -49,16 +49,16 @@ pocarchitect --url https://github.com/some/exploit \
 That’s it. The report lands in POCArchitect_Report_YYYY-MM-DD.md.
 
 ### CLI Usage
-# Single URL
+#### Single URL
 pocarchitect --url <URL> --provider xai --api-key <key>
 
-# Batch mode
+#### Batch mode
 pocarchitect --url batch_urls.txt --provider openai --api-key <key>
 
-# Full options
+#### Full options
 pocarchitect --help
 
-Flags
+#### Flags
 
 - url → Single URL or path to batch_urls.txt (one URL per line)
 - provider → xai or openai (default: xai)
