@@ -67,14 +67,14 @@ pocarchitect --help
 - output-dir → Custom output folder (default: current directory)
 - temperature → Default 0.0 (recommended for reproducibility)
 
-Prompt-Only Mode (No CLI)
+#### Prompt-Only Mode (No CLI)
 - If you prefer manual use in Grok / ChatGPT / Claude:
 
-Copy the entire content of POC_Architect_Prompt.md
+#### Copy the entire content of POC_Architect_Prompt.md
 - Paste it as the System Prompt
 - Send a single URL or the contents of batch_urls.txt as the user message
 
-Example Output
+### Example Output
 - See example_usage/ for real generated reports.
 - Example filename:
   POCArchitect_CVE-2024-21413-Outlook-RCE.md
