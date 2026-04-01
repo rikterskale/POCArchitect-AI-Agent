@@ -56,11 +56,13 @@ C. Pass on command line
 ###Usage Examples
 
 Single PoC
+
 pocarchitect --url https://github.com/some/exploit \
              --provider xai \
              --model grok-4
 
 Batch mode
+
 pocarchitect --url example_usage/batch_urls.txt \
              --provider xai
 
