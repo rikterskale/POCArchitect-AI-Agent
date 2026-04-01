@@ -1,2 +1,2 @@
-# Empty or add version if you want
+# pocarchitect/__init__.py
 __version__ = "0.2.0"
