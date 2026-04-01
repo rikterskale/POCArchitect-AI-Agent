@@ -26,8 +26,18 @@ Every report contains build instructions, execution playbook, risk assessment, a
 git clone (https://github.com/rikterskale/POCArchitect-AI-Agent.git)
 
 cd POCArchitect-AI-Agent
+pip install -e .          # installs the `pocarchitect` command
 
-pip install -e .
+Usage examples:
+# Single PoC
+pocarchitect --url https://github.com/some/exploit --provider xai --api-key xai-xxx --model grok-4
+
+# Batch mode
+pocarchitect --url example_usage/batch_urls.txt --provider xai --api-key xai-xxx
+
+# Full help
+pocarchitect --help
+All output goes to ./reports/ (or your --output-dir).
 
 # 2. Run it
 pocarchitect --url https://github.com/some/exploit \
