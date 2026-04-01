@@ -49,12 +49,12 @@ pocarchitect --help
 
 Flags
 
---url → Single URL or path to batch_urls.txt (one URL per line)
---provider → xai or openai (default: xai)
---api-key → Your API key
---model → e.g. grok-4, gpt-5-turbo, claude-3-5-sonnet-20241022
---output-dir → Custom output folder (default: current directory)
---temperature → Default 0.0 (recommended for reproducibility)
+url → Single URL or path to batch_urls.txt (one URL per line)
+provider → xai or openai (default: xai)
+api-key → Your API key
+model → e.g. grok-4, gpt-5-turbo, claude-3-5-sonnet-20241022
+output-dir → Custom output folder (default: current directory)
+temperature → Default 0.0 (recommended for reproducibility)
 
 Prompt-Only Mode (No CLI)
 If you prefer manual use in Grok / ChatGPT / Claude:
