@@ -46,7 +46,7 @@ B. .env file (create .env in project root)
 envXAI_API_KEY=xai-XXXXXXXXXXXXXXXX
 
 C. Pass on command line
-Bash--api-key xai-XXXXXXXXXXXXXXXX
+--api-key xai-XXXXXXXXXXXXXXXX
 
 - Usage Examples
 Single PoC
