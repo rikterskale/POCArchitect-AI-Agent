@@ -27,36 +27,36 @@ Every report contains build instructions, execution playbook, risk assessment, a
 
 - cd POCArchitect-AI-Agent
 
-pip install -e .          # installs the `pocarchitect` command
+-pip install -e .          # installs the `pocarchitect` command
 
 ## Usage examples:
 ### Single PoC
-pocarchitect --url https://github.com/some/exploit --provider xai --api-key xai-xxx --model grok-4
+- pocarchitect --url https://github.com/some/exploit --provider xai --api-key xai-xxx --model grok-4
 
 ### Batch mode
-pocarchitect --url example_usage/batch_urls.txt --provider xai --api-key xai-xxx
+- pocarchitect --url example_usage/batch_urls.txt --provider xai --api-key xai-xxx
 
 ### Full help
-pocarchitect --help
+- pocarchitect --help
 All output goes to ./reports/ (or your --output-dir).
 
 ### 2. Run it
-pocarchitect --url https://github.com/some/exploit \
+- pocarchitect --url https://github.com/some/exploit \
              --provider xai \
              --api-key xai-XXXXXXXXXXXXXXXX \
              --model grok-4
 
-That’s it. The report lands in POCArchitect_Report_YYYY-MM-DD.md.
+- That’s it. The report lands in POCArchitect_Report_YYYY-MM-DD.md.
 
 ### CLI Usage
 #### Single URL
-pocarchitect --url <URL> --provider xai --api-key <key>
+- pocarchitect --url <URL> --provider xai --api-key <key>
 
 #### Batch mode
-pocarchitect --url batch_urls.txt --provider openai --api-key <key>
+- pocarchitect --url batch_urls.txt --provider openai --api-key <key>
 
 #### Full options
-pocarchitect --help
+- pocarchitect --help
 
 #### Flags
 
@@ -76,10 +76,10 @@ pocarchitect --help
 
 ### Example Output
 - See example_usage/ for real generated reports.
-  Example filename:
+  - Example filename:
   POCArchitect_CVE-2024-21413-Outlook-RCE.md
 
-POCArchitect-AI-Agent/
+- POCArchitect-AI-Agent/
 ├── pocarchitect/
 │   ├── __init__.py
 │   └── cli.py
