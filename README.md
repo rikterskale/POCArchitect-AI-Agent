@@ -48,7 +48,7 @@ pocarchitect --url https://github.com/some/exploit \
 
 That’s it. The report lands in POCArchitect_Report_YYYY-MM-DD.md.
 
-CLI Usage
+### CLI Usage
 # Single URL
 pocarchitect --url <URL> --provider xai --api-key <key>
 
