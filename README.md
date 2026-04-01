@@ -79,6 +79,7 @@ All output goes to ./reports/ (or your --output-dir).
   - Example filename:
   POCArchitect_CVE-2024-21413-Outlook-RCE.md
 
+POCArchitect AI Agent File Structure
 - POCArchitect-AI-Agent/
 ├── pocarchitect/
 │   ├── __init__.py
