@@ -68,8 +68,7 @@ Example Output
 - Example filename:
   POCArchitect_CVE-2024-21413-Outlook-RCE.md
 
-- Project Structure
-  POCArchitect-AI-Agent/
+POCArchitect-AI-Agent/
 ├── pocarchitect/
 │   ├── __init__.py
 │   └── cli.py
