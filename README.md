@@ -29,7 +29,7 @@ cd POCArchitect-AI-Agent
 
 pip install -e .          # installs the `pocarchitect` command
 
-Usage examples:
+## Usage examples:
 ### Single PoC
 pocarchitect --url https://github.com/some/exploit --provider xai --api-key xai-xxx --model grok-4
 
