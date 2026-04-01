@@ -1,1 +1,19 @@
+[project]
+name = "pocarchitect"
+version = "0.2.0"
+description = "Turn any PoC into a complete offensive security blueprint using AI"
+authors = [{ name = "Rikter", email = "rikter@yourdomain.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "typer[all]>=0.12.0",
+    "rich>=13.7.0",
+    "openai>=1.35.0",
+]
 
+[project.scripts]
+pocarchitect = "pocarchitect.cli:app"
+
+[build-system]
+requires = ["setuptools>=45"]
+build-backend = "setuptools.build_meta"
