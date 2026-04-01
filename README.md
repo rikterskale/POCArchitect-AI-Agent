@@ -19,15 +19,36 @@ Every report contains build instructions, execution playbook, risk assessment, a
 - Beautiful, consistent output format every time
 
 ---
+## 🚀 Installation
 
-## 🚀 Quick Start (Recommended)
+### Prerequisites
+- Python 3.9 or higher
+- An xAI (Grok), OpenAI, or any OpenAI-compatible API key
 
-# 1. Install the CLI
-- git clone (https://github.com/rikterskale/POCArchitect-AI-Agent.git)
+### 1. Install the CLI (Recommended)
 
+- git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 - cd POCArchitect-AI-Agent
+- pip install -e .
+This installs the pocarchitect command globally in your environment.
 
--pip install -e .          # installs the `pocarchitect` command
+### 2. Verify installation
+
+- pocarchitect --help
+You should see the full CLI help output.
+
+- Alternative: One-liner install (no cloning needed)
+pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
+
+- API Key Setup
+Option A: Environment variable (recommended)
+Bashexport XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
+
+Option B: Using a .env file (create .env in the project root)
+- envXAI_API_KEY=xai-XXXXXXXXXXXXXXXX
+
+Option C: Pass directly in every command
+- pocarchitect --url <URL> --api-key xai-XXXXXXXXXXXXXXXX
 
 ## Usage examples:
 ### Single PoC
