@@ -40,12 +40,15 @@ Every report contains build instructions, execution playbook, risk assessment, a
 ### API Key Setup (pick one)
 
 A. Environment variable (recommended)
-Bashexport XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
+
+export XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
 
 B. .env file (create .env in project root)
-envXAI_API_KEY=xai-XXXXXXXXXXXXXXXX
+
+XAI_API_KEY=xai-XXXXXXXXXXXXXXXX
 
 C. Pass on command line
+
 --api-key xai-XXXXXXXXXXXXXXXX
 
 - Usage Examples
