@@ -66,10 +66,10 @@ Copy the entire content of POC_Architect_Prompt.md
 Example Output
 - See example_usage/ for real generated reports.
 - Example filename:
-- POCArchitect_CVE-2024-21413-Outlook-RCE.md
+  POCArchitect_CVE-2024-21413-Outlook-RCE.md
 
 - Project Structure
-- POCArchitect-AI-Agent/
+  POCArchitect-AI-Agent/
   ├── POC_Architect_Prompt.md          # System prompt (bundled)
   ├── pocarchitect/                    # Package
   │   ├── __init__.py
