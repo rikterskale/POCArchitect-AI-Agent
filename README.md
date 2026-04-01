@@ -3,59 +3,88 @@
 > **Forging the blueprints of digital domination.**  
 > **I don't write exploits — I architect empires of proof-of-concept that turn defenses into dust.**
 
-**POCArchitect** is a senior offensive-security engineer AI agent that ingests any proof-of-concept (GitHub repo, raw code URL, advisory, or blog post) and outputs a **complete, self-contained, reproducible operational blueprint** in Markdown.
+**POCArchitect** is a senior offensive-security AI agent that takes **any** POC URL (GitHub repo, raw code, advisory, blog post) and instantly outputs a **complete, reproducible, zero-guesswork Markdown blueprint**.
 
-Every report is accurate enough that a competent operator can reproduce the POC with **zero guesswork**.
-
----
-
-## Features
-
-- One URL = One perfect Markdown report
-- Full build instructions, execution playbook, and weaponized artifact
-- Works with **SuperGrok (xAI)**, GPT-5.x, Claude 3.5/4, Gemini 2.0, or any OpenAI-compatible API
-- Batch processing of hundreds of URLs
-- 100% faithful to the original source code — no hallucination
+Every report contains build instructions, execution playbook, risk assessment, and a fully annotated weaponized artifact — accurate enough for a competent operator to run it with zero external reference.
 
 ---
 
-## Quick Start (SuperGrok / xAI Recommended)
+## ✨ Features
 
-1. Go to [grok.x.ai](https://grok.x.ai) or use the xAI API
-2. Paste the **entire contents** of `POCArchitect_Prompt-FINAL.md` as the **System Prompt**
-3. In the user message, paste **a single URL** (or upload `batch_urls.txt`)
-
-Done. You will receive a perfect `POCArchitect_Report_*.md` file.
+- One URL → One perfect Markdown report
+- Full build + execution playbook + annotated weaponized code
+- Supports **SuperGrok (xAI)**, OpenAI (GPT-4o / GPT-5.x), Claude, Gemini, or any OpenAI-compatible endpoint
+- Batch processing (hundreds of URLs → folder of reports + `index.md`)
+- Zero hallucination — reads actual source code
+- Beautiful, consistent output format every time
 
 ---
 
-## Full Setup Instructions
+## 🚀 Quick Start (Recommended)
 
-### Step 1: Clone This Repo
-```bash
-git clone https://github.com/YOURUSERNAME/POCArchitect.git
-cd POCArchitect
+# 1. Install the CLI
+git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
+cd POCArchitect-AI-Agent
+pip install -e .
 
-Step 2: Choose Your Platform
-Option A — SuperGrok / xAI (Recommended)
+# 2. Run it
+pocarchitect --url https://github.com/some/exploit \
+             --provider xai \
+             --api-key xai-XXXXXXXXXXXXXXXX \
+             --model grok-4
 
-Open grok.x.ai → New Chat
-Click the system prompt icon (or use API)
-Paste the full content of POCArchitect_Prompt-FINAL.md
-Save as custom agent (SuperGrok supports persistent agents)
+That’s it. The report lands in POCArchitect_Report_YYYY-MM-DD.md.
 
-Option B — OpenAI (GPT-5.x / ChatGPT)
+CLI Usage
+# Single URL
+pocarchitect --url <URL> --provider xai --api-key <key>
 
-Go to chatgpt.com → Custom GPT → Create
-Paste POCArchitect_Prompt-FINAL.md into Instructions
-Upload the prompt file as a knowledge file
+# Batch mode
+pocarchitect --url batch_urls.txt --provider openai --api-key <key>
 
-Option C — Claude (Anthropic)
+# Full options
+pocarchitect --help
 
-Open Claude.ai → Projects → New Project
-Paste the full prompt as System Prompt
-Add POCArchitect_Prompt-FINAL.md as a document
+Flags
 
-Option D — Gemini / Others
-Use any OpenAI-compatible endpoint and set the system prompt to the content of POCArchitect_Prompt-FINAL.md.
+--url → Single URL or path to batch_urls.txt (one URL per line)
+--provider → xai or openai (default: xai)
+--api-key → Your API key
+--model → e.g. grok-4, gpt-5-turbo, claude-3-5-sonnet-20241022
+--output-dir → Custom output folder (default: current directory)
+--temperature → Default 0.0 (recommended for reproducibility)
+
+Prompt-Only Mode (No CLI)
+If you prefer manual use in Grok / ChatGPT / Claude:
+
+Copy the entire content of POC_Architect_Prompt.md
+Paste it as the System Prompt
+Send a single URL or the contents of batch_urls.txt as the user message
+
+Example Output
+See example_usage/ for real generated reports.
+Example filename:
+POCArchitect_CVE-2024-21413-Outlook-RCE.md
+
+Project Structure
+POCArchitect-AI-Agent/
+├── POC_Architect_Prompt.md          # System prompt (bundled)
+├── pocarchitect/                    # Package
+│   ├── __init__.py
+│   └── cli.py
+├── scripts/                         # Legacy wrappers (kept for reference)
+├── example_usage/                   # Generated reports
+├── pyproject.toml
+├── requirements.txt
+└── README.md
+
+Why This Exists
+Red teamers and pentesters waste hours turning messy POCs into usable artifacts. POCArchitect does it in seconds with military-grade consistency.
+Star the repo if you find it useful — more features (HTML export, auto-deobfuscation, Dockerized targets) are coming.
+
+Made with 🔥 for the offensive-security community.
+
+
+
+
 
