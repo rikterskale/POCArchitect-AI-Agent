@@ -76,7 +76,7 @@ pocarchitect --help
 
 ### Example Output
 - See example_usage/ for real generated reports.
-- Example filename:
+  Example filename:
   POCArchitect_CVE-2024-21413-Outlook-RCE.md
 
 POCArchitect-AI-Agent/
