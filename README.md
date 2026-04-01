@@ -70,15 +70,14 @@ Example Output
 
 - Project Structure
   POCArchitect-AI-Agent/
-  ├── POC_Architect_Prompt.md          # System prompt (bundled)
-  ├── pocarchitect/                    # Package
-  │   ├── __init__.py
-  │   └── cli.py
-  ├── scripts/                         # Legacy wrappers (kept for reference)
-  ├── example_usage/                   # Generated reports
-  ├── pyproject.toml
-  ├── requirements.txt
-  └── README.md
+├── pocarchitect/
+│   ├── __init__.py
+│   └── cli.py
+├── POC_Architect_Prompt.md          # ← your existing prompt (unchanged)
+├── pyproject.toml
+├── README.md
+├── requirements.txt                 # optional, pyproject.toml is enough
+└── example_usage/
 
 Why This Exists
 Red teamers and pentesters waste hours turning messy POCs into usable artifacts. POCArchitect does it in seconds with military-grade consistency.
