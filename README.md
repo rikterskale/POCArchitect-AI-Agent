@@ -53,7 +53,8 @@ C. Pass on command line
 
 --api-key xai-XXXXXXXXXXXXXXXX
 
-- Usage Examples
+###Usage Examples
+
 Single PoC
 pocarchitect --url https://github.com/some/exploit \
              --provider xai \
