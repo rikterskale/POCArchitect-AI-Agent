@@ -24,7 +24,9 @@ Every report contains build instructions, execution playbook, risk assessment, a
 
 # 1. Install the CLI
 git clone (https://github.com/rikterskale/POCArchitect-AI-Agent.git)
+
 cd POCArchitect-AI-Agent
+
 pip install -e .
 
 # 2. Run it
