@@ -41,7 +41,7 @@ Every report contains build instructions, execution playbook, risk assessment, a
 
 A. Environment variable (recommended)
 
-export XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
+export XAI_API_KEY=xai-XXXXXXXXXXXXXXXX
 
 
 B. .env file (create .env in project root)
@@ -55,7 +55,7 @@ C. Pass on command line
 
 ## Usage Examples
 
-### Single PoC (recommended formatting)
+### Single PoC
 
 ```bash
 pocarchitect \
@@ -71,6 +71,7 @@ pocarchitect \
 
 - Full help
 pocarchitect --help
+```
 
 - All reports are saved to ./reports/ (or your --output-dir).
 
