@@ -49,36 +49,36 @@ pocarchitect --help
 
 Flags
 
-url → Single URL or path to batch_urls.txt (one URL per line)
-provider → xai or openai (default: xai)
-api-key → Your API key
-model → e.g. grok-4, gpt-5-turbo, claude-3-5-sonnet-20241022
-output-dir → Custom output folder (default: current directory)
-temperature → Default 0.0 (recommended for reproducibility)
+- url → Single URL or path to batch_urls.txt (one URL per line)
+- provider → xai or openai (default: xai)
+- api-key → Your API key
+- model → e.g. grok-4, gpt-5-turbo, claude-3-5-sonnet-20241022
+- output-dir → Custom output folder (default: current directory)
+- temperature → Default 0.0 (recommended for reproducibility)
 
 Prompt-Only Mode (No CLI)
-If you prefer manual use in Grok / ChatGPT / Claude:
+- If you prefer manual use in Grok / ChatGPT / Claude:
 
 Copy the entire content of POC_Architect_Prompt.md
-Paste it as the System Prompt
-Send a single URL or the contents of batch_urls.txt as the user message
+- Paste it as the System Prompt
+- Send a single URL or the contents of batch_urls.txt as the user message
 
 Example Output
-See example_usage/ for real generated reports.
-Example filename:
-POCArchitect_CVE-2024-21413-Outlook-RCE.md
+- See example_usage/ for real generated reports.
+- Example filename:
+- POCArchitect_CVE-2024-21413-Outlook-RCE.md
 
-Project Structure
-POCArchitect-AI-Agent/
-├── POC_Architect_Prompt.md          # System prompt (bundled)
-├── pocarchitect/                    # Package
-│   ├── __init__.py
-│   └── cli.py
-├── scripts/                         # Legacy wrappers (kept for reference)
-├── example_usage/                   # Generated reports
-├── pyproject.toml
-├── requirements.txt
-└── README.md
+- Project Structure
+- POCArchitect-AI-Agent/
+- ├── POC_Architect_Prompt.md          # System prompt (bundled)
+- ├── pocarchitect/                    # Package
+- │   ├── __init__.py
+- │   └── cli.py
+- ├── scripts/                         # Legacy wrappers (kept for reference)
+- ├── example_usage/                   # Generated reports
+- ├── pyproject.toml
+- ├── requirements.txt
+- └── README.md
 
 Why This Exists
 Red teamers and pentesters waste hours turning messy POCs into usable artifacts. POCArchitect does it in seconds with military-grade consistency.
