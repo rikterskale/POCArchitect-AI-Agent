@@ -43,9 +43,11 @@ A. Environment variable (recommended)
 
 export XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
 
+
 B. .env file (create .env in project root)
 
 XAI_API_KEY=xai-XXXXXXXXXXXXXXXX
+
 
 C. Pass on command line
 
