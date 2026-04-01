@@ -37,7 +37,8 @@ Every report contains build instructions, execution playbook, risk assessment, a
 - Alternative (no clone)
 - pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
 
-API Key Setup (pick one)
+### API Key Setup (pick one)
+
 A. Environment variable (recommended)
 Bashexport XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
 
