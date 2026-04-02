@@ -5,8 +5,8 @@ Companion script for https://github.com/rikterskale/POCArchitect-AI-Agent
 
 Run this after:
 1. git clone + cd POCArchitect-AI-Agent
-2. pip install -e .
-3. (Optional) Create .env with your API key
+2. pip install -e .[all]
+3. Create .env with your API key(s)
 
 It validates the FULL environment so you never hit a runtime surprise.
 """
@@ -20,7 +20,6 @@ import importlib.util
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich import print as rprint
 
 console = Console()
 
@@ -31,11 +30,20 @@ REQUIRED_DEPS = [
     "rich",
     "openai",
     "httpx",
-    "dotenv",  # python-dotenv
+    "dotenv",
+    "git",                    # ← GitPython (PoC ingestion / grounding context)
 ]
 PACKAGE_NAME = "pocarchitect"
 PROMPT_FILENAME = "POC_Architect_Prompt.md"
-ENV_KEY_NAMES = ["XAI_API_KEY", "OPENAI_API_KEY"]
+
+# All supported providers' API key names
+ENV_KEY_NAMES = [
+    "XAI_API_KEY",
+    "OPENAI_API_KEY",
+    "GROQ_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+]
 
 
 def check_python_version() -> tuple[bool, str]:
@@ -52,7 +60,7 @@ def check_dependency(dep: str) -> tuple[bool, str]:
         importlib.import_module(dep)
         return True, f"✅ {dep}"
     except ImportError:
-        return False, f"❌ {dep} — not installed (run pip install -e .)"
+        return False, f"❌ {dep} — not installed (run pip install -e .[all])"
 
 
 def check_pocarchitect_package() -> tuple[bool, str]:
@@ -61,7 +69,7 @@ def check_pocarchitect_package() -> tuple[bool, str]:
         version = getattr(pocarchitect, "__version__", "0.1.0")
         return True, f"✅ pocarchitect package (v{version})"
     except ImportError:
-        return False, "❌ pocarchitect package — run `pip install -e .`"
+        return False, "❌ pocarchitect package — run `pip install -e .[all]`"
 
 
 def check_cli_command() -> tuple[bool, str]:
@@ -76,7 +84,7 @@ def check_cli_command() -> tuple[bool, str]:
             return True, "✅ pocarchitect CLI command available"
         return False, "❌ CLI command failed"
     except (subprocess.SubprocessError, FileNotFoundError):
-        return False, "❌ `pocarchitect` not found in PATH (run `pip install -e .` and reactivate venv if needed)"
+        return False, "❌ `pocarchitect` not found in PATH (run `pip install -e .[all]`)"
 
 
 def check_prompt_file() -> tuple[bool, str]:
@@ -91,18 +99,31 @@ def check_prompt_file() -> tuple[bool, str]:
 
 
 def check_api_key() -> tuple[bool, str]:
+    found_keys = []
     for key_name in ENV_KEY_NAMES:
         if os.getenv(key_name):
-            return True, f"✅ {key_name} found in environment (or .env — now auto-loaded by CLI)"
-    
+            found_keys.append(key_name)
+
+    if found_keys:
+        return True, f"✅ API key(s) found: {', '.join(found_keys)} (auto-loaded by CLI)"
+
+    # Check .env file for any key
     env_file = Path.cwd() / ".env"
     if env_file.exists():
         content = env_file.read_text(encoding="utf-8", errors="ignore")
         for key_name in ENV_KEY_NAMES:
             if any(line.strip().startswith(f"{key_name}=") for line in content.splitlines()):
                 return True, f"✅ {key_name} found in .env (will be auto-loaded)"
-    
-    return False, f"❌ No API key — set {ENV_KEY_NAMES[0]} in .env or pass --api-key"
+
+    return False, f"❌ No API key found — add any of {ENV_KEY_NAMES} to .env or use --api-key"
+
+
+def check_gitpython() -> tuple[bool, str]:
+    try:
+        import git
+        return True, "✅ GitPython (PoC ingestion / grounding context ready)"
+    except ImportError:
+        return False, "❌ GitPython — run `pip install -e .[all]`"
 
 
 def check_output_directory_writable() -> tuple[bool, str]:
@@ -127,6 +148,7 @@ def main():
     checks = [
         ("Python Version", check_python_version),
         ("Dependencies", lambda: (all(check_dependency(d)[0] for d in REQUIRED_DEPS), "See table below")),
+        ("GitPython", check_gitpython),
         ("Package", check_pocarchitect_package),
         ("CLI Command", check_cli_command),
         ("System Prompt", check_prompt_file),
@@ -151,7 +173,8 @@ def main():
     if all_passed:
         console.print(Panel.fit(
             "[bold green]✅ Environment is PERFECTLY ready![/]\n"
-            "You can now run:\n"
+            "Python-side PoC ingestion + grounding context is enabled by default.\n"
+            "Run:\n"
             "  pocarchitect --url https://github.com/... --provider xai",
             border_style="green"
         ))
