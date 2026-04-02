@@ -1,4 +1,4 @@
-# POCArchitect Report: Example Bogus Python POC Analysis
+# POCArchitect Report: Extremely Dangerous Python POC Analysis
 
 **Source:** https://www.github.com/(not real/(not realer)  
 **Date Analyzed:** 2026-04-02  
