@@ -120,6 +120,7 @@ docker run --rm \
   --env-file .env \
   -v $(pwd)/reports:/app/reports \
   pocarchitect --url https://github.com/user/exploit-repo
+
 - **New:** If you have a `.env` file on the host, you can pass it with:
 ```bash
 docker run --rm \
