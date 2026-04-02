@@ -38,7 +38,7 @@ pip install -e .
 pip install -r requirements.txt
 pip install -e .
 
-2. Verify
+# 2. Verify
 pocarchitect --help
 
 Alternative (no clone)
