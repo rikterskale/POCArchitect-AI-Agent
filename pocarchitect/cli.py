@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
-import git  # GitPython for shallow clone
+import git
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
@@ -38,14 +38,11 @@ def build_grounding_context(poc_url: str) -> str:
     context = ["=== GROUNDING CONTEXT (auto-fetched by POCArchitect CLI) ==="]
     context.append(f"PoC URL: {poc_url}\n")
 
-    # Non-GitHub URLs get a simple note
     if not poc_url.startswith("https://github.com/"):
         context.append("NOTE: Non-GitHub URL. No automatic cloning performed.")
-        context.append("The LLM will rely on its own browsing tools for this PoC.")
         return "\n".join(context)
 
     try:
-        # Parse owner/repo
         parts = poc_url.rstrip("/").split("/")
         if len(parts) < 5 or "github.com" not in parts[2]:
             context.append("ERROR: Could not parse GitHub repo URL.")
@@ -57,23 +54,15 @@ def build_grounding_context(poc_url: str) -> str:
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo_path = Path(tmp_dir) / "poc"
             console.print(f"[dim]Cloning {repo_name} (shallow)...[/dim]", end=" ")
-            git.Repo.clone_from(
-                clone_url,
-                repo_path,
-                depth=1,
-                single_branch=True,
-                no_checkout=False,
-            )
+            git.Repo.clone_from(clone_url, repo_path, depth=1, single_branch=True)
             console.print("[green]done[/]")
 
-            # Build tree
             context.append(f"Repository: {repo_name}")
             context.append("File tree:")
             files_found = []
             critical_files = []
 
             for root, dirs, files in os.walk(repo_path):
-                # Skip .git
                 if ".git" in dirs:
                     dirs.remove(".git")
                 rel_root = Path(root).relative_to(repo_path)
@@ -82,35 +71,26 @@ def build_grounding_context(poc_url: str) -> str:
                     full_path = Path(root) / file
                     files_found.append(str(file_path))
 
-                    # Critical files only (limit to ~12 files total)
-                    if (
-                        file_path.name in {"README.md", "README", "Dockerfile"}
-                        or file_path.suffix in {".py", ".js", ".go", ".c", ".cpp", ".sh", ".md", ".txt"}
-                        or "exploit" in file_path.name.lower()
-                        or "poc" in file_path.name.lower()
-                        or "payload" in file_path.name.lower()
-                    ) and full_path.stat().st_size < 150_000:  # skip huge files
+                    if (file_path.name in {"README.md", "Dockerfile"} or
+                        file_path.suffix in {".py", ".js", ".go", ".c", ".cpp", ".sh", ".md", ".txt"} or
+                        any(x in file_path.name.lower() for x in ["exploit", "poc", "payload"])) and full_path.stat().st_size < 150_000:
+
                         try:
                             content = full_path.read_text(encoding="utf-8", errors="ignore")
-                            # Truncate to ~8k chars per file
                             if len(content) > 8000:
-                                content = content[:8000] + "\n... [truncated for token budget]"
+                                content = content[:8000] + "\n... [truncated]"
                             critical_files.append((str(file_path), content))
                         except Exception:
                             pass
 
-            context.append("\n".join(f"├── {f}" for f in files_found[:30]))  # max 30 in tree
-
-            # Add critical file contents
+            context.append("\n".join(f"├── {f}" for f in files_found[:30]))
             context.append("\nCRITICAL FILES CONTENT:")
-            for filepath, content in critical_files[:12]:  # max 12 files
-                ext = Path(filepath).suffix
-                lang = ext[1:] if ext else "text"
+            for filepath, content in critical_files[:12]:
+                lang = Path(filepath).suffix[1:] if Path(filepath).suffix else "text"
                 context.append(f"\nFile: {filepath}")
                 context.append(f"```{lang}")
                 context.append(content.strip())
                 context.append("```")
-
             context.append("\nEnd of grounding context.")
             return "\n".join(context)
 
@@ -119,10 +99,62 @@ def build_grounding_context(poc_url: str) -> str:
         return "\n".join(context)
 
 
-def get_llm_response(...):  # (unchanged from previous version — kept exactly as you had it)
-    # ... [the entire get_llm_response function you already have from the provider expansion]
-    # (I kept it identical so you can just copy-paste the whole file)
-    pass  # ← placeholder; use the exact function from your last cli.py
+def get_llm_response(
+    provider: str,
+    api_key: Optional[str],
+    model: str,
+    temperature: float,
+    base_url: Optional[str],
+    system_prompt: str,
+    user_message: str,
+) -> str:
+    """Unified LLM call – now supports local servers."""
+    p = provider.lower()
+
+    if p == "local":
+        # Local servers usually don't need a real key
+        client = OpenAI(api_key=api_key or "ollama", base_url=base_url)
+        response = client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+        return response.choices[0].message.content.strip()
+
+    # Existing providers (xai, openai, groq, anthropic, gemini) – unchanged
+    elif p in ["xai", "openai", "groq"]:
+        base = None
+        if p == "xai":
+            base = "https://api.x.ai/v1"
+        elif p == "groq":
+            base = "https://api.groq.com/openai/v1"
+        client = OpenAI(api_key=api_key, base_url=base)
+        response = client.chat.completions.create(
+            model=model, temperature=temperature,
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
+        )
+        return response.choices[0].message.content.strip()
+
+    elif p == "anthropic":
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(model=model, temperature=temperature, max_tokens=8192,
+                                          system=system_prompt, messages=[{"role": "user", "content": user_message}])
+        return response.content[0].text.strip()
+
+    elif p == "gemini":
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model_obj = genai.GenerativeModel(model_name=model, system_instruction=system_prompt)
+        response = model_obj.generate_content(user_message)
+        return response.text.strip()
+
+    else:
+        console.print(f"[bold red]Error: Unsupported provider: {provider}[/]", style="bold red")
+        raise typer.Exit(1)
 
 
 @app.callback(invoke_without_command=True)
@@ -130,45 +162,57 @@ def main(
     ctx: typer.Context,
     url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch file"),
 
-    provider: str = typer.Option("xai", "--provider", "-p", help="LLM provider: xai, openai, groq, anthropic, gemini", case_sensitive=False),
+    provider: str = typer.Option("xai", "--provider", "-p",
+                                 help="LLM provider: xai, openai, groq, anthropic, gemini, local"),
     api_key: Optional[str] = typer.Option(None, "--api-key", "-k", help="API key (auto-loaded from .env)"),
+    base_url: Optional[str] = typer.Option(None, "--base-url", help="Base URL for local OpenAI-compatible server (required for --provider local)"),
     model: str = typer.Option("grok-4", "--model", "-m", help="Model name to use"),
     output_dir: Path = typer.Option(Path.cwd() / "reports", "--output-dir", "-o", help="Output directory"),
     temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended)"),
 
-    # Operator flags (unchanged)
     risk_level: str = typer.Option("auto", "--risk-level", help="Force risk level", choices=["Critical","High","Medium","Low","auto"]),
     target_os: str = typer.Option("auto", "--target-os", help="Target OS", choices=["Windows","Linux","macOS","cross-platform","auto"]),
     include_mitigations: bool = typer.Option(True, "--include-mitigations", "--mitigations"),
     no_mitigations: bool = typer.Option(False, "--no-mitigations"),
     target_version: Optional[str] = typer.Option(None, "--target-version"),
 
-    # New flag for this feature
-    no_ingest: bool = typer.Option(False, "--no-ingest", help="Disable Python-side PoC ingestion / grounding context"),
-
+    no_ingest: bool = typer.Option(False, "--no-ingest", help="Disable Python-side PoC ingestion"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     version: bool = typer.Option(False, "--version"),
 ):
     """Generate full offensive security blueprints from PoC URLs."""
 
-    if api_key is None:
-        # ... (exact same provider-specific env var logic as before)
-        pass  # ← keep your existing api_key resolution code here
+    # Resolve API key
+    if api_key is None and provider.lower() != "local":
+        p = provider.lower()
+        key_map = {
+            "anthropic": "ANTHROPIC_API_KEY",
+            "gemini": "GEMINI_API_KEY",
+            "groq": "GROQ_API_KEY",
+        }
+        api_key = os.getenv(key_map.get(p, f"{p.upper()}_API_KEY")) or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            console.print(f"[bold red]No API key for {provider}. Set in .env or use --api-key[/]", style="bold red")
+            raise typer.Exit(1)
 
     if no_mitigations:
         include_mitigations = False
 
     if version:
-        # ... (unchanged)
-        pass
+        try:
+            from pocarchitect import __version__
+            console.print(f"[bold cyan]POCArchitect[/bold cyan] v{__version__}")
+        except ImportError:
+            console.print("[bold cyan]POCArchitect[/bold cyan] (version unknown)")
+        raise typer.Exit()
 
     console.print(Panel.fit("[bold green]POCArchitect AI Agent[/] — Forging blueprints of digital domination", border_style="green"))
 
     prompt = load_prompt()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Batch handling (unchanged)
+    # Batch handling
     urls: list[str] = []
     input_path = Path(url)
     if input_path.exists() and input_path.suffix in (".txt", ""):
@@ -179,21 +223,15 @@ def main(
         urls = [url]
 
     if dry_run:
-        # ... (unchanged, just shows prompt)
-        pass
+        console.print("[bold yellow]DRY-RUN MODE ENABLED[/]")
+        raise typer.Exit()
 
-    # ==================== NORMAL MODE ====================
     with Progress(SpinnerColumn(), TextColumn("[bold cyan]{task.description}"), console=console) as progress:
         task = progress.add_task("Processing PoCs...", total=len(urls))
-
         for i, poc_url in enumerate(urls, 1):
             progress.update(task, description=f"Processing {i}/{len(urls)} → [yellow]{poc_url[:70]}...[/]")
 
-            # === NEW: Build grounding context ===
-            if no_ingest:
-                grounding = "NOTE: --no-ingest flag used. No automatic file grounding."
-            else:
-                grounding = build_grounding_context(poc_url)
+            grounding = "NOTE: --no-ingest used." if no_ingest else build_grounding_context(poc_url)
 
             user_message = f"""Analyze this Proof-of-Concept and generate the COMPLETE offensive security blueprint.
 
@@ -217,6 +255,7 @@ Output ONLY the Markdown blueprint (no extra text)."""
                     api_key=api_key,
                     model=model,
                     temperature=temperature,
+                    base_url=base_url,
                     system_prompt=prompt,
                     user_message=user_message,
                 )
@@ -224,7 +263,6 @@ Output ONLY the Markdown blueprint (no extra text)."""
                 safe_name = poc_url.split("/")[-1].replace(".git", "").replace("/", "_")[:100]
                 output_path = output_dir / f"POC_Blueprint_{safe_name}.md"
                 output_path.write_text(blueprint, encoding="utf-8")
-
                 rprint(f"[bold green]Saved:[/] [cyan]{output_path.name}[/]")
 
             except Exception as e:
