@@ -1,11 +1,15 @@
 # Core dependencies for POCArchitect
-typer>=0.15.0
-requests>=2.32.0
+typer[all]>=0.12.5
+rich>=13.7.0
+openai>=1.35.0
+httpx>=0.27.0
 python-dotenv>=1.0.0
-rich>=13.0.0
+
+# Optional: full provider support (anthropic + gemini)
+# Install with: pip install -e .[all]
+anthropic>=0.30.0
+google-generativeai>=0.8.0
+
+# Development / testing
 pytest
 pytest-mock
-# Add any other deps from your pyproject.toml here
-
-# For development / editable install
-# pip install -e .
