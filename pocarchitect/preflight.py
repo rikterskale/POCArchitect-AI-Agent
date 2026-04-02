@@ -145,7 +145,7 @@ def main():
             passed_count += 1
         table.add_row(name, msg)
 
-    # Individual dependency checks (much clearer than before)
+    # Individual dependency checks
     for dep in REQUIRED_DEPS:
         passed, msg = check_dependency(dep)
         if passed:
@@ -154,7 +154,7 @@ def main():
 
     console.print(table)
 
-    # === Final Summary Table (the tiny polish you asked for) ===
+    # Final Summary Table
     summary = Table(title="Summary", show_header=False)
     summary.add_column("Item", style="bold")
     summary.add_column("Count")
