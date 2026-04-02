@@ -44,7 +44,7 @@ def get_client(provider: str, api_key: str):
 
 @app.callback(invoke_without_command=True)
 def main(
-    ctx: typer.Context,   # ← Added for better control
+    ctx: typer.Context,
     url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch_urls.txt"),
     provider: str = typer.Option("xai", "--provider", "-p", help="LLM provider: xai or openai"),
     api_key: str = typer.Option(
@@ -71,8 +71,8 @@ def main(
             console.print("[bold cyan]POCArchitect[/bold cyan] (version unknown)")
         raise typer.Exit()
 
-    # If no URL was provided and no subcommand, show help (safety net)
-    if ctx.invoked_subcommand is None and not url:
+    # Safety: if user ran "pocarchitect" with no arguments at all, show help
+    if ctx.invoked_subcommand is None and not ctx.args and not ctx.params.get("url"):
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
@@ -122,7 +122,6 @@ Follow the exact 7-phase pipeline in the system prompt. Output ONLY the Markdown
                 )
                 blueprint = response.choices[0].message.content.strip()
 
-                # Generate safe filename
                 safe_name = poc_url.split("/")[-1].replace(".git", "").replace("/", "_")[:100]
                 output_path = output_dir / f"POC_Blueprint_{safe_name}.md"
 
