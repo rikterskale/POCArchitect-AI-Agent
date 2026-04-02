@@ -11,8 +11,9 @@ from typing import Optional
 
 app = typer.Typer(
     name="pocarchitect",
-    help="🔥 POCArchitect — Turn any PoC URL into a battle-ready offensive security blueprint",
+    help="POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.",
     add_completion=False,
+    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
