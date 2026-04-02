@@ -46,7 +46,7 @@ pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
 
 # API Key Setup (pick one)
 A. Environment variable (recommended)
-**Recommended:**
+****POCArchitect now auto-loads `.env`** from the project root.:**
 1. Copy the template:
    cp .env.example .env
    Add keys as required
