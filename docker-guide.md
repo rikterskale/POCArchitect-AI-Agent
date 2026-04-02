@@ -36,7 +36,7 @@ docker run --rm \
 
 ### Batch Mode
 
-```bash
+```
 docker run --rm \
   -e GROK_API_KEY=your_grok_api_key_here \
   -v $(pwd)/reports:/app/reports \
@@ -48,7 +48,7 @@ docker run --rm \
 
 ### Full Batch Example
 
-```bash
+```
 docker run --rm \
   -e GROK_API_KEY=your_grok_api_key_here \
   -v $(pwd)/reports:/app/reports \
@@ -61,7 +61,7 @@ docker run --rm \
 
 ### Using OpenAI instead of xAI
 
-```bash
+```
 docker run --rm \
   -e OPENAI_API_KEY=sk-your_openai_key \
   -v $(pwd)/reports:/app/reports \
@@ -73,7 +73,7 @@ docker run --rm \
 
 ### Running with Verbose Output
 
-```bash
+```
 docker run --rm \
   -e GROK_API_KEY=your_key \
   -v $(pwd)/reports:/app/reports \
@@ -84,7 +84,7 @@ docker run --rm \
 
 ### Using a Different Output Directory
 
-```bash
+```
 docker run --rm \
   -e GROK_API_KEY=your_key \
   -v $(pwd)/my_custom_reports:/app/reports \
@@ -115,7 +115,7 @@ docker run --rm \
   No extra configuration needed. The grounding context feature works exactly the same as when running locally.
 
 Example:
-```bash
+```
 docker run --rm \
   --env-file .env \
   -v $(pwd)/reports:/app/reports \
@@ -140,7 +140,7 @@ alias pocarch='docker run --rm \
 
 Then use simply:
 
-```bash
+```
 pocarch --url https://github.com/user/repo
 ```
 
