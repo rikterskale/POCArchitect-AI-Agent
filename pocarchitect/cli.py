@@ -7,7 +7,6 @@ from rich import print as rprint
 from openai import OpenAI
 from pathlib import Path
 
-# Create the Typer app
 app = typer.Typer(
     name="pocarchitect",
     help="POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.",
@@ -29,12 +28,9 @@ def load_prompt() -> str:
 
 
 def get_client(provider: str, api_key: str):
-    """Create OpenAI-compatible client for xAI or OpenAI."""
+    """Create OpenAI-compatible client."""
     if provider.lower() == "xai":
-        return OpenAI(
-            api_key=api_key,
-            base_url="https://api.x.ai/v1",
-        )
+        return OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
     elif provider.lower() == "openai":
         return OpenAI(api_key=api_key)
     else:
@@ -58,7 +54,7 @@ def main(
     output_dir: Path = typer.Option(
         Path.cwd() / "reports", "--output-dir", "-o", help="Output directory"
     ),
-    temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended for consistency)"),
+    temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended)"),
     version: bool = typer.Option(False, "--version", "-v", help="Show version and exit"),
 ):
     """Generate full offensive security blueprints from PoC URLs."""
@@ -71,8 +67,8 @@ def main(
             console.print("[bold cyan]POCArchitect[/bold cyan] (version unknown)")
         raise typer.Exit()
 
-    # Safety: if user ran "pocarchitect" with no arguments at all, show help
-    if ctx.invoked_subcommand is None and not ctx.args and not ctx.params.get("url"):
+    # Show help if user typed just "pocarchitect" with no arguments
+    if not ctx.args and url == typer.Option(..., "--url", "-u").default:
         typer.echo(ctx.get_help())
         raise typer.Exit()
 
@@ -87,7 +83,7 @@ def main(
     client = get_client(provider, api_key)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Handle batch vs single
+    # Batch or single mode
     urls: list[str] = []
     input_path = Path(url)
     if input_path.exists() and (input_path.suffix in (".txt", "") or input_path.is_dir()):
