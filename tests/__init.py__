@@ -1,0 +1,9 @@
+"""
+POCArchitect-AI-Agent Test Package.
+
+This empty __init__.py file makes the 'tests' directory a proper Python package,
+allowing pytest to discover and run the test modules correctly.
+"""
+
+# This file is intentionally left mostly empty.
+# It only contains this docstring for clarity.
