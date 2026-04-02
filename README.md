@@ -40,12 +40,12 @@ pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
 
 API Key Setup (pick one)
 A. Environment variable (recommended)
-export XAI_API_KEY="xai-XXXXXXXXXXXXXXXX"
+**Recommended:**
+1. Copy the template:
+   cp .env.example .env
+   Add keys as required
 
-B. .env file (create .env in project root)
-XAI_API_KEY=xai-XXXXXXXXXXXXXXXX
-
-C. Pass on command line
+B. Pass on command line
 --api-key xai-XXXXXXXXXXXXXXXX
 
 Usage Examples
