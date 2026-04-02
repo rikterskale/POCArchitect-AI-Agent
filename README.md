@@ -30,6 +30,12 @@ Every report contains build instructions, execution playbook, risk assessment, a
 ```bash
 git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 cd POCArchitect-AI-Agent
+
+# Option 1: Modern (recommended)
+pip install -e .
+
+# Option 2: Using requirements.txt
+pip install -r requirements.txt
 pip install -e .
 
 2. Verify
