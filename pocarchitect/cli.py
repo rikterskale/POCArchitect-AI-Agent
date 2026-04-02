@@ -5,16 +5,14 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 from rich import print as rprint
 from openai import OpenAI
-import os
 from pathlib import Path
-from typing import Optional
 
 # Create the Typer app
 app = typer.Typer(
     name="pocarchitect",
     help="POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.",
     add_completion=False,
-    no_args_is_help=True,      # Shows help when user runs "pocarchitect" with no args
+    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
@@ -44,13 +42,25 @@ def get_client(provider: str, api_key: str):
         raise typer.Exit(1)
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
-    version: bool = typer.Option(
-        False, "--version", "-v", help="Show version and exit"
+    url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch_urls.txt"),
+    provider: str = typer.Option("xai", "--provider", "-p", help="LLM provider: xai or openai"),
+    api_key: str = typer.Option(
+        ...,
+        "--api-key",
+        "-k",
+        help="API key (or set XAI_API_KEY / OPENAI_API_KEY in .env)",
+        envvar=["XAI_API_KEY", "OPENAI_API_KEY"],
     ),
+    model: str = typer.Option("grok-4", "--model", "-m", help="Model name to use"),
+    output_dir: Path = typer.Option(
+        Path.cwd() / "reports", "--output-dir", "-o", help="Output directory"
+    ),
+    temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended for consistency)"),
+    version: bool = typer.Option(False, "--version", "-v", help="Show version and exit"),
 ):
-    """POCArchitect CLI"""
+    """Generate full offensive security blueprints from PoC URLs."""
     if version:
         try:
             from pocarchitect import __version__
@@ -59,25 +69,6 @@ def main(
             console.print("[bold cyan]POCArchitect[/bold cyan] (version unknown)")
         raise typer.Exit()
 
-
-@app.command()
-def run(
-    url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch_urls.txt"),
-    provider: str = typer.Option("xai", "--provider", "-p", help="LLM provider: xai or openai"),
-    api_key: str = typer.Option(
-        ..., 
-        "--api-key", 
-        "-k", 
-        help="API key (or set XAI_API_KEY / OPENAI_API_KEY in .env)",
-        envvar=["XAI_API_KEY", "OPENAI_API_KEY"]
-    ),
-    model: str = typer.Option("grok-4", "--model", "-m", help="Model name to use"),
-    output_dir: Path = typer.Option(
-        Path.cwd() / "reports", "--output-dir", "-o", help="Output directory"
-    ),
-    temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended for consistency)"),
-):
-    """Generate full offensive security blueprints from PoC URLs."""
     console.print(
         Panel.fit(
             "[bold green]🚀 POCArchitect AI Agent[/] — Forging blueprints of digital domination",
@@ -122,7 +113,6 @@ Follow the exact 7-phase pipeline in the system prompt. Output ONLY the Markdown
                         {"role": "user", "content": user_message},
                     ],
                 )
-
                 blueprint = response.choices[0].message.content.strip()
 
                 # Generate safe filename
