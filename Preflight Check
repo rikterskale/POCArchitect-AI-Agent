@@ -1,0 +1,138 @@
+#!/bin/bash
+# =============================================================================
+# POCArchitect Preflight Check Script
+# Run this after cloning the repo (or installing the package) to verify
+# your environment is ready to run `pocarchitect`.
+#
+# Usage:
+#   1. Save this as `preflight.sh` in the repo root (or anywhere)
+#   2. chmod +x preflight.sh
+#   3. ./preflight.sh
+# =============================================================================
+
+set -euo pipefail
+
+# Colors for nice output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=== POCArchitect Preflight Environment Check ===${NC}"
+echo "Repository: https://github.com/rikterskale/POCArchitect-AI-Agent"
+echo
+
+# 1. Python version check (>= 3.9)
+echo -n "1. Checking Python version... "
+if command -v python3 >/dev/null 2>&1; then
+    PY_VERSION=$(python3 --version | cut -d' ' -f2)
+    PY_MAJOR=$(echo "$PY_VERSION" | cut -d'.' -f1)
+    PY_MINOR=$(echo "$PY_VERSION" | cut -d'.' -f2)
+    
+    if [ "$PY_MAJOR" -gt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -ge 9 ]; }; then
+        echo -e "${GREEN}OK${NC} (Python $PY_VERSION)"
+    else
+        echo -e "${RED}FAIL${NC}"
+        echo -e "   ${RED}Error:${NC} Python 3.9+ is required. You have $PY_VERSION"
+        exit 1
+    fi
+else
+    echo -e "${RED}FAIL${NC}"
+    echo -e "   ${RED}Error:${NC} python3 command not found. Please install Python 3.9+"
+    exit 1
+fi
+
+# 2. Check if the package is installed and CLI is available
+echo -n "2. Checking pocarchitect CLI... "
+if command -v pocarchitect >/dev/null 2>&1; then
+    echo -e "${GREEN}OK${NC}"
+    echo "   CLI found: $(command -v pocarchitect)"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo -e "   ${RED}Error:${NC} 'pocarchitect' command not found in PATH."
+    echo "   Run one of the following:"
+    echo "     pip install -e .          (recommended, from repo root)"
+    echo "     pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git"
+    exit 1
+fi
+
+# 3. Verify CLI actually works (quick --help test)
+echo -n "3. Testing pocarchitect --help... "
+if pocarchitect --help >/dev/null 2>&1; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo -e "   ${RED}Error:${NC} CLI runs but --help failed. Reinstall with: pip install -e . --force-reinstall"
+    exit 1
+fi
+
+# 4. Check API key configuration
+echo -n "4. Checking API key (XAI_API_KEY)... "
+# Try to source .env if it exists (many people forget to source it)
+if [ -f ".env" ]; then
+    # shellcheck disable=SC1091
+    set +u; source .env; set -u
+    echo -e "${YELLOW}(loaded .env)${NC} "
+else
+    echo -n ""
+fi
+
+if [[ -n "${XAI_API_KEY:-}" ]]; then
+    # Basic sanity check (starts with xai- or sk- for OpenAI compat)
+    if [[ "$XAI_API_KEY" == xai-* ]] || [[ "$XAI_API_KEY" == sk-* ]]; then
+        echo -e "${GREEN}OK${NC} (key detected)"
+    else
+        echo -e "${YELLOW}WARNING${NC} (key present but doesn't look like xAI/OpenAI key)"
+    fi
+else
+    echo -e "${RED}MISSING${NC}"
+    echo -e "   ${YELLOW}Tip:${NC} Add your key using one of these methods:"
+    echo "      export XAI_API_KEY=\"xai-XXXXXXXXXXXXXXXX\""
+    echo "      # or create .env in this directory:"
+    echo "      echo \"XAI_API_KEY=xai-XXXXXXXXXXXXXXXX\" > .env"
+    echo "      # or pass it at runtime: pocarchitect --api-key ..."
+    echo "   (The tool also supports any OpenAI-compatible provider via --provider)"
+fi
+
+# 5. Optional: Quick dependency sanity check (imports)
+echo -n "5. Checking core dependencies... "
+if python3 -c '
+import typer
+import rich
+import openai
+import httpx
+import dotenv
+print("All core packages imported successfully")
+' 2>/dev/null; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo -e "   ${RED}Error:${NC} One or more dependencies failed to import."
+    echo "   Fix with: pip install -e . --force-reinstall"
+    exit 1
+fi
+
+# 6. Check write permissions for output directory
+echo -n "6. Checking write access for ./reports/... "
+mkdir -p reports 2>/dev/null || true
+if [ -w "." ] && [ -w "reports" ] 2>/dev/null; then
+    echo -e "${GREEN}OK${NC}"
+else
+    echo -e "${RED}FAIL${NC}"
+    echo -e "   ${RED}Error:${NC} Cannot write to current directory or ./reports/"
+    echo "   Make sure you have write permissions in this folder."
+fi
+
+echo
+echo -e "${GREEN}✅ Preflight checks completed successfully!${NC}"
+echo
+echo "You are ready to use POCArchitect."
+echo
+echo "Quick test command:"
+echo "   pocarchitect --help"
+echo
+echo "Example single PoC:"
+echo "   pocarchitect --url https://github.com/some/exploit --provider xai --model grok-4"
+echo
+echo -e "${BLUE}Happy hunting! 🔥${NC}"
