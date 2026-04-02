@@ -5,7 +5,6 @@ Shared pytest fixtures for POCArchitect-AI-Agent tests.
 import pytest
 from unittest.mock import MagicMock
 
-
 @pytest.fixture
 def mock_llm_response():
     """Return a realistic mock LLM response with all required report sections."""
@@ -24,7 +23,7 @@ def mock_llm_response():
         "\n"
         "## Build Instructions\n"
         "1. Clone the repository:\n"
-        "   ```bash\n"
+        "   ```bash
         "   git clone https://github.com/example/poc-repo.git\n"
         "   cd poc-repo\n"
         "   ```\n"
