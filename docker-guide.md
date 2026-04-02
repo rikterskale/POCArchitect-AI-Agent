@@ -110,6 +110,7 @@ docker run --rm \
 - For frequent use, consider creating an alias or a shell script.
 - If you frequently use the same API key, you can add it to a `.env` file and use `docker run --env-file .env ...`
 - Python-side PoC Ingestion (NEW)***
+
   GitPython is now included in the dependencies, so shallow clones (`git clone --depth 1`) work automatically inside Docker.
   No extra configuration needed. The grounding context feature works exactly the same as when running locally.
 
