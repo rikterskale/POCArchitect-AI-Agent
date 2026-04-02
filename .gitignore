@@ -4,3 +4,4 @@ __pycache__/
 *.pyd
 .DS_Store
 POCArchitect_Reports_*/
+.env
