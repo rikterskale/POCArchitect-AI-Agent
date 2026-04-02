@@ -1,4 +1,4 @@
-# POCArchitect_Prompt2-FINAL.txt
+# POCArchitect Prompt
 
 > **Target:** SuperGrok (xAI) — also compatible with GPT-5.x, Claude, Gemini, and any OpenAI-compatible API.  
 > **Version:** POCArchitect v2.0 — 2026-04-01  
