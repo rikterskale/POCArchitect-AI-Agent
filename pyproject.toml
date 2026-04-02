@@ -13,9 +13,16 @@ keywords = ["red-team", "pentesting", "poc", "exploit-development", "ai-agent", 
 dependencies = [
     "typer[all]>=0.12.5",
     "rich>=13.7.0",
-    "openai>=1.35.0",           # xAI + OpenAI compatible
+    "openai>=1.35.0",           # xAI + OpenAI + Groq compatible
     "httpx>=0.27.0",
-    "python-dotenv>=1.0.0",     # for .env API key support (optional but nice)
+    "python-dotenv>=1.0.0",     # for .env API key support
+]
+
+# NEW: Optional dependencies for full provider support
+[project.optional-dependencies]
+all = [
+    "anthropic>=0.30.0",        # --provider anthropic (Claude)
+    "google-generativeai>=0.8.0", # --provider gemini
 ]
 
 [project.scripts]
