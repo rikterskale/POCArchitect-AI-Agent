@@ -19,7 +19,6 @@ The core philosophy is **zero hallucination**: instead of letting the LLM guess 
 ## High-Level Flow
 
 ```
-flowchart TD
     A[User Input: URL or batch file] --> B[Preflight Checker]
     B --> C[Fetch PoC Content]
     C --> D[Extract Source Code & Artifacts]
