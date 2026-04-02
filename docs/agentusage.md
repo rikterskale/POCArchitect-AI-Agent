@@ -55,8 +55,7 @@ pocarchitect [OPTIONS]
 ### 1. Basic Single URL
 
 ```bash
-pocarchitect --url https://github.com/example/poc-repo \
-  --api-key xai-your_key_here
+pocarchitect --url https://github.com/user/exploit-repo
 ```
 
 ### 2. With Operator Controls
@@ -88,9 +87,7 @@ pocarchitect --url https://github.com/example/poc-repo \
 ### 5. Batch Processing
 
 ```bash
-pocarchitect --url batch_urls.txt \
-  --api-key xai-your_key_here \
-  --verbose
+pocarchitect --url example_usage/batch_urls.txt
 ```
 
 ### 6. Verbose + Custom Output Directory
@@ -133,6 +130,9 @@ Use `--dry-run` to inspect the exact prompt that will be sent to the LLM without
 - Debugging prompt quality
 - Tuning operator flags
 - Verifying zero-hallucination behavior
+
+## Full Options
+- pocarchitect --help
 
 ## Tips
 
