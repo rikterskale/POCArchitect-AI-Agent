@@ -41,10 +41,10 @@ pip install -e .
 # Verify
 pocarchitect --help
 
-Alternative (no clone)
+# Alternative (no clone)
 pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
 
-API Key Setup (pick one)
+# API Key Setup (pick one)
 A. Environment variable (recommended)
 **Recommended:**
 1. Copy the template:
@@ -54,22 +54,22 @@ A. Environment variable (recommended)
 B. Pass on command line
 --api-key xai-XXXXXXXXXXXXXXXX
 
-Usage Examples
+# Usage Examples
 Single PoC
 pocarchitect \
   --url https://github.com/some/exploit \
   --provider xai \
   --model grok-4
 
-Batch mode
+# Batch mode
 pocarchitect \
   --url example_usage/batch_urls.txt \
   --provider xai
 
-Full help
+# Full help
 pocarchitect --help
 
-All generated reports are saved to ./reports/ (or your chosen --output-dir).
+# All generated reports are saved to ./reports/ (or your chosen --output-dir).
 ```
 
 ### Prompt-only mode (no CLI)
