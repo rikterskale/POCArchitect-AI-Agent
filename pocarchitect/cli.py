@@ -7,6 +7,10 @@ from rich import print as rprint
 from openai import OpenAI
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv  # ← NEW: auto-load .env
+
+# Load .env automatically (before Typer even parses arguments)
+load_dotenv(override=False)  # Never override existing shell environment variables
 
 app = typer.Typer(
     name="pocarchitect",
@@ -23,7 +27,7 @@ def load_prompt() -> str:
     """Load the system prompt from the project root."""
     prompt_path = Path(__file__).parent.parent / "POC_Architect_Prompt.md"
     if not prompt_path.exists():
-        console.print("[bold red]❌ POC_Architect_Prompt.md not found![/]", style="bold red")
+        console.print("[bold red]POC_Architect_Prompt.md not found![/]", style="bold red")
         raise typer.Exit(1)
     return prompt_path.read_text(encoding="utf-8")
 
@@ -35,7 +39,7 @@ def get_client(provider: str, api_key: str):
     elif provider.lower() == "openai":
         return OpenAI(api_key=api_key)
     else:
-        console.print(f"[bold red]❌ Unsupported provider: {provider}[/]", style="bold red")
+        console.print(f"[bold red]Unsupported provider: {provider}[/]", style="bold red")
         raise typer.Exit(1)
 
 
@@ -50,7 +54,7 @@ def main(
         ...,
         "--api-key",
         "-k",
-        help="API key (or set XAI_API_KEY / OPENAI_API_KEY in .env)",
+        help="API key (automatically loaded from .env if XAI_API_KEY or OPENAI_API_KEY exists)",
         envvar=["XAI_API_KEY", "OPENAI_API_KEY"],
     ),
     model: str = typer.Option("grok-4", "--model", "-m", help="Model name to use"),
@@ -115,7 +119,7 @@ def main(
 
     console.print(
         Panel.fit(
-            "[bold green]🚀 POCArchitect AI Agent[/] — Forging blueprints of digital domination",
+            "[bold green]POCArchitect AI Agent[/] — Forging blueprints of digital domination",
             border_style="green"
         )
     )
@@ -137,13 +141,13 @@ def main(
     if input_path.exists() and (input_path.suffix in (".txt", "") or input_path.is_dir()):
         content = input_path.read_text(encoding="utf-8")
         urls = [line.strip() for line in content.splitlines() if line.strip() and not line.strip().startswith("#")]
-        console.print(f"[cyan]📦 Batch mode — {len(urls)} URLs loaded[/]")
+        console.print(f"[cyan]Batch mode — {len(urls)} URLs loaded[/]")
     else:
         urls = [url]
 
     # ==================== DRY-RUN MODE ====================
     if dry_run:
-        console.print("[bold yellow]🔍 DRY-RUN MODE ENABLED[/]")
+        console.print("[bold yellow]DRY-RUN MODE ENABLED[/]")
         for i, poc_url in enumerate(urls, 1):
             console.print(f"\n[bold cyan]--- Dry Run {i}/{len(urls)} ---[/]")
             console.print(f"URL: {poc_url}")
@@ -167,7 +171,7 @@ Output ONLY the Markdown blueprint (no extra text)."""
                 border_style="yellow"
             ))
         
-        console.print("[bold green]✅ Dry run completed. No LLM calls were made.[/]")
+        console.print("[bold green]Dry run completed. No LLM calls were made.[/]")
         raise typer.Exit()
 
     # ==================== NORMAL MODE ====================
@@ -212,14 +216,18 @@ Output ONLY the Markdown blueprint (no extra text)."""
                 output_path = output_dir / f"POC_Blueprint_{safe_name}.md"
                 output_path.write_text(blueprint, encoding="utf-8")
 
-                rprint(f"[bold green]✅ Saved:[/] [cyan]{output_path.name}[/]")
+                rprint(f"[bold green]Saved:[/] [cyan]{output_path.name}[/]")
+
             except Exception as e:
-                console.print(f"[bold red]❌ Failed {poc_url}:[/] {e}")
+                console.print(f"[bold red]Error processing {poc_url}: {e}[/]")
+                if verbose:
+                    import traceback
+                    console.print(traceback.format_exc())
 
-            progress.advance(task)
-
-    console.print(Panel.fit("[bold green]🎉 All blueprints generated![/]", border_style="green"))
-    console.print(f"📁 Output folder: [bold]{output_dir}[/]")
+    console.print(Panel.fit(
+        f"[bold green]✅ All done! {len(urls)} blueprint(s) saved to {output_dir}[/]",
+        border_style="green"
+    ))
 
 
 if __name__ == "__main__":
