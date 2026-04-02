@@ -1,0 +1,114 @@
+"""
+Tests for prompt building logic in POCArchitect-AI-Agent.
+Focuses on ensuring the system prompt is correctly constructed with
+source code, metadata, and strict instructions for zero-hallucination output.
+"""
+
+import pytest
+
+# TODO: Update this import once you create the prompt builder module
+# Common future locations:
+# from pocarchitect.core.prompt_builder import build_prompt
+# from pocarchitect.prompt import build_system_prompt
+
+# Placeholder import - replace when ready
+try:
+    from pocarchitect.core.prompt_builder import build_prompt
+except ImportError:
+    # Temporary placeholder function
+    def build_prompt(url: str, source_code: str, metadata: dict = None):
+        """Placeholder - will be replaced with real implementation."""
+        raise NotImplementedError(
+            "Create pocarchitect/core/prompt_builder.py and implement build_prompt()"
+        )
+
+
+class TestPromptBuilder:
+
+    def test_prompt_includes_source_code(self, sample_poc_url):
+        """Ensure the built prompt contains the actual fetched source code."""
+        sample_code = (
+            "# Example PoC Exploit\n"
+            "import requests\n"
+            "\n"
+            "def exploit(target):\n"
+            "    response = requests.get(f'http://{target}/vulnerable')\n"
+            "    print('[+] Exploit sent')\n"
+        )
+
+        prompt = build_prompt(
+            url=sample_poc_url,
+            source_code=sample_code
+        )
+
+        assert prompt is not None
+        assert len(prompt) > 500, "Prompt should be reasonably long"
+        assert sample_code in prompt, "Source code must be injected into the prompt"
+        assert sample_poc_url in prompt, "Original URL should be included"
+
+    def test_prompt_includes_zero_hallucination_instruction(self, sample_poc_url):
+        """Critical test: The prompt must enforce zero hallucination behavior."""
+        sample_code = "print('test payload')"
+
+        prompt = build_prompt(url=sample_poc_url, source_code=sample_code)
+
+        prompt_lower = prompt.lower()
+        zero_hallucination_phrases = [
+            "zero hallucination",
+            "do not hallucinate",
+            "only use the provided code",
+            "base your response only on",
+            "never invent code"
+        ]
+
+        assert any(phrase in prompt_lower for phrase in zero_hallucination_phrases), (
+            "Prompt must contain strong zero-hallucination instructions"
+        )
+
+    def test_prompt_includes_structure_requirements(self, sample_poc_url):
+        """Ensure the prompt asks for the exact report structure."""
+        sample_code = "# dummy code"
+
+        prompt = build_prompt(url=sample_poc_url, source_code=sample_code)
+
+        prompt_lower = prompt.lower()
+        required_sections = [
+            "metadata",
+            "build instructions",
+            "execution playbook",
+            "risk assessment",
+            "weaponized artifact"
+        ]
+
+        for section in required_sections:
+            assert section in prompt_lower, f"Prompt must instruct to include {section} section"
+
+    @pytest.mark.parametrize("extra_metadata", [
+        {"risk_level": "Critical", "target_os": "Windows"},
+        {"author": "rikterskale", "date": "2026-04-02"},
+        None
+    ])
+    def test_prompt_accepts_optional_metadata(self, sample_poc_url, extra_metadata):
+        """Prompt builder should gracefully handle optional metadata."""
+        sample_code = "print('hello')"
+
+        prompt = build_prompt(
+            url=sample_poc_url,
+            source_code=sample_code,
+            metadata=extra_metadata
+        )
+
+        assert prompt is not None
+
+
+# ==================== PLACEHOLDER ====================
+# Remove this function once you implement the real prompt builder
+
+def build_prompt(url: str, source_code: str, metadata: dict = None):
+    """Temporary placeholder function.
+    Replace this with proper import from your package when ready.
+    """
+    raise NotImplementedError(
+        "Implement build_prompt() in pocarchitect/core/prompt_builder.py\n"
+        "Then update the import at the top of this test file."
+    )
