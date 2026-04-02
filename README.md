@@ -66,7 +66,7 @@ pocarchitect --help
 All generated reports are saved to ./reports/ (or your chosen --output-dir).
 ```
 
-- Prompt-only mode (no CLI)
+### Prompt-only mode (no CLI)
 
 Copy the entire content of POC_Architect_Prompt.md as your system prompt and send a URL (or batch_urls.txt content) as the user message
 
