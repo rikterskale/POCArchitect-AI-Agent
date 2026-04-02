@@ -2,6 +2,15 @@
 
 This document outlines all available command-line options for **POCArchitect**.
 
+## Quick Start (Recommended)
+
+```bash
+# Automatic PoC ingestion + grounding context (default)
+pocarchitect --url https://github.com/user/exploit-repo
+
+# Disable Python-side ingestion if desired
+pocarchitect --url https://github.com/user/exploit-repo --no-ingest
+
 ## Basic Usage
 
 ```bash
@@ -140,6 +149,8 @@ Use `--dry-run` to inspect the exact prompt that will be sent to the LLM without
 - Set temperature to 0.0 for maximum consistency.
 - Use `--verbose` when troubleshooting.
 - Mount a volume when running in Docker to persist reports.
+- Pro tip: Create a .env file (copy from .env.example) — the CLI automatically loads it.
+- All reports are saved to ./reports/ (or use --output-dir).
 
 ---
 
