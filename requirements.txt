@@ -3,6 +3,8 @@ typer>=0.15.0
 requests>=2.32.0
 python-dotenv>=1.0.0
 rich>=13.0.0
+pytest
+pytest-mock
 # Add any other deps from your pyproject.toml here
 
 # For development / editable install
