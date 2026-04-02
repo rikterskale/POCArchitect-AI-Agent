@@ -44,6 +44,7 @@ def get_client(provider: str, api_key: str):
 
 @app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,   # ← Added for better control
     url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch_urls.txt"),
     provider: str = typer.Option("xai", "--provider", "-p", help="LLM provider: xai or openai"),
     api_key: str = typer.Option(
@@ -61,12 +62,18 @@ def main(
     version: bool = typer.Option(False, "--version", "-v", help="Show version and exit"),
 ):
     """Generate full offensive security blueprints from PoC URLs."""
+
     if version:
         try:
             from pocarchitect import __version__
             console.print(f"[bold cyan]POCArchitect[/bold cyan] v{__version__}")
         except ImportError:
             console.print("[bold cyan]POCArchitect[/bold cyan] (version unknown)")
+        raise typer.Exit()
+
+    # If no URL was provided and no subcommand, show help (safety net)
+    if ctx.invoked_subcommand is None and not url:
+        typer.echo(ctx.get_help())
         raise typer.Exit()
 
     console.print(
@@ -81,7 +88,7 @@ def main(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Handle batch vs single
-    urls = []
+    urls: list[str] = []
     input_path = Path(url)
     if input_path.exists() and (input_path.suffix in (".txt", "") or input_path.is_dir()):
         content = input_path.read_text(encoding="utf-8")
