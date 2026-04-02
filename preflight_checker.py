@@ -35,7 +35,7 @@ REQUIRED_DEPS = [
 ]
 PACKAGE_NAME = "pocarchitect"
 PROMPT_FILENAME = "POC_Architect_Prompt.md"
-ENV_KEY_NAMES = ["XAI_API_KEY", "OPENAI_API_KEY"]  # checked in order of preference for default provider
+ENV_KEY_NAMES = ["XAI_API_KEY", "OPENAI_API_KEY"]
 
 
 def check_python_version() -> tuple[bool, str]:
@@ -80,11 +80,9 @@ def check_cli_command() -> tuple[bool, str]:
 
 
 def check_prompt_file() -> tuple[bool, str]:
-    # When run from repo root (or after editable install)
     prompt_path = Path.cwd() / PROMPT_FILENAME
     if prompt_path.exists():
         return True, f"✅ {PROMPT_FILENAME} found"
-    # Fallback: check relative to this script (if user moved it)
     script_dir = Path(__file__).parent
     prompt_path = script_dir / PROMPT_FILENAME
     if prompt_path.exists():
@@ -95,18 +93,16 @@ def check_prompt_file() -> tuple[bool, str]:
 def check_api_key() -> tuple[bool, str]:
     for key_name in ENV_KEY_NAMES:
         if os.getenv(key_name):
-            return True, f"✅ {key_name} found in environment"
+            return True, f"✅ {key_name} found in environment (or .env — now auto-loaded by CLI)"
     
-    # Check for .env file (README mentions it, even if cli.py doesn't load yet)
     env_file = Path.cwd() / ".env"
     if env_file.exists():
-        # We can peek without loading (to avoid side-effects)
         content = env_file.read_text(encoding="utf-8", errors="ignore")
         for key_name in ENV_KEY_NAMES:
             if any(line.strip().startswith(f"{key_name}=") for line in content.splitlines()):
-                return True, f"✅ {key_name} found in .env (but remember: current CLI does NOT auto-load .env)"
+                return True, f"✅ {key_name} found in .env (will be auto-loaded)"
     
-    return False, f"❌ No API key — set {ENV_KEY_NAMES[0]} (or create .env)"
+    return False, f"❌ No API key — set {ENV_KEY_NAMES[0]} in .env or pass --api-key"
 
 
 def check_output_directory_writable() -> tuple[bool, str]:
@@ -150,10 +146,8 @@ def main():
             all_passed = False
         table.add_row(name, msg)
 
-    # Detailed dep table if needed
     console.print(table)
 
-    # Final verdict
     if all_passed:
         console.print(Panel.fit(
             "[bold green]✅ Environment is PERFECTLY ready![/]\n"
@@ -161,7 +155,6 @@ def main():
             "  pocarchitect --url https://github.com/... --provider xai",
             border_style="green"
         ))
-        rprint("\n[bold]Pro tip:[/] If you want .env support, the CLI can be updated with `load_dotenv()` — just say the word.")
     else:
         console.print(Panel.fit(
             "[bold red]❌ Some checks failed. Fix the red items above then re-run this script.[/]",
