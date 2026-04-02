@@ -1,11 +1,11 @@
 """
 Shared pytest fixtures for POCArchitect-AI-Agent tests.
 """
- 
+
 import pytest
 from unittest.mock import MagicMock
- 
- 
+
+
 @pytest.fixture
 def mock_llm_response():
     """Return a realistic mock LLM response with all required report sections."""
@@ -29,7 +29,7 @@ def mock_llm_response():
         "   cd poc-repo\n"
         "   ```\n"
         "\n"
-        "1. Install dependencies:\n"
+        "2. Install dependencies:\n"
         "   ```bash\n"
         "   pip install -r requirements.txt\n"
         "   ```\n"
@@ -44,10 +44,10 @@ def mock_llm_response():
         "```\n"
         "\n"
         "## Risk Assessment\n"
-        "* Impact: Critical (Remote Code Execution)\n"
-        "* Prerequisites: Target running vulnerable version 1.2.3\n"
-        "* Detection: Low (no obvious signatures)\n"
-        "* Mitigations: Update to version 1.2.4 or later\n"
+        "- **Impact**: Critical (Remote Code Execution)\n"
+        "- **Prerequisites**: Target running vulnerable version 1.2.3\n"
+        "- **Detection**: Low (no obvious signatures)\n"
+        "- **Mitigations**: Update to version 1.2.4 or later\n"
         "\n"
         "## Weaponized Artifact\n"
         "```python\n"
@@ -65,8 +65,8 @@ def mock_llm_response():
         '    main("192.168.1.100", 8080)\n'
         "```\n"
     )
- 
- 
+
+
 @pytest.fixture
 def mock_llm_client(mock_llm_response):
     """Mock LLM client that returns a consistent structured report."""
@@ -75,14 +75,14 @@ def mock_llm_client(mock_llm_response):
     client.provider = "xai"
     client.model = "grok-beta"
     return client
- 
- 
+
+
 @pytest.fixture
 def sample_poc_url():
     """A sample GitHub PoC URL for testing."""
     return "https://github.com/example/poc-repo"
- 
- 
+
+
 @pytest.fixture
 def sample_batch_file(tmp_path):
     """Create a temporary batch file with multiple URLs."""
