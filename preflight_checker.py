@@ -15,7 +15,6 @@ import sys
 import os
 import subprocess
 from pathlib import Path
-import importlib.util
 
 from rich.console import Console
 from rich.panel import Panel
