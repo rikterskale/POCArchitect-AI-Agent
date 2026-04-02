@@ -1,4 +1,3 @@
-``txt
 # Core dependencies for POCArchitect
 typer>=0.15.0
 requests>=2.32.0
