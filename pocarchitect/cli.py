@@ -44,7 +44,7 @@ def main(
     ctx: typer.Context,
     url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch file"),
     
-    # Existing flags
+    # Core flags
     provider: str = typer.Option("xai", "--provider", "-p", help="LLM provider: xai or openai"),
     api_key: str = typer.Option(
         ...,
@@ -58,9 +58,8 @@ def main(
         Path.cwd() / "reports", "--output-dir", "-o", help="Output directory"
     ),
     temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended)"),
-    version: bool = typer.Option(False, "--version", "-v", help="Show version and exit"),
 
-    # ==================== NEW OPERATOR CONTROL FLAGS ====================
+    # Operator control flags
     risk_level: str = typer.Option(
         "auto",
         "--risk-level",
@@ -89,11 +88,15 @@ def main(
         "--target-version",
         help="Specific vulnerable software version (e.g. 1.2.3)",
     ),
-    # ==================== END NEW FLAGS ====================
+
+    # New flags
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output (shows prompts, etc.)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show final prompt and exit without calling LLM"),
+    version: bool = typer.Option(False, "--version", help="Show version and exit"),
 ):
     """Generate full offensive security blueprints from PoC URLs."""
 
-    # Handle --no-mitigations overriding --include-mitigations
+    # Handle --no-mitigations
     if no_mitigations:
         include_mitigations = False
 
@@ -105,7 +108,7 @@ def main(
             console.print("[bold cyan]POCArchitect[/bold cyan] (version unknown)")
         raise typer.Exit()
 
-    # Show help if no arguments provided
+    # Show help if no arguments
     if not ctx.args and url == typer.Option(..., "--url", "-u").default:
         typer.echo(ctx.get_help())
         raise typer.Exit()
@@ -118,10 +121,9 @@ def main(
     )
 
     prompt = load_prompt()
-    client = get_client(provider, api_key)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Collect operator options to pass into the prompt
+    # Collect all operator options
     operator_options = {
         "risk_level": risk_level,
         "target_os": target_os,
@@ -139,6 +141,38 @@ def main(
     else:
         urls = [url]
 
+    # ==================== DRY-RUN MODE ====================
+    if dry_run:
+        console.print("[bold yellow]🔍 DRY-RUN MODE ENABLED[/]")
+        for i, poc_url in enumerate(urls, 1):
+            console.print(f"\n[bold cyan]--- Dry Run {i}/{len(urls)} ---[/]")
+            console.print(f"URL: {poc_url}")
+            
+            user_message = f"""Analyze this Proof-of-Concept and generate the COMPLETE offensive security blueprint.
+
+PoC URL: {poc_url}
+Risk Level Preference: {risk_level}
+Target OS: {target_os}
+Include Mitigations: {include_mitigations}
+Target Version: {target_version or 'Not specified'}
+
+Follow the exact 7-phase pipeline in the system prompt. 
+Apply the operator preferences above when generating the report.
+Output ONLY the Markdown blueprint (no extra text)."""
+
+            console.print(Panel(
+                f"[bold]System Prompt (first 500 chars):[/]\n{prompt[:500]}...\n\n"
+                f"[bold]User Message:[/]\n{user_message}",
+                title="Final Prompt",
+                border_style="yellow"
+            ))
+        
+        console.print("[bold green]✅ Dry run completed. No LLM calls were made.[/]")
+        raise typer.Exit()
+
+    # ==================== NORMAL MODE ====================
+    client = get_client(provider, api_key)
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[bold cyan]{task.description}"),
@@ -148,7 +182,6 @@ def main(
         for i, poc_url in enumerate(urls, 1):
             progress.update(task, description=f"Processing {i}/{len(urls)} → [yellow]{poc_url[:70]}...[/]")
 
-            # Build enhanced user message with operator options
             user_message = f"""Analyze this Proof-of-Concept and generate the COMPLETE offensive security blueprint.
 
 PoC URL: {poc_url}
@@ -162,6 +195,9 @@ Apply the operator preferences above when generating the report.
 Output ONLY the Markdown blueprint (no extra text)."""
 
             try:
+                if verbose:
+                    console.print(f"[dim]Calling LLM with model: {model}[/]")
+
                 response = client.chat.completions.create(
                     model=model,
                     temperature=temperature,
