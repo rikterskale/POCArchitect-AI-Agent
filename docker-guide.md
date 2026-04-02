@@ -9,11 +9,11 @@ This guide explains how to build, run, and use **POCArchitect** inside Docker.
 - (Optional) GitHub token if fetching private repositories
 
 ## 1. Clone the repo (do this once, or git pull when you want updates)
-git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
-cd POCArchitect-AI-Agent
+- git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
+- cd POCArchitect-AI-Agent
 
 ## 2. Build the Docker image
-docker build -t pocarchitect:latest .
+- docker build -t pocarchitect:latest .
 ```
 
 ## 2. Run POCArchitect in Docker
