@@ -17,6 +17,25 @@ Every report contains build instructions, execution playbook, risk assessment, a
 - Batch processing (hundreds of URLs → folder of reports + `index.md`)
 - Zero hallucination — reads actual source code
 - Beautiful, consistent output format every time
+- ### Python-side PoC Ingestion (NEW)
+- Automatically performs a shallow `git clone --depth 1` on any GitHub repo, scans the file tree, and extracts the most important files (README, exploit code, Dockerfile, payloads, etc.).
+- The CLI then injects a clean **GROUNDING CONTEXT** block directly into the LLM prompt.
+
+**Benefits:**
+- Zero hallucinations on code structure and content
+- Works reliably with *any* provider (including models without browsing tools)
+- Faster and cheaper generations
+- Graceful fallback for non-GitHub URLs
+
+**New flag:** `--no-ingest` to disable this behavior if needed.
+
+**Benefits:**
+- Zero hallucinations on code structure and content
+- Works reliably with *any* provider (including models without browsing tools)
+- Faster and cheaper generations
+- Graceful fallback for non-GitHub URLs
+
+**New flag:** `--no-ingest` to disable this behavior if needed.
 
 ---
 ## 🚀 Installation & Quick Start
