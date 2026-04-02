@@ -8,19 +8,12 @@ This guide explains how to build, run, and use **POCArchitect** inside Docker.
 - API key for your preferred LLM provider (recommended: Grok/xAI)
 - (Optional) GitHub token if fetching private repositories
 
-## 1. Build the Docker Image
+## 1. Clone the repo (do this once, or git pull when you want updates)
+git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
+cd POCArchitect-AI-Agent
 
-From the root of the repository, run:
-
-```bash
-# Build the image
+## 2. Build the Docker image
 docker build -t pocarchitect:latest .
-```
-
-To give it a specific version:
-
-```bash
-docker build -t pocarchitect:0.1.0 .
 ```
 
 ## 2. Run POCArchitect in Docker
