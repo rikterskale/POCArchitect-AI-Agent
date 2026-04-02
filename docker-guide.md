@@ -109,6 +109,12 @@ docker run --rm \
 - Use `--rm` flag to automatically clean up the container after it finishes.
 - For frequent use, consider creating an alias or a shell script.
 - If you frequently use the same API key, you can add it to a `.env` file and use `docker run --env-file .env ...`
+- **New:** If you have a `.env` file on the host, you can pass it with:
+```bash
+docker run --rm \
+  --env-file .env \
+  -v $(pwd)/reports:/app/reports \
+  pocarchitect --url https://github.com/...
 
 ### Example Shell Alias
 
