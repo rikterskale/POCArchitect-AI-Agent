@@ -1,32 +1,38 @@
-POCArchitect AI Agent
-Turn any Proof-of-Concept URL into a clean, reproducible, weaponized Markdown blueprint — built for red teamers and offensive security operators.
+##POCArchitect AI Agent
 
-Features
-GitHub PoC grounding (shallow clone + smart file extraction)
-Fully functional batch mode (--url batch_urls.txt)
-Operator controls:
---risk-level
---target-os
---include-mitigations
---no-mitigations
-Automatic preflight checks on every run
-Multi-provider support (xAI/Grok, OpenAI, Groq, local Ollama)
-Smart Docker volume support (reports saved to /reports by default inside containers)
-Retry logic + timeouts on LLM calls
-Quick Start
-# 1. Clone & install
+### Turn any Proof-of-Concept URL into a clean, reproducible, weaponized Markdown blueprint — built for red teamers and offensive security operators.
+
+### Features
+
+- GitHub PoC grounding (shallow clone + smart file extraction)
+- Fully functional batch mode (--url batch_urls.txt)
+- 
+- Operator controls:
+   - --risk-level
+   - --target-os
+   - --include-mitigations
+   - --no-mitigations
+   - --Automatic preflight checks on every run
+   - --Multi-provider support (xAI/Grok, OpenAI, Groq, local Ollama)
+   - --Smart Docker volume support (reports saved to /reports by default inside containers)
+   - --Retry logic + timeouts on LLM calls
+
+
+### Quick Start  - See the POCArchitect_Quickstart.txt file to get up and running quickly.  Or, you can do the following:
+
+## 1. Clone & install
 git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 cd POCArchitect-AI-Agent
 cp .env.example .env          # ← Add your XAI_API_KEY (or OPENAI_API_KEY)
 pip install -e .
 
-# 2. Run preflight (optional — now runs automatically)
+## 2. Run preflight (optional — now runs automatically)
 pocarchitect preflight
 
-# 3. Single URL
+## 3. Single URL
 pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent --provider xai
 
-# 4. Batch mode (exactly as documented)
+## 4. Batch mode (exactly as documented)
 pocarchitect --url example_usage/batch_urls.txt --provider xai
 Usage
 pocarchitect --url <URL or batch file> [OPTIONS]
