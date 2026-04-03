@@ -1,3 +1,50 @@
+Metadata-Version: 2.4
+Name: pocarchitect
+Version: 0.2.0
+Summary: POC Architect - AI Agent that turns raw PoC URLs into weaponized Markdown blueprints for red teamers
+Author-email: RikterSkale <your-email@example.com>
+License: MIT License — feel free to fork, modify, and use commercially.
+        
+        MIT License
+        
+        Copyright (c) 2026 Rikter (via POCArchitect)
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Project-URL: Homepage, https://github.com/rikterskale/POCArchitect-AI-Agent
+Project-URL: Repository, https://github.com/rikterskale/POCArchitect-AI-Agent
+Project-URL: Bug Tracker, https://github.com/rikterskale/POCArchitect-AI-Agent/issues
+Keywords: red-team,pentesting,poc,exploit-development,ai-agent,offsec,cybersecurity
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: typer>=0.12.5
+Requires-Dist: rich>=13.7.0
+Requires-Dist: openai>=1.35.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: GitPython>=3.1.0
+Provides-Extra: all
+Requires-Dist: anthropic>=0.30.0; extra == "all"
+Requires-Dist: google-generativeai>=0.8.0; extra == "all"
+Dynamic: license-file
+
 # POCArchitect
 
 > **Forging the blueprints of digital domination.**  
@@ -36,98 +83,21 @@ Every report contains build instructions, execution playbook, risk assessment, a
 - Python 3.9+
 - xAI (Grok), OpenAI, or any OpenAI-compatible API key
 
-## Quick Start & Daily Usage
+## Docker
 
-## Installation
+The fastest way to run POCArchitect with zero local dependencies.
+
 ```bash
-# Clone the repository
-git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
-cd POCArchitect-AI-Agent
-
-# Install in editable mode
-python -m pip install -e .
-
-# Copy and configure environment variables
-cp .env.example .env
-```
-
-Then add your API keys to the .env file (especially XAI_API_KEY or OPENAI_API_KEY).
-Run the preflight check to verify everything is ready:
-```bash
-pocarchitect preflight
-```
-
-## Quick Start & Daily Usage
-
-### Local Usage (Recommended for daily work)
-```bash
-# Best balance of quality and speed
-pocarchitect --url "https://github.com/user/repo" --provider openai --model gpt-4o-mini
-
-# Highest quality (Grok via xAI)
-pocarchitect --url "https://github.com/user/repo" --provider xai
-
-# Skip grounding for very large repositories
-pocarchitect --url "https://github.com/user/repo" --provider openai --no-ingest
-```
-
-### Docker Usage
-```bash
-# Build the image (run when you update code)
+# 1. Build (do this once)
 docker build -t pocarchitect:latest .
 
-# Run with OpenAI
+# 2. Run (single PoC example)
 docker run --rm \
-  -v "/$(pwd)/reports:/reports" \
-  --env-file .env \
-  pocarchitect --url "https://github.com/user/repo" --provider openai --model gpt-4o-mini
-
-# Run with Grok (xAI)
-docker run --rm \
-  -v "/$(pwd)/reports:/reports" \
-  --env-file .env \
-  pocarchitect --url "https://github.com/user/repo" --provider xai
+  -v "$(pwd)/reports:/reports" \
+  -e XAI_API_KEY=your_xai_key_here \
+  pocarchitect \
+  --url https://github.com/example/poc-repo
 ```
-
-## Useful Flags
-
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--dry-run` | Show full prompt without calling LLM | `--dry-run` |
-| `--no-ingest` | Skip Git cloning (for huge repos) | `--no-ingest` |
-| `--verbose` | Show more detailed output | `--verbose` |
-| `--model gpt-4o` | Use higher quality model | `--model gpt-4o` |
-
-## Troubleshooting
-
-- **Permission denied when saving reports in Docker** — This is a common Windows + Docker issue. Use the local command instead for reliable saving.
-- **Rate limit / 429 error** — Switch to `gpt-4o-mini` or wait 1 minute. For heavy usage, consider upgrading your plan.
-- **"Repository not found" or empty reports** — Make sure the GitHub URL is public and correct. Try with `--no-ingest` for very large repos.
-- **No green "Report saved to" line** — Run locally (without Docker) — saving works best on Windows with the local install.
-- **Command not found (`pocarchitect`)** — Run `python -m pip install -e .` after any code changes.
-
-## Docker Tips
-
-- Always rebuild after changing code: `docker build -t pocarchitect:latest .`
-- Use `--env-file .env` (more reliable than individual `-e` flags on Windows)
-- If you get permission errors, temporarily add `--user root`:
-```bash
-docker run --rm -v "/$(pwd)/reports:/reports" --env-file .env --user root pocarchitect ...
-```
-
-- For best performance and reliability on Windows, prefer the local command over Docker.
-
-## Example Workflow
-```bash
-# Quick test
-pocarchitect --url "https://github.com/swisskyrepo/PayloadsAllTheThings" --provider openai --model gpt-4o-mini
-
-# View the latest report
-ls -l reports/
-cat reports/POCAnalysis_*.md | head -50
-```
-
-Reports are automatically saved in the `reports/` folder with timestamped names (e.g. `POCAnalysis_payloadsallthethings_20260403_015414.md`).
 
 ### 1. Install the CLI (Recommended)
 

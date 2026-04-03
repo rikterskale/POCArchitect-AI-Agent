@@ -1,0 +1,2 @@
+[console_scripts]
+pocarchitect = pocarchitect.cli:app
