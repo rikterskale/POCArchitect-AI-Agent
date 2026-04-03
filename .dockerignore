@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# .dockerignore - exclude everything we don't need in the build
+# .dockerignore - Optimized for POCArchitect (prompt now included)
 # ──────────────────────────────────────────────────────────────
 
 # Version control
@@ -30,13 +30,12 @@ venv.bak/
 *.swp
 *.swo
 
-# Testing & docs
-tests/
+# Documentation and examples (only root-level; prompt inside package is kept)
 docs/
 example_usage/
-*.md
-CHANGELOG.md
+tests/
 README.md
+CHANGELOG.md
 POCArchitect_Example_Report.md
 
 # Build artifacts
@@ -49,21 +48,19 @@ coverage.xml
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-__pycache__/
 
-# Temporary / logs
+# Temporary / logs / reports
 *.log
 tmp/
 temp/
-reports/          # we mount this as volume anyway
+reports/
 *.tmp
 
 # Docker specific
 Dockerfile*
 .dockerfile*
-.dockerignore
 
-# Any local credentials or large files
+# Credentials
 **/*.key
 **/*.pem
 **/*.crt
