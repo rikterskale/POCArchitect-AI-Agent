@@ -1,192 +1,50 @@
-# POCArchitect
+POCArchitect AI Agent
+Turn any Proof-of-Concept URL into a clean, reproducible, weaponized Markdown blueprint — built for red teamers and offensive security operators.
 
-> **Forging the blueprints of digital domination.**  
-> **I don't write exploits — I architect empires of proof-of-concept that turn defenses into dust.**
-
-**POCArchitect** is a senior offensive-security AI agent that takes **any** POC URL (GitHub repo, raw code, advisory, blog post) and instantly outputs a **complete, reproducible, zero-guesswork Markdown blueprint**.
-
-Every report contains build instructions, execution playbook, risk assessment, and a fully annotated weaponized artifact — accurate enough for a competent operator to run it with zero external reference.
-
----
-
-## ✨ Features
-
-- One URL → One perfect Markdown report
-- Full build + execution playbook + annotated weaponized code
-- Supports **SuperGrok (xAI)**, OpenAI (GPT-4o / GPT-5.x), Claude, Gemini, or any OpenAI-compatible endpoint
-- Batch processing (hundreds of URLs → folder of reports + `index.md`)
-- Zero hallucination — reads actual source code
-- Beautiful, consistent output format every time
-- ### Python-side PoC Ingestion (NEW)
-- Automatically performs a shallow `git clone --depth 1` on any GitHub repo, scans the file tree, and extracts the most important files (README, exploit code, Dockerfile, payloads, etc.).
-- The CLI then injects a clean **GROUNDING CONTEXT** block directly into the LLM prompt.
-
-**Benefits:**
-- Zero hallucinations on code structure and content
-- Works reliably with *any* provider (including models without browsing tools)
-- Faster and cheaper generations
-- Graceful fallback for non-GitHub URLs
-
-**New flag:** `--no-ingest` to disable this behavior if needed.
-
----
-## 🚀 Installation & Quick Start
-
-### Prerequisites
-- Python 3.9+
-- xAI (Grok), OpenAI, or any OpenAI-compatible API key
-
-## Quick Start & Daily Usage
-
-## Installation
-```bash
-# Clone the repository
+Features
+GitHub PoC grounding (shallow clone + smart file extraction)
+Fully functional batch mode (--url batch_urls.txt)
+Operator controls:
+--risk-level
+--target-os
+--include-mitigations
+--no-mitigations
+Automatic preflight checks on every run
+Multi-provider support (xAI/Grok, OpenAI, Groq, local Ollama)
+Smart Docker volume support (reports saved to /reports by default inside containers)
+Retry logic + timeouts on LLM calls
+Quick Start
+# 1. Clone & install
 git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 cd POCArchitect-AI-Agent
+cp .env.example .env          # ← Add your XAI_API_KEY (or OPENAI_API_KEY)
+pip install -e .
 
-# Install in editable mode
-python -m pip install -e .
-
-# Copy and configure environment variables
-cp .env.example .env
-```
-
-Then add your API keys to the .env file (especially XAI_API_KEY or OPENAI_API_KEY).
-Run the preflight check to verify everything is ready:
-```bash
+# 2. Run preflight (optional — now runs automatically)
 pocarchitect preflight
-```
 
-## Quick Start & Daily Usage
+# 3. Single URL
+pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent --provider xai
 
-### Local Usage (Recommended for daily work)
-```bash
-# Best balance of quality and speed
-pocarchitect --url "https://github.com/user/repo" --provider openai --model gpt-4o-mini
+# 4. Batch mode (exactly as documented)
+pocarchitect --url example_usage/batch_urls.txt --provider xai
+Usage
+pocarchitect --url <URL or batch file> [OPTIONS]
+Options
+--provider xai|openai|groq|local
+--risk-level Critical|High|Medium|Low|auto
+--target-os Windows|Linux|macOS|cross-platform|auto
+--include-mitigations / --no-mitigations
+--no-ingest — Skip grounding for very large repos
+--output-dir ./reports
+--verbose
+Reports are saved to ./reports/ (or /reports inside Docker).
 
-# Highest quality (Grok via xAI)
-pocarchitect --url "https://github.com/user/repo" --provider xai
+Docker
+docker build -t pocarchitect .
+docker run -v "$(pwd)/reports:/reports" \
+  -e XAI_API_KEY=your_key_here \
+  pocarchitect --url https://github.com/... --provider xai
 
-# Skip grounding for very large repositories
-pocarchitect --url "https://github.com/user/repo" --provider openai --no-ingest
-```
-
-### Docker Usage
-```bash
-# Build the image (run when you update code)
-docker build -t pocarchitect:latest .
-
-# Run with OpenAI
-docker run --rm \
-  -v "/$(pwd)/reports:/reports" \
-  --env-file .env \
-  pocarchitect --url "https://github.com/user/repo" --provider openai --model gpt-4o-mini
-
-# Run with Grok (xAI)
-docker run --rm \
-  -v "/$(pwd)/reports:/reports" \
-  --env-file .env \
-  pocarchitect --url "https://github.com/user/repo" --provider xai
-```
-
-## Useful Flags
-
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--dry-run` | Show full prompt without calling LLM | `--dry-run` |
-| `--no-ingest` | Skip Git cloning (for huge repos) | `--no-ingest` |
-| `--verbose` | Show more detailed output | `--verbose` |
-| `--model gpt-4o` | Use higher quality model | `--model gpt-4o` |
-
-## Troubleshooting
-
-- **Permission denied when saving reports in Docker** — This is a common Windows + Docker issue. Use the local command instead for reliable saving.
-- **Rate limit / 429 error** — Switch to `gpt-4o-mini` or wait 1 minute. For heavy usage, consider upgrading your plan.
-- **"Repository not found" or empty reports** — Make sure the GitHub URL is public and correct. Try with `--no-ingest` for very large repos.
-- **No green "Report saved to" line** — Run locally (without Docker) — saving works best on Windows with the local install.
-- **Command not found (`pocarchitect`)** — Run `python -m pip install -e .` after any code changes.
-
-## Docker Tips
-
-- Always rebuild after changing code: `docker build -t pocarchitect:latest .`
-- Use `--env-file .env` (more reliable than individual `-e` flags on Windows)
-- If you get permission errors, temporarily add `--user root`:
-```bash
-docker run --rm -v "/$(pwd)/reports:/reports" --env-file .env --user root pocarchitect ...
-```
-
-- For best performance and reliability on Windows, prefer the local command over Docker.
-
-## Example Workflow
-```bash
-# Quick test
-pocarchitect --url "https://github.com/swisskyrepo/PayloadsAllTheThings" --provider openai --model gpt-4o-mini
-
-# View the latest report
-ls -l reports/
-cat reports/POCAnalysis_*.md | head -50
-```
-
-Reports are automatically saved in the `reports/` folder with timestamped names (e.g. `POCAnalysis_payloadsallthethings_20260403_015414.md`).
-
-### 1. Install the CLI (Recommended)
-
-```bash
-git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
-cd POCArchitect-AI-Agent
-
-# Option 1: Modern (recommended)
-pip install -e .
-
-# Option 2: Using requirements.txt
-pip install -r requirements.txt
-pip install -e .
-
-# Verify
-pocarchitect --help
-
-# Alternative (no clone)
-pip install git+https://github.com/rikterskale/POCArchitect-AI-Agent.git
-
-# API Key Setup (pick one)
-A. Environment variable (recommended)
-****POCArchitect now auto-loads `.env`** from the project root.:**
-1. Copy the template:
-   cp .env.example .env
-   Add keys as required
-
-B. Pass on command line
---api-key xai-XXXXXXXXXXXXXXXX
-
-# Usage Examples
-Single PoC
-pocarchitect \
-  --url https://github.com/some/exploit \
-  --provider xai \
-  --model grok-4
-
-# Batch mode
-pocarchitect \
-  --url example_usage/batch_urls.txt \
-  --provider xai
-
-# Full help
-pocarchitect --help
-
-# All generated reports are saved to ./reports/ (or your chosen --output-dir).
-```
-
-### Prompt-only mode (no CLI)
-
-Copy the entire content of POC_Architect_Prompt.md as your system prompt and send a URL (or batch_urls.txt content) as the user message
-
-Why This Exists
-Red teamers and pentesters waste hours turning messy POCs into usable artifacts. POCArchitect does it in seconds with military-grade consistency.
-Star the repo if you find it useful — more features (HTML export, auto-deobfuscation, Dockerized targets) are coming.
-
-Made with 🔥 for the offensive-security community.
-
-
-
-
+No --output-dir flag needed anymore — it automatically uses the mounted volume.
 
