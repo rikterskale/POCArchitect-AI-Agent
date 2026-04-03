@@ -1,157 +1,117 @@
-# Docker Guide - POCArchitect-AI-Agent
+# Docker Guide - POCArchitect AI Agent
 
-This guide explains how to build, run, and use **POCArchitect** inside Docker.
+This guide explains how to build, run, and use **POCArchitect** inside Docker (v0.2.0+).
 
 ## Prerequisites
 
 - Docker installed and running
-- API key for your preferred LLM provider (recommended: Grok/xAI)
-- (Optional) GitHub token if fetching private repositories
+- API key for your preferred LLM provider (xAI/Grok recommended)
+- (Optional) `.env` file with your keys
 
-## 1. Clone the repo (do this once, or git pull when you want updates)
-- git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
-- cd POCArchitect-AI-Agent
+---
 
-## 2. Build the Docker image
-- docker build -t pocarchitect:latest .
+## 1. Build the Docker Image
+
+```bash
+docker build -t pocarchitect:latest .
 ```
+
+This uses a multi-stage build → final image is ~180–220 MB and runs as non-root user.
+
+---
 
 ## 2. Run POCArchitect in Docker
 
-### Basic Usage (Show Help)
+### Show Help
 
 ```bash
 docker run --rm pocarchitect --help
 ```
 
-### Single URL Mode
+### Single URL Mode (Recommended)
 
 ```bash
 docker run --rm \
-  -e GROK_API_KEY=your_grok_api_key_here \
-  -v $(pwd)/reports:/app/reports \
+  -v "$(pwd)/reports:/reports" \
+  -e XAI_API_KEY=your_xai_key_here \
+  pocarchitect \
+  --url https://github.com/example/poc-repo
+```
+
+### Using a `.env` File (Cleanest)
+
+```bash
+docker run --rm \
+  --env-file .env \
+  -v "$(pwd)/reports:/reports" \
   pocarchitect \
   --url https://github.com/example/poc-repo
 ```
 
 ### Batch Mode
 
-```
+```bash
 docker run --rm \
-  -e GROK_API_KEY=your_grok_api_key_here \
-  -v $(pwd)/reports:/app/reports \
+  --env-file .env \
+  -v "$(pwd)/reports:/reports" \
+  -v "$(pwd)/batch_urls.txt:/batch_urls.txt" \
   pocarchitect \
-  --batch /app/pocs.txt
+  --url /batch_urls.txt
 ```
 
-**Note:** When using `--batch`, you need to mount your batch file as well.
+### Full Example with Custom Options
 
-### Full Batch Example
-
-```
+```bash
 docker run --rm \
-  -e GROK_API_KEY=your_grok_api_key_here \
-  -v $(pwd)/reports:/app/reports \
-  -v $(pwd)/pocs.txt:/app/pocs.txt \
+  --env-file .env \
+  -v "$(pwd)/reports:/reports" \
   pocarchitect \
-  --batch /app/pocs.txt
-```
-
-## 3. Common Usage Examples
-
-### Using OpenAI instead of xAI
-
-```
-docker run --rm \
-  -e OPENAI_API_KEY=sk-your_openai_key \
-  -v $(pwd)/reports:/app/reports \
-  pocarchitect \
-  --url https://github.com/example/poc \
-  --provider openai \
-  --model gpt-4o
-```
-
-### Running with Verbose Output
-
-```
-docker run --rm \
-  -e GROK_API_KEY=your_key \
-  -v $(pwd)/reports:/app/reports \
-  pocarchitect \
-  --url https://github.com/example/poc \
+  --url https://github.com/example/poc-repo \
+  --provider xai \
+  --model grok-4 \
+  --output-dir /reports \
   --verbose
 ```
 
-### Using a Different Output Directory
+---
 
-```
-docker run --rm \
-  -e GROK_API_KEY=your_key \
-  -v $(pwd)/my_custom_reports:/app/reports \
-  pocarchitect \
-  --url https://github.com/example/poc
-```
-
-## 4. Environment Variables
+## 3. Environment Variables
 
 | Variable | Description | Required |
-|----------|-------------|----------|
-| GROK_API_KEY | API key for xAI Grok | Yes* |
-| OPENAI_API_KEY | API key for OpenAI | Yes* |
-| ANTHROPIC_API_KEY | API key for Claude | Yes* |
-| GEMINI_API_KEY | API key for Google Gemini | Yes* |
+|---|---|---|
+| `XAI_API_KEY` | xAI / Grok key | Yes* |
+| `OPENAI_API_KEY` | OpenAI / Groq key | Yes* |
+| `ANTHROPIC_API_KEY` | Anthropic (Claude) key | Yes* |
+| `GEMINI_API_KEY` | Google Gemini key | Yes* |
 
-*Only the key for the provider you are using is required.
-
-## 5. Tips & Best Practices
-
-- Always mount a volume (`-v`) for `/app/reports` so generated reports persist on your host machine.
-- Use `--rm` flag to automatically clean up the container after it finishes.
-- For frequent use, consider creating an alias or a shell script.
-- If you frequently use the same API key, you can add it to a `.env` file and use `docker run --env-file .env ...`
-- Python-side PoC Ingestion (NEW)***
-
-  GitPython is now included in the dependencies, so shallow clones (`git clone --depth 1`) work automatically inside Docker.
-  No extra configuration needed. The grounding context feature works exactly the same as when running locally.
-
-Example:
-```
-docker run --rm \
-  --env-file .env \
-  -v $(pwd)/reports:/app/reports \
-  pocarchitect --url https://github.com/user/exploit-repo
-
-**New:** If you have a `.env` file on the host, you can pass it with:
-```
-docker run --rm \
-  --env-file .env \
-  -v $(pwd)/reports:/app/reports \
-  pocarchitect --url https://github.com/...
-
-### Example Shell Alias
-
-Add to your `~/.bashrc` or `~/.zshrc`:
-
-```bash
-alias pocarch='docker run --rm \
-  -e GROK_API_KEY=$GROK_API_KEY \
-  -v $(pwd)/reports:/app/reports \
-  pocarchitect'
-```
-
-Then use simply:
-
-```
-pocarch --url https://github.com/user/repo
-```
-
-## 6. Troubleshooting
-
-- **"API key not found"** → Make sure you pass the correct environment variable.
-- **Permission issues** → The container runs as a non-root user. Make sure your mounted `reports/` folder is writable.
-- **Git clone fails** → For private repos, mount your SSH keys or use a GitHub token.
-- **Image too large** → Use `docker build --no-cache .` after making changes.
+*Only the key for the provider you choose is required.
 
 ---
 
-Last Updated: April 2026
+## 4. Tips & Best Practices
+
+- Always mount `-v "$(pwd)/reports:/reports"` — reports are written to this volume.
+- Use `--rm` to auto-clean the container after it finishes.
+- Create a shell alias for daily use:
+
+```bash
+alias pocarch='docker run --rm --env-file .env -v "$(pwd)/reports:/reports" pocarchitect'
+```
+
+Then just run: `pocarch --url <url>`
+
+- Python-side PoC ingestion (grounding context) works automatically inside Docker — no extra setup needed.
+- For private GitHub repos, pass a GitHub token via `--github-token` (CLI support coming in next release).
+
+---
+
+## 5. Troubleshooting
+
+- **"Permission denied" on reports** → The container runs as non-root `pocuser`. Make sure your host `./reports` folder is writable (`chmod 777 reports` or `mkdir -p reports`).
+- **Git clone fails** → Public repos work out of the box. Private repos need a token (future CLI flag).
+- **API key not found** → Use `--env-file .env` or explicit `-e KEY=...`.
+- **Rebuild after changes** → `docker build --no-cache -t pocarchitect:latest .`
+
+---
+
+*Last Updated: April 2026 (matches Dockerfile v0.2.0)*
