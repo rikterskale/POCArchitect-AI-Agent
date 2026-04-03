@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# POCArchitect AI Agent - Production Dockerfile (v0.2.0)
+# POCArchitect AI Agent - Production Dockerfile (v0.2.0) - FIXED
 # Multi-stage build for minimal, secure image
 # ──────────────────────────────────────────────────────────────
 
@@ -12,18 +12,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy only packaging files first (leverage Docker layer cache)
-COPY pyproject.toml requirements.txt ./
+# Copy packaging metadata first (layer cache optimization)
+COPY pyproject.toml ./
 
-# Install runtime dependencies + the package itself
-# [all] includes anthropic + google-generativeai so every provider works
+# Copy the actual Python package (includes POC_Architect_Prompt.md)
+COPY pocarchitect/ ./pocarchitect/
+
+# Install the package + all optional providers
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -e .[all]
+    && pip install --no-cache-dir .[all]
 
 # Final runtime stage
 FROM python:3.12-slim
 
-# Labels (security scanners / Kubernetes / GitHub Container Registry love these)
+# Labels
 LABEL org.opencontainers.image.title="POCArchitect AI Agent"
 LABEL org.opencontainers.image.description="Turn raw PoC URLs into weaponized Markdown blueprints"
 LABEL org.opencontainers.image.version="0.2.0"
@@ -31,7 +33,7 @@ LABEL org.opencontainers.image.authors="RikterSkale"
 LABEL org.opencontainers.image.source="https://github.com/rikterskale/POCArchitect-AI-Agent"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Install only the runtime system dependency (git)
+# Install only the runtime system dependency
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/* \
@@ -44,7 +46,7 @@ RUN useradd -m -s /bin/bash pocuser && \
 
 WORKDIR /app
 
-# Copy only the installed Python packages and binaries from builder
+# Copy the fully installed package from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
@@ -54,6 +56,6 @@ USER pocuser
 # Persistent volume for generated reports
 VOLUME ["/reports"]
 
-# Default to the CLI (you can still run any subcommand/flag)
+# Default CLI entrypoint
 ENTRYPOINT ["pocarchitect"]
 CMD ["--help"]
