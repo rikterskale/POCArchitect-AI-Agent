@@ -3,7 +3,7 @@ import typer
 import os
 import tempfile
 from pathlib import Path
-from typing import Literal, Optional, List
+from typing import Optional
 from dotenv import load_dotenv
 import git
 from rich.console import Console
@@ -32,6 +32,7 @@ console = Console()
 
 @app.command("preflight")
 def preflight():
+    """Run environment preflight checks"""
     run_preflight()
 
 
@@ -69,7 +70,7 @@ def save_report(content: str, url: str, output_dir: Path) -> Path:
     return output_path
 
 
-def build_grounding_context(poc_url: str, no_ingest: bool = False) -> str:
+def build_grounding_context(poc_url: str, no_ingest: bool = False, verbose: bool = False) -> str:
     if no_ingest:
         return f"PoC URL: {poc_url}\n[Grounding disabled by --no-ingest]"
 
@@ -91,6 +92,9 @@ def build_grounding_context(poc_url: str, no_ingest: bool = False) -> str:
             git.Repo.clone_from(clone_url, repo_path, depth=1, single_branch=True)
             console.print("[green]done[/]")
 
+            if verbose:
+                console.print(f"[dim]Grounding: Analyzing {repo_name}[/]")
+
             context.append(f"Repository: {repo_name}")
             context.append("Critical files and content:")
 
@@ -110,6 +114,8 @@ def build_grounding_context(poc_url: str, no_ingest: bool = False) -> str:
                     full_path = Path(root) / file
 
                     if full_path.stat().st_size > 250_000:
+                        if verbose:
+                            console.print(f"[dim]  Skipped large file: {file_path}[/]")
                         continue
 
                     lower_name = file_path.name.lower()
@@ -122,6 +128,9 @@ def build_grounding_context(poc_url: str, no_ingest: bool = False) -> str:
                             critical.append((str(file_path), content))
                         except Exception:
                             pass
+
+            if verbose:
+                console.print(f"[dim]  Found {len(critical)} critical files (showing up to 25)[/]")
 
             for filepath, content in critical[:25]:
                 lang = Path(filepath).suffix[1:] if Path(filepath).suffix else "text"
@@ -192,11 +201,11 @@ def get_llm_response(
 def process_single_url(url: str, provider: str, api_key: Optional[str], model: str,
                        temperature: float, base_url: Optional[str], output_dir: Path,
                        risk_level: str, target_os: str, include_mitigations: bool,
-                       no_ingest: bool):
+                       no_ingest: bool, dry_run: bool = False, verbose: bool = False):
     console.print(f"[bold cyan]Processing:[/] {url}")
 
     system_prompt = load_prompt()
-    grounding = "" if no_ingest else build_grounding_context(url)
+    grounding = "" if no_ingest else build_grounding_context(url, no_ingest=no_ingest, verbose=verbose)
 
     user_message = f"""PoC URL: {url}
 
@@ -205,9 +214,13 @@ def process_single_url(url: str, provider: str, api_key: Optional[str], model: s
 Operator Preferences (respect these exactly):
 - Risk Level: {risk_level}
 - Target OS / Environment: {target_os}
-- Include Mitigations: {'Yes' if include_mitigations else 'No'}
+- Include Mitigations: {'Yes' if include_mitigations else 'No'}"""
 
-MANDATORY: Base your entire report on the grounding context above. Quote real code, file names, and techniques from the provided files. Do not hallucinate or use general knowledge when specific content is available."""
+    if dry_run:
+        console.print("[bold green]🚀 DRY RUN MODE — No LLM call will be made[/bold green]")
+        full_prompt = f"--- SYSTEM PROMPT ---\n{system_prompt}\n\n--- USER MESSAGE ---\n{user_message}"
+        console.print(Panel(full_prompt, title="Full Prompt (Ready for LLM)", border_style="blue", expand=True))
+        raise typer.Exit(0)
 
     result = get_llm_response(
         provider=provider,
@@ -219,109 +232,46 @@ MANDATORY: Base your entire report on the grounding context above. Quote real co
         user_message=user_message,
     )
 
-    console.print(Panel(result[:500] + "..." if len(result) > 500 else result,
-                        title="POC Architect Output", border_style="green"))
-    return save_report(result, url, output_dir)
+    save_report(result, url, output_dir)
 
 
-def generate_index_md(output_dir: Path, report_files: List[Path]):
-    index_path = output_dir / "index.md"
-    lines = ["# POCArchitect Batch Analysis Index\n"]
-    lines.append(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-    lines.append("## Reports\n")
-
-    for report in report_files:
-        relative = report.relative_to(output_dir)
-        lines.append(f"- [{relative.name}]({relative})")
-
-    index_path.write_text("\n".join(lines), encoding="utf-8")
-    console.print(f"[green]Batch index created:[/] {index_path}")
-
-
+# ── Main CLI entry point ─────────────────────────────────────────────
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    url: Optional[str] = typer.Option(None, "--url", "-u", help="Single PoC URL or path to .txt batch file (one URL per line)"),
+    url: Optional[str] = typer.Option(None, "--url", "-u", help="Single PoC GitHub URL"),
+    batch: Optional[Path] = typer.Option(None, "--batch", "-b", help="Path to .txt file with multiple URLs"),
     provider: str = typer.Option("xai", "--provider", "-p"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", "-k"),
+    model: str = typer.Option("grok-3", "--model", "-m"),
+    temperature: float = typer.Option(0.2, "--temperature", "-t"),
     base_url: Optional[str] = typer.Option(None, "--base-url"),
-    model: str = typer.Option(None, "--model", "-m"),
-    output_dir: Path = typer.Option(get_default_output_dir, "--output-dir", "-o"),
-    temperature: float = typer.Option(0.0, "--temperature", "-t"),
-    risk_level: Literal["Critical", "High", "Medium", "Low", "auto"] = typer.Option("auto", "--risk-level"),
-    target_os: Literal["Windows", "Linux", "macOS", "cross-platform", "auto"] = typer.Option("auto", "--target-os"),
-    include_mitigations: bool = typer.Option(True, "--include-mitigations", "--mitigations"),
-    no_mitigations: bool = typer.Option(False, "--no-mitigations"),
-    no_ingest: bool = typer.Option(False, "--no-ingest", help="Skip GitHub ingestion for very large repos"),
-    dry_run: bool = typer.Option(False, "--dry-run"),
-    version: bool = typer.Option(False, "--version"),
+    output_dir: Optional[Path] = typer.Option(None, "--output-dir"),
+    risk_level: str = typer.Option("High", "--risk-level"),
+    target_os: str = typer.Option("Linux", "--target-os"),
+    include_mitigations: bool = typer.Option(True, "--include-mitigations"),
+    no_ingest: bool = typer.Option(False, "--no-ingest"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show full prompt and exit without calling LLM"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output (extra details during grounding)"),
+    version: bool = typer.Option(False, "--version", "-V", help="Show version and exit"),
 ):
     if ctx.invoked_subcommand is not None:
         return
 
     if version:
         from . import __version__
-        console.print(f"[bold green]POCArchitect v{__version__}[/]")
+        console.print(f"POCArchitect v{__version__}")
         raise typer.Exit(0)
 
-    if url is None:
-        console.print("[bold red]Error: Missing option '--url' / '-u'.[/]")
-        raise typer.Exit(1)
+    run_preflight()
 
-    if no_mitigations:
-        include_mitigations = False
+    if output_dir is None:
+        output_dir = get_default_output_dir()
 
-    if model is None:
-        if provider.lower() == "openai":
-            model = "gpt-4o"
-        elif provider.lower() == "xai":
-            model = "grok-4"
-        else:
-            model = "gpt-4o-mini"
-
-    console.print("[bold cyan]POCArchitect AI Agent[/] — Starting...")
-
-    if not dry_run:
-        console.print("[bold cyan]🔍 Running preflight checks...[/]")
-        run_preflight()
-
-    input_path = Path(url)
-
-    if input_path.is_file() and input_path.suffix.lower() in (".txt", ".list"):
-        console.print(f"[bold magenta]Batch mode detected — processing file:[/] {input_path.name}")
-        urls = [line.strip() for line in input_path.read_text(encoding="utf-8").splitlines()
-                if line.strip() and not line.strip().startswith("#")]
-
-        if not urls:
-            console.print("[bold red]Batch file is empty or contains only comments.[/]")
-            raise typer.Exit(1)
-
-        report_files: List[Path] = []
-        for u in urls:
-            report_path = process_single_url(
-                url=u,
-                provider=provider,
-                api_key=api_key,
-                model=model,
-                temperature=temperature,
-                base_url=base_url,
-                output_dir=output_dir,
-                risk_level=risk_level,
-                target_os=target_os,
-                include_mitigations=include_mitigations,
-                no_ingest=no_ingest,
-            )
-            report_files.append(report_path)
-
-        generate_index_md(output_dir, report_files)
-        console.print(f"[bold green]✅ Batch complete — {len(urls)} reports generated[/]")
-        raise typer.Exit(0)
-
-    else:
+    if url:
         process_single_url(
             url=url,
             provider=provider,
-            api_key=api_key,
+            api_key=None,
             model=model,
             temperature=temperature,
             base_url=base_url,
@@ -330,7 +280,14 @@ def main(
             target_os=target_os,
             include_mitigations=include_mitigations,
             no_ingest=no_ingest,
+            dry_run=dry_run,
+            verbose=verbose,
         )
+    elif batch:
+        console.print("[yellow]Batch mode coming in next update...[/]")
+    else:
+        console.print("[bold red]Error:[/] Provide --url or --batch")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

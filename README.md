@@ -1,55 +1,80 @@
-## POCArchitect AI Agent
+# POCArchitect AI Agent
 
-### Turn any Proof-of-Concept URL into a clean, reproducible, weaponized Markdown blueprint — built for red teamers and offensive security operators.
+Turn any Proof-of-Concept URL (primarily GitHub repos) into a clean, reproducible, **weaponized** Markdown blueprint for red teamers and offensive security operators.
 
-### Features
+## Features
 
-- GitHub PoC grounding (shallow clone + smart file extraction)
-- Fully functional batch mode (--url batch_urls.txt)
-- Operator controls:
-   - --risk-level
-   - --target-os
-   - --include-mitigations
-   - --no-mitigations
-   - --Automatic preflight checks on every run
-   - --Multi-provider support (xAI/Grok, OpenAI, Groq, local Ollama)
-   - --Smart Docker volume support (reports saved to /reports by default inside containers)
-   - --Retry logic + timeouts on LLM calls
+- Shallow git clone + smart file extraction (grounding)
+- Fully functional batch mode (`--url batch_urls.txt`)
+- Operator controls: `--risk-level`, `--target-os`, `--include-mitigations`, `--no-ingest`
+- Automatic preflight checks on every run
+- Multi-provider support: xAI/Grok (recommended), OpenAI, Groq, local Ollama
+- Smart Docker support (reports saved to mounted `/reports` volume)
+- Retry logic + timeouts on LLM calls
+- `--dry-run` and `--verbose` flags
 
+## Quick Start
 
-### Quick Start  - See the POCArchitect_Quickstart.txt file to get up and running quickly.  Or, you can do the following:
+1. Clone the repo:
 
-## 1. Clone & install
-git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
-cd POCArchitect-AI-Agent
-cp .env.example .env          # ← Add your XAI_API_KEY (or OPENAI_API_KEY)
-pip install -e .
+   ```
+   git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
+   cd POCArchitect-AI-Agent
+   ```
 
-## 2. Run preflight (optional — now runs automatically)
-pocarchitect preflight
+2. Set up your API key:
 
-## 3. Single URL
-pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent --provider xai
+   ```
+   cp .env.example .env
+   ```
 
-## 4. Batch mode (exactly as documented)
-pocarchitect --url example_usage/batch_urls.txt --provider xai
-Usage
-pocarchitect --url <URL or batch file> [OPTIONS]
-Options
---provider xai|openai|groq|local
---risk-level Critical|High|Medium|Low|auto
---target-os Windows|Linux|macOS|cross-platform|auto
---include-mitigations / --no-mitigations
---no-ingest — Skip grounding for very large repos
---output-dir ./reports
---verbose
-Reports are saved to ./reports/ (or /reports inside Docker).
+   Edit `.env` and add your `XAI_API_KEY` (or `OPENAI_API_KEY` / `GROQ_API_KEY`).
 
-Docker
-docker build -t pocarchitect .
-docker run -v "$(pwd)/reports:/reports" \
-  -e XAI_API_KEY=your_key_here \
-  pocarchitect --url https://github.com/... --provider xai
+3. Install:
 
-No --output-dir flag needed anymore — it automatically uses the mounted volume.
+   ```bash
+   pip install -e .[all]
+   ```
 
+4. Verify:
+
+   ```bash
+   pocarchitect preflight
+   ```
+
+5. Run a single PoC:
+
+   ```bash
+   pocarchitect --url https://github.com/example/poc-repo --provider xai
+   ```
+
+Reports are saved in `./reports/` (or `/reports` inside Docker).
+
+## Command-Line Options
+
+| Option | Description | Default |
+|---|---|---|
+| `--url`, `-u` | Single URL or path to batch `.txt` file | Required |
+| `--provider`, `-p` | LLM provider | `xai` |
+| `--model`, `-m` | Model name | `grok-3` |
+| `--risk-level` | Risk level | `High` |
+| `--target-os` | Target OS | `Linux` |
+| `--include-mitigations` | Include mitigations section | `true` |
+| `--no-ingest` | Skip GitHub grounding | `false` |
+| `--dry-run` | Show full prompt and exit (no API call) | `false` |
+| `--verbose`, `-v` | Extra grounding details | `false` |
+| `--version`, `-V` | Show version and exit | — |
+
+Full help:
+
+```bash
+pocarchitect --help
+```
+
+## Docker Usage
+
+See `docs/docker-guide.md` for full instructions.
+
+## Local Ollama Setup
+
+See `docs/ollama-setup-guide.md`.

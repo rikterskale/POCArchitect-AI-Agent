@@ -1,214 +1,128 @@
-# POCArchitect AI Agent - Beginner-Friendly Installation, Setup & Usage Guide
+POCArchitect AI Agent - Beginner-Friendly Installation, Setup & Usage Guide
 
-**POCArchitect-AI-Agent** is a Python CLI tool that takes any Proof-of-Concept (PoC) URL (usually a GitHub repo) and turns it into a clean, reproducible, "weaponized" Markdown blueprint/report.  
-It uses AI (LLMs) to analyze the code/files and generates structured documentation with your chosen risk level, target OS, mitigations, etc.  
+POCArchitect-AI-Agent is a Python CLI tool that takes any Proof-of-Concept (PoC) URL, usually a GitHub repo, and turns it into a clean, reproducible, "weaponized" Markdown blueprint/report.
+
+It uses AI (LLMs) with real code grounding to generate structured documentation with your chosen risk level, target OS, mitigations, etc.
+
 Perfect for red teamers and offensive security operators.
 
----
+Prerequisites
 
-## Prerequisites
+Git – For cloning PoCs and grounding
+Download: https://git-scm.com/downloads
+Python 3.9 or higher
+Download: https://www.python.org/downloads/
 
-Before you begin, install these (all free):
+Make sure "Add to PATH" is checked on Windows
+An LLM API key (choose one):
+xAI / Grok (recommended): https://console.grok.x.ai/
+OpenAI: https://platform.openai.com/api-keys
+Groq: https://console.groq.com/keys
+Ollama (completely local & free): See Ollama Setup Guide
+Optional but recommended: Docker Desktop
 
-1. **Git** – For cloning PoCs and grounding  
-   Download: https://git-scm.com/downloads
+Option 1: Local Python Installation (Recommended)
 
-2. **Python 3.9 or higher**  
-   Download: https://www.python.org/downloads/  
-   Make sure **"Add to PATH"** is checked on Windows.
+Step 1: Clone the repo
 
-3. **An LLM API key** (choose one):
-   - **xAI / Grok** (recommended): Get a key at https://console.grok.x.ai/
-   - **OpenAI**: https://platform.openai.com/api-keys
-   - **Groq**: https://console.groq.com/keys
-   - **Ollama** (completely local & free): Install from https://ollama.com and run:
-     ```bash
-     ollama pull llama3
-     ```
-
-4. **Optional but recommended**: **Docker Desktop**  
-   Download: https://www.docker.com/products/docker-desktop/
-
----
-
-## Option 1: Local Python Installation (Best for most users)
-
-### Step 1: Clone the repo
-
-Open your terminal (Terminal on macOS/Linux, Command Prompt or PowerShell on Windows) and run:
-
-```bash
 git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
+
 cd POCArchitect-AI-Agent
-```
 
-### Step 2: Create a virtual environment (highly recommended)
+Step 2: Create a virtual environment (strongly recommended)
 
-This keeps everything isolated and clean:
-
-```bash
-# Create the environment
+Windows:
 python -m venv venv
-
-# Activate it
-
-# Windows:
 venv\Scripts\activate
 
-# macOS / Linux:
+macOS / Linux:
+python -m venv venv
 source venv/bin/activate
-```
 
-You’ll see `(venv)` appear at the start of your prompt.
+Step 3: Install the tool
 
-### Step 3: Install the tool
+pip install -e .[all]
 
-```bash
-pip install -e .
-```
+Step 4: Set up your API key
 
-This installs `pocarchitect` as a command you can run from anywhere while the virtual environment is active.
-
-### Step 4: Set up your API key
-
-```bash
 cp .env.example .env
-```
 
-Open the new `.env` file in any text editor (Notepad, VS Code, etc.) and add your key.
+Edit .env and add your key, for example:
+XAI_API_KEY=...
 
-Example for xAI / Grok:
+Step 5: Test your setup
 
-```env
-XAI_API_KEY=sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-# You can also add OPENAI_API_KEY, GROQ_API_KEY, etc.
-# if you want to switch providers later
-```
-
-Save the file. Never share or upload this file.
-
-### Step 5: Test your setup
-
-```bash
 pocarchitect preflight
-```
 
-It will automatically check Git, your API key, and everything else. If it passes, you’re ready.
+If all checks pass, you're ready.
 
----
+Option 2: Docker (No Python setup needed)
 
-## Option 2: Docker (Easiest – no Python setup needed)
+Build the image:
 
-### Build the image
-
-```bash
 docker build -t pocarchitect .
-```
 
-### Run it
+Run it:
 
-Reports will appear in `./reports` on your computer:
+docker run --rm
+-v "$(pwd)/reports:/reports"
+-e XAI_API_KEY=your_actual_key_here
+pocarchitect --url https://github.com/example/poc-repo
+ --provider xai
 
-```bash
-docker run -v "$(pwd)/reports:/reports" \
-  -e XAI_API_KEY=your_actual_key_here \
-  pocarchitect --url https://github.com/example/poc-repo --provider xai
-```
+Basic Usage
 
-No virtual environment or `pip install` required.
+Single PoC (most common)
 
----
+pocarchitect --url https://github.com/someuser/some-poc
+ --provider xai
 
-## Basic Usage
+With common options
 
-### Single PoC (most common)
+pocarchitect --url https://github.com/someuser/some-poc
 
-```bash
-pocarchitect --url https://github.com/someuser/some-poc --provider xai
-```
+--provider xai
+--risk-level Critical
+--target-os Windows
+--include-mitigations
+--verbose
 
-### Full example with options
+Dry-Run Mode (highly recommended before real runs)
 
-```bash
-pocarchitect --url https://github.com/someuser/some-poc \
-  --provider xai \
-  --risk-level High \
-  --target-os Windows \
-  --include-mitigations \
-  --verbose
-```
+pocarchitect --url https://github.com/someuser/some-poc
+ --dry-run
 
-### Batch mode (multiple PoCs at once)
+This shows the full prompt that will be sent to the LLM without making any API call.
 
-Create a text file such as `my_batch.txt` with one URL per line.
+Batch Mode
 
-Run:
+Create a .txt file with one URL per line, then run:
 
-```bash
-pocarchitect --url my_batch.txt --provider xai
-```
+pocarchitect --url example_usage/batch_urls.txt --provider xai
 
-An example file is available in `example_usage/batch_urls.txt`.
+Useful Flags
 
----
+--provider xai|openai|groq|local
+--model (model name)
+--risk-level Critical|High|Medium|Low
+--target-os Windows|Linux|macOS|cross-platform
+--include-mitigations / --no-mitigations
+--no-ingest (skip grounding for very large repos)
+--dry-run (show prompt only)
+--verbose / -v (extra grounding details)
 
-## Useful Command-Line Options
+Run pocarchitect --help for the full list.
 
-| Option | Description | Example values |
-|---|---|---|
-| `--provider` | Which AI to use | `xai`, `openai`, `groq`, `local` |
-| `--risk-level` | Aggressiveness of the blueprint | `Critical`, `High`, `Medium`, `Low`, `auto` |
-| `--target-os` | Target operating system | `Windows`, `Linux`, `macOS`, `cross-platform`, `auto` |
-| `--include-mitigations` | Add defensive recommendations | Flag only |
-| `--no-mitigations` | Skip mitigations | Flag only |
-| `--no-ingest` | Skip deep file analysis for huge repos | Flag only |
-| `--output-dir` | Where to save reports | `./my-reports` |
-| `--verbose` | Show detailed logs | Flag only |
+Where Reports Are Saved
 
-Run `pocarchitect --help` anytime for the latest list.
+Default location: ./reports/ folder (created automatically)
+Each report is a nicely formatted Markdown file.
 
----
+Troubleshooting
 
-## Where Reports Are Saved
+Command not found → Activate your virtual environment first.
+API key error → Check your .env file and make sure the key matches the --provider you chose.
+Git not found → Install Git and restart your terminal.
+Still stuck? → Run pocarchitect preflight and follow the error messages.
 
-Default location: `./reports/` folder (created automatically)
-
-Each report is a nicely formatted Markdown file with:
-
-- Executive summary
-- Technical analysis
-- Weaponized steps
-- Optional mitigations
-
-You can open them in any Markdown viewer or import them into Notion, Obsidian, and similar tools.
-
----
-
-## Troubleshooting (Common Fixes)
-
-- **"command not found"**  
-  Make sure your virtual environment is activated:
-  - Windows: `venv\Scripts\activate`
-  - macOS / Linux: `source venv/bin/activate`
-
-- **API key error**  
-  Double-check your `.env` file and make sure you used the correct `--provider`.
-
-- **Git not found**  
-  Install Git and restart your terminal.
-
-- **Ollama (local)**  
-  Run this in another terminal first:
-  ```bash
-  ollama serve
-  ```
-
-- **Permission issues**  
-  Run commands in your project folder, or use `sudo` on Linux/macOS only if needed.
-
-- **Still stuck?**  
-  Run:
-  ```bash
-  pocarchitect preflight
-  ```
-  Then review the error message carefully.
+Happy hunting!
