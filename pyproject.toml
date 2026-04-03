@@ -36,6 +36,10 @@ Repository = "https://github.com/rikterskale/POCArchitect-AI-Agent"
 [tool.setuptools.packages.find]
 include = ["pocarchitect*"]
 
-# ── NEW: Include prompt file (and any other *.md) inside the package ──
+# ── Explicitly include non-Python files from MANIFEST.in ──
+[tool.setuptools]
+include_package_data = true
+
+# ── Modern alternative (still kept for wheel compatibility) ──
 [tool.setuptools.package-data]
 pocarchitect = ["*.md"]
