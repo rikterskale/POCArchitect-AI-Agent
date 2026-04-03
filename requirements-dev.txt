@@ -1,0 +1,7 @@
+# requirements-dev.txt – development dependencies
+-r requirements.txt
+tenacity>=8.5.0
+tiktoken>=0.7.0
+ruff>=0.6.0
+black>=24.8.0
+mypy>=1.11.0
