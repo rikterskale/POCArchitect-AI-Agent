@@ -1,4 +1,4 @@
-##POCArchitect AI Agent
+## POCArchitect AI Agent
 
 ### Turn any Proof-of-Concept URL into a clean, reproducible, weaponized Markdown blueprint — built for red teamers and offensive security operators.
 
@@ -6,7 +6,6 @@
 
 - GitHub PoC grounding (shallow clone + smart file extraction)
 - Fully functional batch mode (--url batch_urls.txt)
-- 
 - Operator controls:
    - --risk-level
    - --target-os
