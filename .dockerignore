@@ -1,0 +1,69 @@
+# ──────────────────────────────────────────────────────────────
+# .dockerignore - exclude everything we don't need in the build
+# ──────────────────────────────────────────────────────────────
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python bytecode / caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# Local development
+.env
+.env.example
+.dockerignore
+.docker/
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Testing & docs
+tests/
+docs/
+example_usage/
+*.md
+CHANGELOG.md
+README.md
+POCArchitect_Example_Report.md
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
+
+# Temporary / logs
+*.log
+tmp/
+temp/
+reports/          # we mount this as volume anyway
+*.tmp
+
+# Docker specific
+Dockerfile*
+.dockerfile*
+.dockerignore
+
+# Any local credentials or large files
+**/*.key
+**/*.pem
+**/*.crt
