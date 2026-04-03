@@ -9,8 +9,9 @@ import git
 from rich.console import Console
 from rich.panel import Panel
 from openai import OpenAI
+from importlib.resources import files
 
-# ── Preflight support (added) ─────────────────────────────────────
+# ── Preflight support ─────────────────────────────────────
 from .preflight import main as run_preflight
 
 load_dotenv(override=False)
@@ -28,16 +29,23 @@ console = Console()
 
 @app.command("preflight")
 def preflight():
-    """Run full environment pre-flight checks (Python version, deps, API key, prompt file, etc.)."""
+    """Run full environment pre-flight checks."""
     run_preflight()
 
 
 def load_prompt() -> str:
-    prompt_path = Path(__file__).parent.parent / "POC_Architect_Prompt.md"
-    if not prompt_path.exists():
-        console.print("[bold red]Error: POC_Architect_Prompt.md not found![/]", style="bold red")
+    """Load the core system prompt from package data.
+    
+    This version works reliably whether running from source,
+    after `pip install -e .`, or when installed from PyPI.
+    """
+    try:
+        prompt_file = files("pocarchitect") / "POC_Architect_Prompt.md"
+        return prompt_file.read_text(encoding="utf-8")
+    except Exception as e:
+        console.print(f"[bold red]Error: Could not load POC_Architect_Prompt.md from package: {e}[/]")
+        console.print("[yellow]Make sure the prompt file is inside the 'pocarchitect/' package directory.[/]")
         raise typer.Exit(1)
-    return prompt_path.read_text(encoding="utf-8")
 
 
 def build_grounding_context(poc_url: str) -> str:
@@ -115,7 +123,7 @@ def get_llm_response(
     system_prompt: str,
     user_message: str,
 ) -> str:
-    """Unified LLM call – now supports local servers."""
+    """Unified LLM call – supports xAI, OpenAI, Groq, Anthropic, Gemini, and local servers."""
     p = provider.lower()
 
     if p == "local":
@@ -138,7 +146,8 @@ def get_llm_response(
             base = "https://api.groq.com/openai/v1"
         client = OpenAI(api_key=api_key, base_url=base)
         response = client.chat.completions.create(
-            model=model, temperature=temperature,
+            model=model,
+            temperature=temperature,
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
         )
         return response.choices[0].message.content.strip()
@@ -146,14 +155,22 @@ def get_llm_response(
     elif p == "anthropic":
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(model=model, temperature=temperature, max_tokens=8192,
-                                          system=system_prompt, messages=[{"role": "user", "content": user_message}])
+        response = client.messages.create(
+            model=model,
+            temperature=temperature,
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}]
+        )
         return response.content[0].text.strip()
 
     elif p == "gemini":
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        model_obj = genai.GenerativeModel(model_name=model, system_instruction=system_prompt)
+        model_obj = genai.GenerativeModel(
+            model_name=model,
+            system_instruction=system_prompt
+        )
         response = model_obj.generate_content(user_message)
         return response.text.strip()
 
@@ -166,17 +183,18 @@ def get_llm_response(
 def main(
     ctx: typer.Context,
     url: str = typer.Option(..., "--url", "-u", help="Single PoC URL or path to batch file"),
-
     provider: str = typer.Option("xai", "--provider", "-p",
                                  help="LLM provider: xai, openai, groq, anthropic, gemini, local"),
     api_key: Optional[str] = typer.Option(None, "--api-key", "-k", help="API key (auto-loaded from .env)"),
-    base_url: Optional[str] = typer.Option(None, "--base-url", help="Base URL for local OpenAI-compatible server (required for --provider local)"),
+    base_url: Optional[str] = typer.Option(None, "--base-url", help="Base URL for local OpenAI-compatible server"),
     model: str = typer.Option("grok-4", "--model", "-m", help="Model name to use"),
     output_dir: Path = typer.Option(Path.cwd() / "reports", "--output-dir", "-o", help="Output directory"),
     temperature: float = typer.Option(0.0, "--temperature", "-t", help="Temperature (0.0 recommended)"),
 
-    risk_level: str = typer.Option("auto", "--risk-level", help="Force risk level", choices=["Critical","High","Medium","Low","auto"]),
-    target_os: str = typer.Option("auto", "--target-os", help="Target OS", choices=["Windows","Linux","macOS","cross-platform","auto"]),
+    risk_level: str = typer.Option("auto", "--risk-level", help="Force risk level", 
+                                   choices=["Critical", "High", "Medium", "Low", "auto"]),
+    target_os: str = typer.Option("auto", "--target-os", help="Target OS", 
+                                  choices=["Windows", "Linux", "macOS", "cross-platform", "auto"]),
     include_mitigations: bool = typer.Option(True, "--include-mitigations", "--mitigations"),
     no_mitigations: bool = typer.Option(False, "--no-mitigations"),
     target_version: Optional[str] = typer.Option(None, "--target-version"),
@@ -184,30 +202,33 @@ def main(
     no_ingest: bool = typer.Option(False, "--no-ingest", help="Disable Python-side PoC ingestion"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    version: bool = typer.Option(False, "--version"),
-) -> None:
-    """Generate full offensive security blueprints from PoC URLs."""
+    version: bool = typer.Option(False, "--version", "-V", help="Show version and exit"),
+):
+    """Main entrypoint for POCArchitect."""
     if version:
-        import pocarchitect
-        console.print(f"[bold]POCArchitect v{pocarchitect.__version__}[/]")
+        console.print("[bold]POCArchitect AI Agent[/] v0.2.0")
         raise typer.Exit()
 
-    if ctx.invoked_subcommand == "preflight":
+    if ctx.invoked_subcommand is not None:
         return
 
-    if not url:
-        console.print("[bold red]Error: --url is required[/]")
-        raise typer.Exit(1)
-
-    console.print(Panel.fit("[bold green]POCArchitect AI Agent[/] starting…", border_style="blue"))
-
+    # Load system prompt (now production-safe)
     system_prompt = load_prompt()
 
-    if not no_ingest:
-        grounding = build_grounding_context(url)
-        user_message = f"{grounding}\n\nNow analyze this PoC and generate the full blueprint."
+    # Build user message + grounding
+    if no_ingest:
+        user_message = f"Analyze this PoC and generate a full operational blueprint:\n\nURL: {url}"
     else:
-        user_message = f"Analyze this PoC URL: {url}\nGenerate the full blueprint."
+        grounding = build_grounding_context(url)
+        user_message = f"{grounding}\n\nGenerate a complete, production-ready operational blueprint for the above PoC."
+
+    if dry_run:
+        console.print(Panel("[yellow]DRY RUN MODE - No LLM call will be made[/]", title="Dry Run"))
+        console.print(f"[dim]Would send to {provider} using model {model}[/]")
+        return
+
+    console.print(f"[bold]Generating blueprint for:[/] {url}")
+    console.print(f"[dim]Provider:[/] {provider} • [dim]Model:[/] {model}")
 
     try:
         response = get_llm_response(
@@ -222,11 +243,12 @@ def main(
 
         # Save report
         output_dir.mkdir(parents=True, exist_ok=True)
-        report_path = output_dir / f"poc_blueprint_{Path(url).name.replace('/', '_')}.md"
+        safe_name = Path(url).name.replace("/", "_").replace(":", "_").replace("?", "_")
+        report_path = output_dir / f"poc_blueprint_{safe_name}.md"
         report_path.write_text(response, encoding="utf-8")
 
         console.print(Panel.fit(
-            f"[green]✅ Blueprint generated successfully![/]\nSaved to: [bold]{report_path}[/]",
+            f"[green]Blueprint generated successfully![/]\nSaved to: [bold]{report_path}[/]",
             border_style="green"
         ))
 
