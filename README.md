@@ -36,6 +36,22 @@ Every report contains build instructions, execution playbook, risk assessment, a
 - Python 3.9+
 - xAI (Grok), OpenAI, or any OpenAI-compatible API key
 
+## Docker
+
+The fastest way to run POCArchitect with zero local dependencies.
+
+```bash
+# 1. Build (do this once)
+docker build -t pocarchitect:latest .
+
+# 2. Run (single PoC example)
+docker run --rm \
+  -v "$(pwd)/reports:/reports" \
+  -e XAI_API_KEY=your_xai_key_here \
+  pocarchitect \
+  --url https://github.com/example/poc-repo
+```
+
 ### 1. Install the CLI (Recommended)
 
 ```bash
