@@ -8,7 +8,7 @@ The design philosophy is **zero hallucination through grounding**: the tool perf
 
 ### Current Design Goals (Met)
 - Accurate grounding via real source code (not just READMEs)
-- Fully functional **batch mode** (`--url batch_urls.txt`)
+- Batch mode via `--batch` flag (processes `.txt` files with one URL per line)
 - Operator controls fully wired (`--risk-level`, `--target-os`, `--include-mitigations`)
 - Automatic preflight checks on every run
 - Robust LLM calls with retries and timeouts
@@ -31,7 +31,8 @@ LLM Call (with retry + 60s timeout)
 Markdown Report Generation
 ↓
 Save to ./reports/ (or /reports in Docker)
-text---
+
+---
 
 ## Core Components
 
@@ -42,18 +43,19 @@ text---
 | System Prompt                    | `pocarchitect/POC_Architect_Prompt.md`   | Defines exact report structure and zero-hallucination rules |
 | Grounding Logic                  | `cli.py` (`build_grounding_context`)     | Shallow clone + improved keyword/extension file selection |
 | LLM Client                       | `cli.py` (`get_llm_response`)            | Provider support, API key resolution, retries, timeout |
-| Report Saving & Batch Index      | `cli.py`                                 | Timestamped reports + `index.md` generation |
+| Report Saving                    | `cli.py`                                 | Timestamped reports saved to output directory |
 
 ---
 
 ## Key Implementation Details
 
 - **Monolithic but clean**: All core logic lives in `cli.py` (intentional simplicity for a CLI tool).
-- **Batch Mode**: Fully implemented — accepts `.txt` files, processes each URL, and creates `index.md`.
+- **Batch Mode**: Accepts `.txt` files via `--batch`, processes each URL sequentially, generates one report per URL.
 - **Operator Controls**: `--risk-level`, `--target-os`, and `--include-mitigations` are now injected into every prompt.
 - **Resilience**: LLM calls use `tenacity` (3 retries with exponential backoff) + 60-second timeout.
 - **Docker Awareness**: Default output directory automatically becomes `/reports` when running inside a container.
 - **API Key Handling**: Automatic resolution from `.env` for xAI, OpenAI, and Groq.
+- **Provider-Specific Models**: Default model adjusts per provider (e.g., `grok-3` for xAI, `gpt-4o` for OpenAI).
 
 ---
 

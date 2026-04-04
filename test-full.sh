@@ -17,7 +17,7 @@ echo
 
 # 1. Clean install
 echo "1. 📦 Installing latest version..."
-pip install -e .[all] --force-reinstall
+pip install -e . --force-reinstall
 echo "✅ Installed"
 echo
 
@@ -30,6 +30,7 @@ echo
 echo "3. 🔗 Real Single URL Test (OpenAI)..."
 pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent \
   --provider openai \
+  --model gpt-4o \
   --risk-level High \
   --target-os Linux
 echo "✅ Single URL test completed"
@@ -39,6 +40,7 @@ echo
 echo "4. ⚙️ Real Operator Flags Test (OpenAI)..."
 pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent \
   --provider openai \
+  --model gpt-4o \
   --risk-level Critical \
   --target-os Windows \
   --include-mitigations \
@@ -48,7 +50,9 @@ echo
 
 # 5. Real Batch Mode Test (OpenAI)
 echo "5. 📋 Real Batch Mode Test (OpenAI)..."
-pocarchitect --url example_usage/batch_urls.txt --provider openai
+pocarchitect --batch example_usage/batch_urls.txt \
+  --provider openai \
+  --model gpt-4o
 echo "✅ Batch mode test completed"
 echo
 
@@ -57,9 +61,8 @@ echo "=================================================="
 echo "🎉 FULL TEST COMPLETE!"
 echo "=================================================="
 echo "📁 Reports saved in: ./reports/"
-echo "📄 Batch index created: ./reports/index.md (if batch was run)"
 echo
-echo "All tests ran with --provider openai"
+echo "All tests ran with --provider openai --model gpt-4o"
 echo "=================================================="
 
 # Show the latest reports

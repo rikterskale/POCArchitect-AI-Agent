@@ -38,6 +38,8 @@ ollama pull qwen2.5-coder:14b
 ollama pull deepseek-r1:32b
 ```
 
+> **Note:** The included preflight checker (`docs/ollama_preflight_check.py`) tests for `qwen2.5-coder:32b` by default. If you use a different model, update the `TEST_MODEL` variable in that script to match.
+
 ## 4. Test Ollama (Recommended)
 Run the included preflight checker:
 
@@ -45,7 +47,9 @@ Run the included preflight checker:
 python docs/ollama_preflight_check.py
 ```
 
-This validates the server, model, and OpenAI-compatible endpoint that POCArchitect actually uses.
+This validates the server, model availability, and the OpenAI-compatible endpoint (`/v1/chat/completions`) that POCArchitect actually uses.
+
+> **Prerequisite:** The checker requires the `requests` library. Install it with `pip install requests` if not already available.
 
 ## 5. Run POCArchitect with Local Ollama
 

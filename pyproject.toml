@@ -9,7 +9,7 @@ authors = [{name = "RikterSkale"}]
 keywords = ["red-team", "pentesting", "poc", "exploit-development", "ai-agent", "offsec", "cybersecurity"]
 
 dependencies = [
-    "typer[all]>=0.12.5",      # [all] brings shell completion support
+    "typer>=0.12.5",      # [all] brings shell completion support
     "rich>=13.7.0",
     "openai>=1.35.0",
     "python-dotenv>=1.0.0",

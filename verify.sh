@@ -13,7 +13,7 @@ echo
 
 # 1. Clean re-install
 echo "1. 📦 Re-installing package..."
-pip install -e .[all] --force-reinstall
+pip install -e . --force-reinstall
 echo "✅ Package installed"
 echo
 
@@ -52,7 +52,7 @@ echo
 
 # 6. Batch mode dry-run test
 echo "6. 📋 Batch mode test (dry-run)..."
-pocarchitect --url example_usage/batch_urls.txt \
+pocarchitect --batch example_usage/batch_urls.txt \
   --provider openai \
   --dry-run
 echo "✅ Batch mode dry-run passed"
@@ -64,7 +64,7 @@ echo "🎉 ALL VERIFICATION STEPS COMPLETE!"
 echo "=================================================="
 echo "✅ --dry-run now works correctly (no API calls)"
 echo "✅ --verbose flag is functional"
-echo "✅ All documentation flags match the code"
+echo "✅ --batch flag works for batch mode"
 echo "✅ Project is clean and production-ready!"
 echo "=================================================="
 

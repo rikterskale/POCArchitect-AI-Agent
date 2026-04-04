@@ -29,6 +29,14 @@ app = typer.Typer(
 
 console = Console()
 
+# ── Provider-specific default models (#9) ─────────────────
+DEFAULT_MODELS = {
+    "xai": "grok-3",
+    "openai": "gpt-4o",
+    "groq": "llama-3.1-70b-versatile",
+    "local": "qwen2.5-coder:32b",
+}
+
 
 @app.command("preflight")
 def preflight():
@@ -163,15 +171,18 @@ def get_llm_response(
     system_prompt: str,
     user_message: str,
 ) -> str:
+    p = provider.lower()
+
+    # Resolve API key from environment if not provided (#1: guard against None key for env_map)
     if api_key is None:
         env_map = {
             "xai": "XAI_API_KEY",
             "openai": "OPENAI_API_KEY",
             "groq": "GROQ_API_KEY",
         }
-        api_key = os.getenv(env_map.get(provider.lower()))
-
-    p = provider.lower()
+        env_var = env_map.get(p)
+        if env_var is not None:
+            api_key = os.getenv(env_var)
 
     if p == "local":
         client = OpenAI(api_key=api_key or "ollama", base_url=base_url, timeout=60.0)
@@ -193,9 +204,14 @@ def get_llm_response(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ],
-        timeout=60.0
     )
-    return response.choices[0].message.content.strip()
+
+    # (#8) Guard against None content
+    content = response.choices[0].message.content
+    if content is None:
+        console.print("[bold red]Error: LLM returned empty content[/]")
+        raise typer.Exit(1)
+    return content.strip()
 
 
 def process_single_url(url: str, provider: str, api_key: Optional[str], model: str,
@@ -235,6 +251,54 @@ Operator Preferences (respect these exactly):
     save_report(result, url, output_dir)
 
 
+# ── Batch processing (#2) ────────────────────────────────────────────
+def process_batch_file(batch_path: Path, provider: str, api_key: Optional[str], model: str,
+                       temperature: float, base_url: Optional[str], output_dir: Path,
+                       risk_level: str, target_os: str, include_mitigations: bool,
+                       no_ingest: bool, dry_run: bool = False, verbose: bool = False):
+    """Read URLs from a text file and process each one sequentially."""
+    if not batch_path.exists():
+        console.print(f"[bold red]Error:[/] Batch file not found: {batch_path}")
+        raise typer.Exit(1)
+
+    raw = batch_path.read_text(encoding="utf-8")
+    urls = [line.strip() for line in raw.splitlines() if line.strip() and not line.strip().startswith("#")]
+
+    if not urls:
+        console.print("[bold red]Error:[/] Batch file is empty or contains no valid URLs")
+        raise typer.Exit(1)
+
+    console.print(f"[bold cyan]Batch mode:[/] {len(urls)} URL(s) from {batch_path.name}")
+
+    for i, url in enumerate(urls, 1):
+        console.print(f"\n[bold]── URL {i}/{len(urls)} ──[/]")
+        try:
+            process_single_url(
+                url=url,
+                provider=provider,
+                api_key=api_key,
+                model=model,
+                temperature=temperature,
+                base_url=base_url,
+                output_dir=output_dir,
+                risk_level=risk_level,
+                target_os=target_os,
+                include_mitigations=include_mitigations,
+                no_ingest=no_ingest,
+                dry_run=dry_run,
+                verbose=verbose,
+            )
+        except typer.Exit:
+            if dry_run:
+                break  # dry-run exits after first URL
+            raise
+        except Exception as e:
+            console.print(f"[bold red]Error processing {url}:[/] {e}")
+            console.print("[yellow]Continuing to next URL...[/]")
+
+    console.print(f"\n[bold green]Batch complete:[/] processed {len(urls)} URL(s)")
+
+
 # ── Main CLI entry point ─────────────────────────────────────────────
 @app.callback(invoke_without_command=True)
 def main(
@@ -242,7 +306,7 @@ def main(
     url: Optional[str] = typer.Option(None, "--url", "-u", help="Single PoC GitHub URL"),
     batch: Optional[Path] = typer.Option(None, "--batch", "-b", help="Path to .txt file with multiple URLs"),
     provider: str = typer.Option("xai", "--provider", "-p"),
-    model: str = typer.Option("grok-3", "--model", "-m"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Model name (default: provider-specific)"),
     temperature: float = typer.Option(0.2, "--temperature", "-t"),
     base_url: Optional[str] = typer.Option(None, "--base-url"),
     output_dir: Optional[Path] = typer.Option(None, "--output-dir"),
@@ -262,7 +326,15 @@ def main(
         console.print(f"POCArchitect v{__version__}")
         raise typer.Exit(0)
 
-    run_preflight()
+    # (#10) Skip preflight in dry-run mode (dry-run does not need API keys)
+    if not dry_run:
+        run_preflight()
+
+    # (#9) Resolve provider-specific default model if not explicitly set
+    if model is None:
+        model = DEFAULT_MODELS.get(provider.lower(), "grok-3")
+        if verbose:
+            console.print(f"[dim]Using default model for {provider}: {model}[/]")
 
     if output_dir is None:
         output_dir = get_default_output_dir()
@@ -284,7 +356,21 @@ def main(
             verbose=verbose,
         )
     elif batch:
-        console.print("[yellow]Batch mode coming in next update...[/]")
+        process_batch_file(
+            batch_path=batch,
+            provider=provider,
+            api_key=None,
+            model=model,
+            temperature=temperature,
+            base_url=base_url,
+            output_dir=output_dir,
+            risk_level=risk_level,
+            target_os=target_os,
+            include_mitigations=include_mitigations,
+            no_ingest=no_ingest,
+            dry_run=dry_run,
+            verbose=verbose,
+        )
     else:
         console.print("[bold red]Error:[/] Provide --url or --batch")
         raise typer.Exit(1)

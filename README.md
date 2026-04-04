@@ -5,7 +5,7 @@ Turn any Proof-of-Concept URL (primarily GitHub repos) into a clean, reproducibl
 ## Features
 
 - Shallow git clone + smart file extraction (grounding)
-- Fully functional batch mode (`--url batch_urls.txt`)
+- Batch mode (`--batch batch_urls.txt`) — process multiple URLs from a text file
 - Operator controls: `--risk-level`, `--target-os`, `--include-mitigations`, `--no-ingest`
 - Automatic preflight checks on every run
 - Multi-provider support: xAI/Grok (recommended), OpenAI, Groq, local Ollama
@@ -54,9 +54,10 @@ Reports are saved in `./reports/` (or `/reports` inside Docker).
 
 | Option | Description | Default |
 |---|---|---|
-| `--url`, `-u` | Single URL or path to batch `.txt` file | Required |
+| `--url`, `-u` | Single PoC GitHub URL | Required (or use `--batch`) |
+| `--batch`, `-b` | Path to `.txt` file with multiple URLs | None |
 | `--provider`, `-p` | LLM provider | `xai` |
-| `--model`, `-m` | Model name | `grok-3` |
+| `--model`, `-m` | Model name | Provider-specific (e.g., `grok-3`) |
 | `--risk-level` | Risk level | `High` |
 | `--target-os` | Target OS | `Linux` |
 | `--include-mitigations` | Include mitigations section | `true` |

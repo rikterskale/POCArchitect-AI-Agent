@@ -96,17 +96,17 @@ This shows the full prompt that will be sent to the LLM without making any API c
 
 Batch Mode
 
-Create a .txt file with one URL per line, then run:
+Create a .txt file with one URL per line, then run using --batch:
 
-pocarchitect --url example_usage/batch_urls.txt --provider xai
+pocarchitect --batch example_usage/batch_urls.txt --provider xai
 
 Useful Flags
 
 --provider xai|openai|groq|local
---model (model name)
+--model (model name, defaults per provider)
 --risk-level Critical|High|Medium|Low
 --target-os Windows|Linux|macOS|cross-platform
---include-mitigations / --no-mitigations
+--include-mitigations / --no-include-mitigations
 --no-ingest (skip grounding for very large repos)
 --dry-run (show prompt only)
 --verbose / -v (extra grounding details)

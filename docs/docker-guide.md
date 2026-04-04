@@ -56,7 +56,7 @@ docker run --rm \
   -v "$(pwd)/reports:/reports" \
   -v "$(pwd)/batch_urls.txt:/batch_urls.txt" \
   pocarchitect \
-  --url /batch_urls.txt
+  --batch /batch_urls.txt
 ```
 
 ### Full Example with Custom Options
@@ -68,7 +68,7 @@ docker run --rm \
   pocarchitect \
   --url https://github.com/example/poc-repo \
   --provider xai \
-  --model grok-4 \
+  --model grok-3 \
   --output-dir /reports \
   --verbose
 ```
@@ -80,9 +80,8 @@ docker run --rm \
 | Variable | Description | Required |
 |---|---|---|
 | `XAI_API_KEY` | xAI / Grok key | Yes* |
-| `OPENAI_API_KEY` | OpenAI / Groq key | Yes* |
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) key | Yes* |
-| `GEMINI_API_KEY` | Google Gemini key | Yes* |
+| `OPENAI_API_KEY` | OpenAI key | Yes* |
+| `GROQ_API_KEY` | Groq key | Yes* |
 
 *Only the key for the provider you choose is required.
 
@@ -101,14 +100,13 @@ alias pocarch='docker run --rm --env-file .env -v "$(pwd)/reports:/reports" poca
 Then just run: `pocarch --url <url>`
 
 - Python-side PoC ingestion (grounding context) works automatically inside Docker — no extra setup needed.
-- For private GitHub repos, pass a GitHub token via `--github-token` (CLI support coming in next release).
 
 ---
 
 ## 5. Troubleshooting
 
-- **"Permission denied" on reports** → The container runs as non-root `pocuser`. Make sure your host `./reports` folder is writable (`chmod 777 reports` or `mkdir -p reports`).
-- **Git clone fails** → Public repos work out of the box. Private repos need a token (future CLI flag).
+- **"Permission denied" on reports** → The container runs as non-root `pocuser`. Make sure your host `./reports` folder is writable (`chmod 775 reports` or `mkdir -p reports`).
+- **Git clone fails** → Public repos work out of the box. Private repos need authentication configured separately.
 - **API key not found** → Use `--env-file .env` or explicit `-e KEY=...`.
 - **Rebuild after changes** → `docker build --no-cache -t pocarchitect:latest .`
 
