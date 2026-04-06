@@ -46,3 +46,25 @@ def test_check_cli_command_reports_not_found(monkeypatch):
     ok, msg = preflight.check_cli_command()
     assert ok is False
     assert msg == "✗ Not found"
+
+
+def test_check_api_key_ignores_placeholder_values(tmp_path, monkeypatch):
+    for key in preflight.ENV_KEY_NAMES:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=your_key_here\n", encoding="utf-8")
+
+    ok, msg = preflight.check_api_key()
+    assert ok is False
+    assert msg == "✗ No API key found"
+
+
+def test_check_api_key_accepts_real_env_file_value(tmp_path, monkeypatch):
+    for key in preflight.ENV_KEY_NAMES:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-test-123\n", encoding="utf-8")
+
+    ok, msg = preflight.check_api_key()
+    assert ok is True
+    assert msg == "✓ OPENAI_API_KEY in .env"

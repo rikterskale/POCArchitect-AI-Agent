@@ -4,6 +4,7 @@ import os
 import subprocess
 import importlib
 from pathlib import Path
+from dotenv import dotenv_values
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -22,6 +23,21 @@ REQUIRED_DEPS = [
 ]
 
 
+def _is_valid_key_value(value: str | None) -> bool:
+    if value is None:
+        return False
+    cleaned = value.strip()
+    placeholders = {
+        "",
+        "your_key_here",
+        "your-api-key-here",
+        "changeme",
+        "<your_key>",
+        "<api_key>",
+    }
+    return cleaned.lower() not in placeholders
+
+
 def check_dependency(name: str) -> tuple[bool, str]:
     try:
         importlib.import_module(name)
@@ -31,14 +47,15 @@ def check_dependency(name: str) -> tuple[bool, str]:
 
 def check_api_key() -> tuple[bool, str]:
     env_path = Path.cwd() / ".env"
-    if env_path.exists():
-        content = env_path.read_text(encoding="utf-8")
-        for key in ENV_KEY_NAMES:
-            if key in content and os.getenv(key):
-                return True, f"✓ {key} found"
+    env_file_values = dotenv_values(env_path) if env_path.exists() else {}
+
     for key in ENV_KEY_NAMES:
-        if os.getenv(key):
+        env_value = os.getenv(key)
+        file_value = env_file_values.get(key)
+        if _is_valid_key_value(env_value):
             return True, f"✓ {key} in environment"
+        if _is_valid_key_value(file_value):
+            return True, f"✓ {key} in .env"
     return False, "✗ No API key found"
 
 def check_prompt_file() -> tuple[bool, str]:

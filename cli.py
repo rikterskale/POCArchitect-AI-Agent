@@ -1,11 +1,11 @@
 ﻿#!/usr/bin/env python3
 import typer
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional, Literal
 from dotenv import load_dotenv
-import git
 from rich.console import Console
 from rich.panel import Panel
 from openai import OpenAI
@@ -120,7 +120,16 @@ def build_grounding_context(poc_url: str, no_ingest: bool = False, verbose: bool
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo_path = Path(tmp_dir) / "poc"
             console.print(f"[dim]Cloning {repo_name} (shallow)...[/dim]", end=" ")
-            git.Repo.clone_from(clone_url, repo_path, depth=1, single_branch=True)
+            git_env = os.environ.copy()
+            git_env["GIT_TERMINAL_PROMPT"] = "0"
+            subprocess.run(
+                ["git", "clone", "--depth", "1", "--single-branch", clone_url, str(repo_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env=git_env,
+            )
             console.print("[green]done[/]")
 
             if verbose:
