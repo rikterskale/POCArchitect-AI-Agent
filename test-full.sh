@@ -2,7 +2,7 @@
 # ================================================
 # POCArchitect FULL TEST Script
 # Runs real LLM calls (consumes tokens/credits)
-# Uses OpenAI by default — change as needed
+# Uses OpenAI by default — change as required
 # ================================================
 
 set -e

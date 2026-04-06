@@ -1,4 +1,4 @@
-# requirements.txt – runtime dependencies
+# requirements.txt – runtime deps
 typer>=0.12.5
 rich>=13.7.0
 openai>=1.35.0

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================
-# POCArchitect Verification Script (DRY-RUN)
+# POCArchitect Verification Script (Dry-Run))
 # Validates the tool without making real LLM calls
 # ================================================
 

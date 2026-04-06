@@ -1,6 +1,6 @@
 # POCArchitect AI Agent
 
-Turn any Proof-of-Concept URL (primarily GitHub repos) into a clean, reproducible, **weaponized** Markdown blueprint for red teamers and offensive security operators.
+Turn any Proof-of-Concept URL (primarily GitHub repos, but can be others) into a clean, reproducible, **weaponized** Markdown blueprint for red teamers and offensive security operators.
 
 ## Features
 

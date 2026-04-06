@@ -1,4 +1,4 @@
-# MANIFEST.in - Controls which files go into sdist (source distribution)
+# MANIFEST.in - Controls which files go into (source distribution)
 
 # Core files
 include LICENSE

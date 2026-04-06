@@ -1,4 +1,4 @@
-# requirements-dev.txt – development dependencies
+# requirements-dev.txt – dev dependencies
 -r requirements.txt
 pytest>=7.0.0
 ruff>=0.6.0

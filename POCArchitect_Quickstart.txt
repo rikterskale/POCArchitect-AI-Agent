@@ -1,4 +1,4 @@
-POCArchitect AI Agent - Beginner-Friendly Installation, Setup & Usage Guide
+POCArchitect AI Agent - Beginner Friendly Installation, Setup & Usage Guide
 
 POCArchitect-AI-Agent is a Python CLI tool that takes any Proof-of-Concept (PoC) URL, usually a GitHub repo, and turns it into a clean, reproducible, "weaponized" Markdown blueprint/report.
 

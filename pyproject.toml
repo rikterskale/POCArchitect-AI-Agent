@@ -1,7 +1,7 @@
 [project]
 name = "pocarchitect"
 version = "0.2.0"
-description = "POC Architect - AI Agent that turns raw PoC URLs into weaponized Markdown blueprints for red teamers"
+description = "POC Architect - AI Agent that turns raw PoC URLs into weaponized Markdown blueprints for red teamers and offensive security researchers"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
