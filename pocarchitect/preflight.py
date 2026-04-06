@@ -4,6 +4,7 @@ import os
 import subprocess
 import importlib
 from pathlib import Path
+from dotenv import dotenv_values
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -18,8 +19,24 @@ ENV_KEY_NAMES = [
 ]
 
 REQUIRED_DEPS = [
-    "typer", "rich", "openai", "dotenv", "git", "tenacity"
+    "typer", "rich", "openai", "dotenv", "tenacity"
 ]
+
+
+def _is_valid_key_value(value: str | None) -> bool:
+    if value is None:
+        return False
+    cleaned = value.strip()
+    placeholders = {
+        "",
+        "your_key_here",
+        "your-api-key-here",
+        "changeme",
+        "<your_key>",
+        "<api_key>",
+    }
+    return cleaned.lower() not in placeholders
+
 
 def check_dependency(name: str) -> tuple[bool, str]:
     try:
@@ -30,14 +47,15 @@ def check_dependency(name: str) -> tuple[bool, str]:
 
 def check_api_key() -> tuple[bool, str]:
     env_path = Path.cwd() / ".env"
-    if env_path.exists():
-        content = env_path.read_text(encoding="utf-8")
-        for key in ENV_KEY_NAMES:
-            if key in content and os.getenv(key):
-                return True, f"✓ {key} found"
+    env_file_values = dotenv_values(env_path) if env_path.exists() else {}
+
     for key in ENV_KEY_NAMES:
-        if os.getenv(key):
+        env_value = os.getenv(key)
+        file_value = env_file_values.get(key)
+        if _is_valid_key_value(env_value):
             return True, f"✓ {key} in environment"
+        if _is_valid_key_value(file_value):
+            return True, f"✓ {key} in .env"
     return False, "✗ No API key found"
 
 def check_prompt_file() -> tuple[bool, str]:
@@ -60,6 +78,20 @@ def check_output_directory_writable() -> tuple[bool, str]:
         return True, f"✓ {out_dir} writable"
     except Exception:
         return False, "✗ Output directory not writable"
+
+
+def check_cli_command() -> tuple[bool, str]:
+    candidates = [
+        [sys.executable, "-m", "pocarchitect", "--help"],
+        ["pocarchitect", "--help"],
+    ]
+    for cmd in candidates:
+        try:
+            subprocess.run(cmd, capture_output=True, check=True)
+            return True, f"✓ Available via: {' '.join(cmd[:3])}".strip()
+        except Exception:
+            continue
+    return False, "✗ Not found"
 
 def main():
     console.print(Panel("[bold green]POCArchitect Preflight Check[/bold green]", expand=False))
@@ -85,12 +117,10 @@ def main():
         table.add_row(f"Dependency: {dep}", msg)
 
     # CLI command
-    try:
-        subprocess.run(["pocarchitect", "--help"], capture_output=True, check=True)
-        table.add_row("CLI command", "✓ Available")
-    except Exception:
+    ok, msg = check_cli_command()
+    if not ok:
         has_failure = True
-        table.add_row("CLI command", "✗ Not found")
+    table.add_row("CLI command", msg)
 
     # Prompt file
     ok, msg = check_prompt_file()
