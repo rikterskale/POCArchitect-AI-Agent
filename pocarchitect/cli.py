@@ -3,7 +3,7 @@ import typer
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 from dotenv import load_dotenv
 import git
 from rich.console import Console
@@ -13,6 +13,7 @@ from importlib.resources import files
 import re
 from datetime import datetime
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from urllib.parse import urlparse
 
 # ── Preflight support ─────────────────────────────────────
 from .preflight import main as run_preflight
@@ -78,6 +79,29 @@ def save_report(content: str, url: str, output_dir: Path) -> Path:
     return output_path
 
 
+def normalize_github_repo_url(poc_url: str) -> tuple[str, str]:
+    parsed = urlparse(poc_url.strip())
+    host = parsed.netloc.lower()
+    if host not in {"github.com", "www.github.com"}:
+        raise ValueError("Only github.com URLs are supported for grounding ingestion")
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if len(path_parts) < 2:
+        raise ValueError("Expected a GitHub repository URL in the format /<owner>/<repo>")
+
+    owner = path_parts[0]
+    repo = path_parts[1]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+
+    if not owner or not repo:
+        raise ValueError("Could not determine repository owner/name from URL")
+
+    repo_name = f"{owner}/{repo}"
+    clone_url = f"https://github.com/{owner}/{repo}.git"
+    return repo_name, clone_url
+
+
 def build_grounding_context(poc_url: str, no_ingest: bool = False, verbose: bool = False) -> str:
     if no_ingest:
         return f"PoC URL: {poc_url}\n[Grounding disabled by --no-ingest]"
@@ -85,14 +109,13 @@ def build_grounding_context(poc_url: str, no_ingest: bool = False, verbose: bool
     context = ["=== GROUNDING CONTEXT — USE THIS HEAVILY ==="]
     context.append(f"PoC URL: {poc_url}\n")
 
-    if not poc_url.startswith("https://github.com/"):
+    parsed = urlparse(poc_url.strip())
+    if parsed.netloc.lower() not in {"github.com", "www.github.com"}:
         context.append("Non-GitHub URL — limited analysis.")
         return "\n".join(context)
 
     try:
-        parts = poc_url.rstrip("/").split("/")
-        repo_name = f"{parts[3]}/{parts[4]}"
-        clone_url = poc_url if poc_url.endswith(".git") else poc_url + ".git"
+        repo_name, clone_url = normalize_github_repo_url(poc_url)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo_path = Path(tmp_dir) / "poc"
@@ -269,8 +292,13 @@ def process_batch_file(batch_path: Path, provider: str, api_key: Optional[str], 
         raise typer.Exit(1)
 
     console.print(f"[bold cyan]Batch mode:[/] {len(urls)} URL(s) from {batch_path.name}")
+    processed_count = 0
+    success_count = 0
+    failure_count = 0
+    failed_urls = []
 
     for i, url in enumerate(urls, 1):
+        processed_count += 1
         console.print(f"\n[bold]── URL {i}/{len(urls)} ──[/]")
         try:
             process_single_url(
@@ -288,15 +316,27 @@ def process_batch_file(batch_path: Path, provider: str, api_key: Optional[str], 
                 dry_run=dry_run,
                 verbose=verbose,
             )
+            success_count += 1
         except typer.Exit:
             if dry_run:
                 break  # dry-run exits after first URL
             raise
         except Exception as e:
+            failure_count += 1
+            failed_urls.append(url)
             console.print(f"[bold red]Error processing {url}:[/] {e}")
             console.print("[yellow]Continuing to next URL...[/]")
 
-    console.print(f"\n[bold green]Batch complete:[/] processed {len(urls)} URL(s)")
+    console.print(
+        f"\n[bold green]Batch complete:[/] total={len(urls)} processed={processed_count} "
+        f"success={success_count} failed={failure_count} skipped={len(urls) - processed_count}"
+    )
+    if dry_run and processed_count < len(urls):
+        console.print("[yellow]Dry-run mode processed only the first URL by design.[/]")
+    if failed_urls:
+        console.print("[yellow]Failed URLs:[/]")
+        for failed_url in failed_urls:
+            console.print(f" - {failed_url}")
 
 
 # ── Main CLI entry point ─────────────────────────────────────────────
@@ -305,7 +345,7 @@ def main(
     ctx: typer.Context,
     url: Optional[str] = typer.Option(None, "--url", "-u", help="Single PoC GitHub URL"),
     batch: Optional[Path] = typer.Option(None, "--batch", "-b", help="Path to .txt file with multiple URLs"),
-    provider: str = typer.Option("xai", "--provider", "-p"),
+    provider: Literal["xai", "openai", "groq", "local"] = typer.Option("xai", "--provider", "-p"),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="Model name (default: provider-specific)"),
     temperature: float = typer.Option(0.2, "--temperature", "-t"),
     base_url: Optional[str] = typer.Option(None, "--base-url"),
