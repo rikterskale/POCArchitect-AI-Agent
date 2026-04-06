@@ -23,6 +23,10 @@ def test_normalize_github_repo_url_supports_common_variants():
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"
 
+    repo_name, clone_url = cli.normalize_github_repo_url("https://github.com/octocat/Hello-World.GIT")
+    assert repo_name == "octocat/Hello-World"
+    assert clone_url == "https://github.com/octocat/Hello-World.git"
+
     repo_name, clone_url = cli.normalize_github_repo_url("https://github.com/octocat/Hello-World/tree/main")
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"

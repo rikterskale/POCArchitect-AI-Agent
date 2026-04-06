@@ -91,7 +91,7 @@ def normalize_github_repo_url(poc_url: str) -> tuple[str, str]:
 
     owner = path_parts[0]
     repo = path_parts[1]
-    if repo.endswith(".git"):
+    if repo.lower().endswith(".git"):
         repo = repo[:-4]
 
     if not owner or not repo:
