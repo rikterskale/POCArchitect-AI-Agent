@@ -274,7 +274,7 @@ Operator Preferences (respect these exactly):
     save_report(result, url, output_dir)
 
 
-# ── Batch processing (#2) ───────────────────────────────────────────
+# ── Batch processing (#2) ────────────────────────────────────────────
 def process_batch_file(batch_path: Path, provider: str, api_key: Optional[str], model: str,
                        temperature: float, base_url: Optional[str], output_dir: Path,
                        risk_level: str, target_os: str, include_mitigations: bool,
@@ -383,6 +383,10 @@ def main(
 
     if output_dir is None:
         output_dir = get_default_output_dir()
+
+    if url and batch:
+        console.print("[bold red]Error:[/] Provide either --url or --batch, not both")
+        raise typer.Exit(1)
 
     if url:
         process_single_url(
