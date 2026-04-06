@@ -15,15 +15,10 @@ FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
-# Create user first
 RUN useradd -m -s /bin/bash pocuser
 
-# Create reports dir and hand ownership to runtime user
-RUN mkdir -p /reports \
-    && chown -R pocuser:pocuser /reports \
-    && chmod -R 775 /reports
-
-RUN useradd -m -s /bin/bash pocuser
+# Create reports directory and grant runtime user write access
+RUN mkdir -p /reports && chown -R pocuser:pocuser /reports && chmod -R 775 /reports
 
 WORKDIR /app
 
