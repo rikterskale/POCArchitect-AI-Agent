@@ -1,4 +1,6 @@
 import io
+import os
+import subprocess
 
 import pytest
 import typer
@@ -173,3 +175,26 @@ def test_process_batch_file_continues_after_non_dry_typer_exit(tmp_path, monkeyp
     text = output.getvalue()
     assert "total=2 processed=2 success=1 failed=1 skipped=0" in text
     assert "https://github.com/example/exit" in text
+
+
+def test_build_grounding_context_uses_non_interactive_timed_git_clone(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):  # noqa: ANN001
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+
+    context = cli.build_grounding_context("https://github.com/octocat/Hello-World")
+
+    assert "Repository: octocat/Hello-World" in context
+    assert calls, "Expected git clone subprocess call"
+    cmd, kwargs = calls[0]
+    assert cmd[:4] == ["git", "clone", "--depth", "1"]
+    assert kwargs["timeout"] == 90
+    assert kwargs["check"] is True
+    assert kwargs["capture_output"] is True
+    assert kwargs["text"] is True
+    assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
+    assert kwargs["env"]["PATH"] == os.environ["PATH"]
