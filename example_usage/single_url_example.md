@@ -1,1 +1,1 @@
-https://github.com/offsec-tools/some-poc
+https://github.com/offsec-tools/somepoc

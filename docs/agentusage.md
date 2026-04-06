@@ -72,7 +72,7 @@ pocarchitect --help
 - Use `--verbose` when troubleshooting.
 - When switching providers, the model default adjusts automatically. Override with `--model` if needed.
 
-**Last Updated:** April 03, 2026
+**Last Updated:** April 06, 2026
 
 For more details, see:
 
