@@ -129,3 +129,43 @@ def test_cli_rejects_url_and_batch_together(tmp_path):
 
     assert result.exit_code == 1
     assert "Provide either --url or --batch, not both" in result.stdout
+
+
+def test_process_batch_file_continues_after_non_dry_typer_exit(tmp_path, monkeypatch):
+    batch_file = tmp_path / "batch.txt"
+    batch_file.write_text(
+        "https://github.com/example/exit\nhttps://github.com/example/good\n",
+        encoding="utf-8",
+    )
+
+    def fake_process_single_url(url, **kwargs):  # noqa: ANN001
+        if url.endswith("/exit"):
+            raise typer.Exit(1)
+
+    output = io.StringIO()
+    monkeypatch.setattr(cli, "process_single_url", fake_process_single_url)
+    monkeypatch.setattr(
+        cli,
+        "console",
+        Console(file=output, force_terminal=False, color_system=None),
+    )
+
+    cli.process_batch_file(
+        batch_path=batch_file,
+        provider="openai",
+        api_key=None,
+        model="gpt-4o",
+        temperature=0.2,
+        base_url=None,
+        output_dir=tmp_path / "reports",
+        risk_level="High",
+        target_os="Linux",
+        include_mitigations=True,
+        no_ingest=True,
+        dry_run=False,
+        verbose=False,
+    )
+
+    text = output.getvalue()
+    assert "total=2 processed=2 success=1 failed=1 skipped=0" in text
+    assert "https://github.com/example/exit" in text
