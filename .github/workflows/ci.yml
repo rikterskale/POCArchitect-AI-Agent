@@ -1,28 +1,67 @@
-name: Build and Test
+name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
   pull_request:
+    branches: ["main"]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-test:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Ruff lint
+        run: ruff check --output-format=github .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Black format check
+        run: black --check --diff .
+
+      - name: Mypy type check
+        run: mypy pocarchitect tests
+
+  test:
+    needs: quality
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -36,10 +75,77 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip install -e .
-          pip install build
 
-      - name: Run tests
-        run: pytest
+      - name: Run tests with coverage
+        run: pytest --cov=pocarchitect --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  security:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Install dependencies + pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+          pip install pip-audit
+
+      - name: Dependency vulnerability scan
+        run: pip-audit
+
+  docker:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t pocarchitect:test .
+
+      - name: Smoke test Docker image
+        run: docker run --rm pocarchitect:test --help
+
+  build:
+    needs: [quality, test, security, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
 
       - name: Build package
         run: python -m build
+
+      - name: List built artifacts
+        run: ls -la dist/
