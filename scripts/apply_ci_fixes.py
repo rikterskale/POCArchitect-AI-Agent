@@ -53,6 +53,7 @@ jobs:
         run: python -m build
 """
 
+
 def replace_once(text: str, old: str, new: str) -> tuple[str, bool]:
     if old in text:
         return text.replace(old, new, 1), True
@@ -63,27 +64,31 @@ def patch_cli(text: str) -> tuple[str, int]:
     changes = 0
 
     if "import subprocess\n" not in text:
-        text, changed = replace_once(text, "import tempfile\n", "import tempfile\nimport subprocess\n")
+        text, changed = replace_once(
+            text, "import tempfile\n", "import tempfile\nimport subprocess\n"
+        )
         changes += int(changed)
 
     if "\nimport git\n" in text:
         text = text.replace("\nimport git\n", "\n", 1)
         changes += 1
 
-    text, changed = replace_once(text, 'if repo.endswith(".git"):', 'if repo.lower().endswith(".git"):')
+    text, changed = replace_once(
+        text, 'if repo.endswith(".git"):', 'if repo.lower().endswith(".git"):'
+    )
     changes += int(changed)
 
     old_clone = "git.Repo.clone_from(clone_url, repo_path, depth=1, single_branch=True)"
     new_clone = (
         "subprocess.run(\n"
-        "                [\"git\", \"clone\", \"--depth\", \"1\", \"--single-branch\", clone_url, str(repo_path)],\n"
+        '                ["git", "clone", "--depth", "1", "--single-branch", clone_url, str(repo_path)],\n'
         "                check=True,\n"
         "                capture_output=True,\n"
         "                text=True,\n"
         "                timeout=90,\n"
         "                env={\n"
-        "                    \"GIT_TERMINAL_PROMPT\": \"0\",\n"
-        "                    \"PATH\": os.environ.get(\"PATH\", \"\"),\n"
+        '                    "GIT_TERMINAL_PROMPT": "0",\n'
+        '                    "PATH": os.environ.get("PATH", ""),\n'
         "                },\n"
         "            )"
     )
@@ -112,8 +117,8 @@ def patch_cli(text: str) -> tuple[str, int]:
         "                break  # dry-run exits after first URL\n"
         "            failure_count += 1\n"
         "            failed_urls.append(url)\n"
-        "            console.print(f\"[bold red]Error processing {url}:[/] exit code {e.exit_code}\")\n"
-        "            console.print(\"[yellow]Continuing to next URL...[/]\")\n"
+        '            console.print(f"[bold red]Error processing {url}:[/] exit code {e.exit_code}")\n'
+        '            console.print("[yellow]Continuing to next URL...[/]")\n'
     )
     text, changed = replace_once(text, old_batch, new_batch)
     changes += int(changed)
@@ -126,7 +131,9 @@ def patch_preflight(text: str) -> tuple[str, int]:
 
     if "from typing import Optional\n" not in text:
         text, changed = replace_once(
-            text, "from pathlib import Path\n", "from pathlib import Path\nfrom typing import Optional\n"
+            text,
+            "from pathlib import Path\n",
+            "from pathlib import Path\nfrom typing import Optional\n",
         )
         changes += int(changed)
 
