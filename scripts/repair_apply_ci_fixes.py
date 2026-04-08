@@ -6,7 +6,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
 TARGET = Path(__file__).resolve().parent / "apply_ci_fixes.py"
 TEMPLATE = Path(__file__).resolve().parent / "apply_ci_fixes.template.py"
 SHEBANG = "#!/usr/bin/env python3"

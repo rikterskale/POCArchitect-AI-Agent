@@ -3,7 +3,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-
 MODULE_PATH = (
     Path(__file__).resolve().parent.parent / "scripts" / "repair_apply_ci_fixes.py"
 )

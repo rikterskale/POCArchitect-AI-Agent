@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-
 CI_YML = """name: Build and Test
 
 on:
