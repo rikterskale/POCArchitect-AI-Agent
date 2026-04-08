@@ -2,10 +2,10 @@
 import typer
 import os
 import tempfile
+import subprocess
 from pathlib import Path
 from typing import Optional, Literal
 from dotenv import load_dotenv
-import git
 from rich.console import Console
 from rich.panel import Panel
 from openai import OpenAI
@@ -91,7 +91,7 @@ def normalize_github_repo_url(poc_url: str) -> tuple[str, str]:
 
     owner = path_parts[0]
     repo = path_parts[1]
-    if repo.endswith(".git"):
+    if repo.lower().endswith(".git"):
         repo = repo[:-4]
 
     if not owner or not repo:
@@ -120,7 +120,17 @@ def build_grounding_context(poc_url: str, no_ingest: bool = False, verbose: bool
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo_path = Path(tmp_dir) / "poc"
             console.print(f"[dim]Cloning {repo_name} (shallow)...[/dim]", end=" ")
-            git.Repo.clone_from(clone_url, repo_path, depth=1, single_branch=True)
+            subprocess.run(
+                ["git", "clone", "--depth", "1", "--single-branch", clone_url, str(repo_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={
+                    "GIT_TERMINAL_PROMPT": "0",
+                    "PATH": os.environ.get("PATH", ""),
+                },
+            )
             console.print("[green]done[/]")
 
             if verbose:
@@ -325,7 +335,10 @@ def process_batch_file(batch_path: Path, provider: str, api_key: Optional[str], 
                     failure_count += 1
                     failed_urls.append(url)
                 break  # dry-run exits after first URL
-            raise
+            failure_count += 1
+            failed_urls.append(url)
+            console.print(f"[bold red]Error processing {url}:[/] exit code {e.exit_code}")
+            console.print("[yellow]Continuing to next URL...[/]")
         except Exception as e:
             failure_count += 1
             failed_urls.append(url)

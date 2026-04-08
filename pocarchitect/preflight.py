@@ -4,6 +4,7 @@ import os
 import subprocess
 import importlib
 from pathlib import Path
+from typing import Optional
 from dotenv import dotenv_values
 from rich.console import Console
 from rich.table import Table
@@ -23,7 +24,7 @@ REQUIRED_DEPS = [
 ]
 
 
-def _is_valid_key_value(value: str | None) -> bool:
+def _is_valid_key_value(value: Optional[str]) -> bool:
     if value is None:
         return False
     cleaned = value.strip()
