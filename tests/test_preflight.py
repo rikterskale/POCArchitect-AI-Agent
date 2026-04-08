@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 
 from pocarchitect import preflight
 

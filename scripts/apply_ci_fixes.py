@@ -53,6 +53,9 @@ jobs:
       - name: Run tests
         run: pytest
 
+      - name: Check formatting
+        run: ruff format --check .
+
       - name: Build package
         run: python -m build
 """

@@ -19,9 +19,7 @@ ENV_KEY_NAMES = [
     "GROQ_API_KEY",
 ]
 
-REQUIRED_DEPS = [
-    "typer", "rich", "openai", "dotenv", "tenacity"
-]
+REQUIRED_DEPS = ["typer", "rich", "openai", "dotenv", "tenacity"]
 
 
 def _is_valid_key_value(value: Optional[str]) -> bool:
@@ -46,6 +44,7 @@ def check_dependency(name: str) -> tuple[bool, str]:
     except ImportError:
         return False, "✗ Missing"
 
+
 def check_api_key() -> tuple[bool, str]:
     env_path = Path.cwd() / ".env"
     env_file_values = dotenv_values(env_path) if env_path.exists() else {}
@@ -59,6 +58,7 @@ def check_api_key() -> tuple[bool, str]:
             return True, f"✓ {key} in .env"
     return False, "✗ No API key found"
 
+
 def check_prompt_file() -> tuple[bool, str]:
     prompt_candidates = [
         Path.cwd() / "pocarchitect" / "POC_Architect_Prompt.md",
@@ -69,9 +69,12 @@ def check_prompt_file() -> tuple[bool, str]:
             return True, f"✓ Found at {p.name}"
     return False, "✗ Prompt file missing"
 
+
 def check_output_directory_writable() -> tuple[bool, str]:
     try:
-        out_dir = Path("/reports") if Path("/.dockerenv").exists() else Path.cwd() / "reports"
+        out_dir = (
+            Path("/reports") if Path("/.dockerenv").exists() else Path.cwd() / "reports"
+        )
         out_dir.mkdir(parents=True, exist_ok=True)
         test_file = out_dir / ".write_test"
         test_file.touch()
@@ -94,8 +97,11 @@ def check_cli_command() -> tuple[bool, str]:
             continue
     return False, "✗ Not found"
 
+
 def main():
-    console.print(Panel("[bold green]POCArchitect Preflight Check[/bold green]", expand=False))
+    console.print(
+        Panel("[bold green]POCArchitect Preflight Check[/bold green]", expand=False)
+    )
 
     table = Table(title="Preflight Results")
     table.add_column("Check", style="cyan")
@@ -147,7 +153,10 @@ def main():
         console.print("[bold red]❌ Preflight failed. Fix the issues above.[/]")
         sys.exit(1)
     else:
-        console.print("[bold green]✅ All checks passed! You are ready to run POCArchitect.[/]")
+        console.print(
+            "[bold green]✅ All checks passed! You are ready to run POCArchitect.[/]"
+        )
+
 
 if __name__ == "__main__":
     main()

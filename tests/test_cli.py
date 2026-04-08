@@ -13,23 +13,33 @@ RUNNER = CliRunner()
 
 
 def test_normalize_github_repo_url_supports_common_variants():
-    repo_name, clone_url = cli.normalize_github_repo_url("https://github.com/octocat/Hello-World")
+    repo_name, clone_url = cli.normalize_github_repo_url(
+        "https://github.com/octocat/Hello-World"
+    )
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"
 
-    repo_name, clone_url = cli.normalize_github_repo_url("https://www.github.com/octocat/Hello-World/")
+    repo_name, clone_url = cli.normalize_github_repo_url(
+        "https://www.github.com/octocat/Hello-World/"
+    )
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"
 
-    repo_name, clone_url = cli.normalize_github_repo_url("https://github.com/octocat/Hello-World.git")
+    repo_name, clone_url = cli.normalize_github_repo_url(
+        "https://github.com/octocat/Hello-World.git"
+    )
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"
 
-    repo_name, clone_url = cli.normalize_github_repo_url("https://github.com/octocat/Hello-World.GIT")
+    repo_name, clone_url = cli.normalize_github_repo_url(
+        "https://github.com/octocat/Hello-World.GIT"
+    )
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"
 
-    repo_name, clone_url = cli.normalize_github_repo_url("https://github.com/octocat/Hello-World/tree/main")
+    repo_name, clone_url = cli.normalize_github_repo_url(
+        "https://github.com/octocat/Hello-World/tree/main"
+    )
     assert repo_name == "octocat/Hello-World"
     assert clone_url == "https://github.com/octocat/Hello-World.git"
 
@@ -39,7 +49,9 @@ def test_normalize_github_repo_url_rejects_non_github():
         cli.normalize_github_repo_url("https://gitlab.com/octocat/Hello-World")
 
 
-def test_process_batch_file_reports_success_failure_and_failed_urls(tmp_path, monkeypatch):
+def test_process_batch_file_reports_success_failure_and_failed_urls(
+    tmp_path, monkeypatch
+):
     batch_file = tmp_path / "batch.txt"
     batch_file.write_text(
         "https://github.com/example/good\nhttps://github.com/example/bad\n",
