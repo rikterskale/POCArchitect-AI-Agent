@@ -8,50 +8,79 @@ the command/configuration surface. Use --check in CI to detect drift.
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
-import re
-import subprocess
 import sys
 
+import click
+from typer.main import get_command
+
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+def markdown_cell(value: object) -> str:
+    """Return a deterministic Markdown table cell across operating systems."""
+    text = value.as_posix() if isinstance(value, Path) else str(value)
+    return " ".join(text.replace("|", "\\|").split()) or "—"
 
 
-def runtime_help(*arguments: str) -> str:
-    """Capture the Typer-owned help text so docs cannot drift from CLI metadata."""
-    environment = {**os.environ, "NO_COLOR": "1", "FORCE_COLOR": "0"}
-    result = subprocess.run(
-        [sys.executable, "-m", "pocarchitect", *arguments, "--help"],
-        cwd=ROOT,
-        capture_output=True,
-        check=True,
-        encoding="utf-8",
-        env=environment,
+def option_type(option: click.Option) -> str:
+    if isinstance(option.type, click.Choice):
+        return " | ".join(str(choice) for choice in option.type.choices)
+    return option.type.name.upper()
+
+
+def option_rows(command: click.Command) -> list[str]:
+    rows = []
+    for parameter in command.params:
+        if not isinstance(parameter, click.Option) or parameter.hidden:
+            continue
+        flags = ", ".join(
+            f"`{flag}`" for flag in (*parameter.opts, *parameter.secondary_opts)
+        )
+        default = "required" if parameter.required else markdown_cell(parameter.default)
+        rows.append(
+            f"| {flags} | {option_type(parameter)} | {default} | "
+            f"{markdown_cell(parameter.help or '')} |"
+        )
+    return rows
+
+
+def command_section(title: str, command: click.Command) -> str:
+    description = markdown_cell(command.help or "")
+    rows = option_rows(command)
+    table = "\n".join(rows) if rows else "| — | — | — | No options |"
+    return (
+        f"## {title}\n\n{description}\n\n"
+        "| Option | Type | Default | Purpose |\n"
+        "|---|---|---|---|\n"
+        f"{table}"
     )
-    plain_help = ANSI_ESCAPE.sub("", result.stdout)
-    return "\n".join(line.rstrip() for line in plain_help.splitlines()).strip()
 
 
 def cli_reference() -> str:
-    sections = [
-        ("Main command", ()),
-        ("Provider preflight", ("preflight",)),
-        ("Batch recovery status", ("batch-status",)),
-        ("Batch recovery reset", ("batch-reset",)),
-    ]
-    rendered_sections = []
-    for title, arguments in sections:
-        rendered_sections.append(
-            f"## {title}\n\n```text\n{runtime_help(*arguments)}\n```"
-        )
+    from pocarchitect.cli import app
+
+    root_command = get_command(app)
+    sections = [command_section("Main command", root_command)]
+    sections.extend(
+        command_section(f"Command: `{name}`", command)
+        for name, command in root_command.commands.items()
+    )
+    commands = "\n".join(
+        f"| `{name}` | {markdown_cell(command.help or '')} |"
+        for name, command in root_command.commands.items()
+    )
     return (
         "# CLI Reference\n\n"
-        "Generated from Typer command metadata by `python scripts/generate_docs.py`. "
-        "CI fails when this runtime reference is stale.\n\n"
-        + "\n\n".join(rendered_sections)
-        + "\n\n## Safe examples\n\n"
+        "Generated directly from Typer/Click command metadata by "
+        "`python scripts/generate_docs.py`; it does not depend on terminal layout or platform path separators.\n\n"
+        + "\n\n".join(sections)
+        + "\n\n## Commands\n\n"
+        "| Command | Purpose |\n"
+        "|---|---|\n"
+        f"{commands}" + "\n\n## Safe examples\n\n"
         "```text\n"
         "python -m pocarchitect preflight --provider local --offline\n"
         "python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color\n"

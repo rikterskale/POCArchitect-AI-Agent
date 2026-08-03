@@ -1,113 +1,68 @@
 # CLI Reference
 
-Generated from Typer command metadata by `python scripts/generate_docs.py`. CI fails when this runtime reference is stale.
+Generated directly from Typer/Click command metadata by `python scripts/generate_docs.py`; it does not depend on terminal layout or platform path separators.
 
 ## Main command
 
-```text
-Usage: python -m pocarchitect [OPTIONS] COMMAND [ARGS]...
+POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 
- POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--url`, `-u` | TEXT | None | Single PoC GitHub URL |
+| `--batch`, `-b` | PATH | None | Path to .txt file with multiple URLs |
+| `--provider`, `-p` | xai | openai | groq | local | xai | — |
+| `--model`, `-m` | TEXT | None | Model name (default: provider-specific) |
+| `--temperature`, `-t` | FLOAT | 0.2 | — |
+| `--base-url` | TEXT | None | — |
+| `--output-dir` | PATH | None | — |
+| `--risk-level` | TEXT | High | — |
+| `--target-os` | TEXT | Linux | — |
+| `--include-mitigations` | BOOLEAN | True | — |
+| `--no-ingest` | BOOLEAN | False | — |
+| `--dry-run` | BOOLEAN | False | Show full prompt and exit without calling LLM |
+| `--verbose`, `-v` | BOOLEAN | False | Enable verbose output (extra details during grounding) |
+| `--batch-state` | PATH | None | JSON progress file used to resume completed batch URLs. |
+| `--yes` | BOOLEAN | False | Confirm source transfer without an interactive prompt. |
+| `--format` | text | json | text | Output mode: text or JSON Lines. |
+| `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
+| `--version`, `-V` | BOOLEAN | False | Show version and exit |
 
-+- Options -------------------------------------------------------------------+
-| --url                  -u      TEXT                   Single PoC GitHub URL |
-| --batch                -b      PATH                   Path to .txt file     |
-|                                                       with multiple URLs    |
-| --provider             -p      [xai|openai|groq|loca  [default: xai]        |
-|                                l]                                           |
-| --model                -m      TEXT                   Model name (default:  |
-|                                                       provider-specific)    |
-| --temperature          -t      FLOAT                  [default: 0.2]        |
-| --base-url                     TEXT                                         |
-| --output-dir                   PATH                                         |
-| --risk-level                   TEXT                   [default: High]       |
-| --target-os                    TEXT                   [default: Linux]      |
-| --include-mitigations                                 [default: True]       |
-| --no-ingest                                                                 |
-| --dry-run                                             Show full prompt and  |
-|                                                       exit without calling  |
-|                                                       LLM                   |
-| --verbose              -v                             Enable verbose output |
-|                                                       (extra details during |
-|                                                       grounding)            |
-| --batch-state                  PATH                   JSON progress file    |
-|                                                       used to resume        |
-|                                                       completed batch URLs. |
-| --yes                                                 Confirm source        |
-|                                                       transfer without an   |
-|                                                       interactive prompt.   |
-| --format                       [text|json]            Output mode: text or  |
-|                                                       JSON Lines.           |
-|                                                       [default: text]       |
-| --no-color                                            Disable ANSI color    |
-|                                                       and style sequences.  |
-| --version              -V                             Show version and exit |
-| --help                                                Show this message and |
-|                                                       exit.                 |
-+-----------------------------------------------------------------------------+
-+- Commands ------------------------------------------------------------------+
-| preflight     Run environment preflight checks                              |
-| batch-status  Show a concise, machine-readable summary of batch recovery    |
-|               state.                                                        |
-| batch-reset   Reset a ledger by moving its prior contents to a timestamped  |
-|               backup.                                                       |
-+-----------------------------------------------------------------------------+
-```
+## Command: `preflight`
 
-## Provider preflight
+Run environment preflight checks
 
-```text
-Usage: python -m pocarchitect preflight [OPTIONS]
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--offline` | BOOLEAN | False | Check installation without requiring an API key or provider access. |
+| `--provider`, `-p` | xai | openai | groq | local | xai | Provider whose readiness to check. |
+| `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
+| `--format` | text | json | text | Output mode: text or JSON Lines. |
+| `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 
- Run environment preflight checks
+## Command: `batch-status`
 
-+- Options -------------------------------------------------------------------+
-| --offline                                    Check installation without     |
-|                                              requiring an API key or        |
-|                                              provider access.               |
-| --provider  -p      [xai|openai|groq|local]  Provider whose readiness to    |
-|                                              check.                         |
-|                                              [default: xai]                 |
-| --base-url          TEXT                     OpenAI-compatible local        |
-|                                              provider endpoint.             |
-| --format            [text|json]              Output mode: text or JSON      |
-|                                              Lines.                         |
-|                                              [default: text]                |
-| --no-color                                   Disable ANSI color and style   |
-|                                              sequences.                     |
-| --help                                       Show this message and exit.    |
-+-----------------------------------------------------------------------------+
-```
+Show a concise, machine-readable summary of batch recovery state.
 
-## Batch recovery status
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--batch-state` | PATH | reports/batch_progress.json | Batch ledger to inspect. |
 
-```text
-Usage: python -m pocarchitect batch-status [OPTIONS]
+## Command: `batch-reset`
 
- Show a concise, machine-readable summary of batch recovery state.
+Reset a ledger by moving its prior contents to a timestamped backup.
 
-+- Options -------------------------------------------------------------------+
-| --batch-state        PATH  Batch ledger to inspect.                         |
-|                            [default: reports\batch_progress.json]           |
-| --help                     Show this message and exit.                      |
-+-----------------------------------------------------------------------------+
-```
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--batch-state` | PATH | reports/batch_progress.json | Batch ledger to reset. |
+| `--yes` | BOOLEAN | False | Confirm the recoverable reset without an interactive prompt. |
 
-## Batch recovery reset
+## Commands
 
-```text
-Usage: python -m pocarchitect batch-reset [OPTIONS]
-
- Reset a ledger by moving its prior contents to a timestamped backup.
-
-+- Options -------------------------------------------------------------------+
-| --batch-state        PATH  Batch ledger to reset.                           |
-|                            [default: reports\batch_progress.json]           |
-| --yes                      Confirm the recoverable reset without an         |
-|                            interactive prompt.                              |
-| --help                     Show this message and exit.                      |
-+-----------------------------------------------------------------------------+
-```
+| Command | Purpose |
+|---|---|
+| `preflight` | Run environment preflight checks |
+| `batch-status` | Show a concise, machine-readable summary of batch recovery state. |
+| `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. |
 
 ## Safe examples
 
