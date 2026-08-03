@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import subprocess
 
@@ -145,7 +146,7 @@ def test_cli_rejects_url_and_batch_together(tmp_path):
         ],
     )
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "Provide either --url or --batch, not both" in result.stdout
 
 
@@ -241,3 +242,70 @@ def test_sensitive_input_detection_does_not_return_secret():
     categories = cli.detect_sensitive_input(secret)
     assert categories
     assert all("sk-test" not in category for category in categories)
+
+
+def test_redact_sensitive_input_removes_values_before_transfer():
+    source = "OPENAI_API_KEY=sk-test-1234567890abcdef\nkeep this context"
+
+    redacted, categories, count = cli.redact_sensitive_input(source)
+
+    assert categories == ["key/token assignment", "provider-token format"]
+    assert count >= 1
+    assert "sk-test-1234567890abcdef" not in redacted
+    assert "[REDACTED]" in redacted
+
+
+def test_json_dry_run_is_machine_readable_and_no_color():
+    result = RUNNER.invoke(
+        cli.app,
+        [
+            "--url",
+            "https://github.com/example/repo",
+            "--no-ingest",
+            "--dry-run",
+            "--format",
+            "json",
+            "--no-color",
+        ],
+    )
+
+    assert result.exit_code == 0
+    events = [json.loads(line) for line in result.stdout.splitlines() if line]
+    assert [event["event"] for event in events] == ["processing", "dry_run"]
+    assert "\x1b" not in result.stdout
+    assert events[-1]["prompt"].startswith("--- SYSTEM PROMPT ---")
+
+
+def test_batch_status_reports_atomic_ledger_summary(tmp_path):
+    state_path = tmp_path / "batch_progress.json"
+    cli.write_state(
+        state_path,
+        {
+            "version": 2,
+            "items": {
+                "https://github.com/example/ok": {"status": "success"},
+                "https://github.com/example/fail": {"status": "failed"},
+            },
+        },
+    )
+
+    result = RUNNER.invoke(cli.app, ["batch-status", "--batch-state", str(state_path)])
+
+    assert result.exit_code == 0
+    assert "total=2 success=1 failed=1" in result.stdout
+
+
+def test_corrupt_batch_state_is_preserved_until_explicit_reset(tmp_path):
+    state_path = tmp_path / "batch_progress.json"
+    state_path.write_text("{not valid json", encoding="utf-8")
+
+    status = RUNNER.invoke(cli.app, ["batch-status", "--batch-state", str(state_path)])
+    reset = RUNNER.invoke(
+        cli.app, ["batch-reset", "--batch-state", str(state_path), "--yes"]
+    )
+
+    assert status.exit_code == 2
+    assert "batch-reset" in status.stdout
+    assert reset.exit_code == 0
+    assert not state_path.exists()
+    assert list(tmp_path.glob("batch_progress.reset-*.json.bak"))

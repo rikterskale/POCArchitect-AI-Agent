@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 from pocarchitect import preflight
@@ -86,3 +87,47 @@ def test_offline_preflight_does_not_require_api_key(monkeypatch):
     )
 
     preflight.main(require_api_key=False, offline=True)
+
+
+def test_local_preflight_checks_endpoint_without_cloud_key(monkeypatch):
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        preflight, "check_output_directory_writable", lambda: (True, "ok")
+    )
+    monkeypatch.setattr(
+        preflight,
+        "check_api_key",
+        lambda provider: (_ for _ in ()).throw(
+            AssertionError("Local provider must not require a cloud API key")
+        ),
+    )
+    checked = []
+    monkeypatch.setattr(
+        preflight,
+        "check_local_endpoint",
+        lambda base_url: (checked.append(base_url) or True, "ok"),
+    )
+
+    preflight.main(provider="local", base_url="http://127.0.0.1:11434/v1")
+
+    assert checked == ["http://127.0.0.1:11434/v1"]
+
+
+def test_preflight_json_is_one_machine_readable_event(monkeypatch, capsys):
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        preflight, "check_output_directory_writable", lambda: (True, "ok")
+    )
+
+    preflight.main(
+        require_api_key=False, offline=True, output_format="json", no_color=True
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["event"] == "preflight"
+    assert payload["offline"] is True
+    assert "\x1b" not in json.dumps(payload)

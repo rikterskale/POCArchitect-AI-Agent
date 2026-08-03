@@ -51,6 +51,9 @@ jobs:
       - name: Documentation generation check
         run: python scripts/generate_docs.py --check
 
+      - name: Novice guide validation
+        run: python scripts/validate_novice_guides.py
+
   test:
     needs: quality
     runs-on: ubuntu-latest
