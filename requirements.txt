@@ -1,7 +1,7 @@
 # requirements.txt – runtime dependencies
 # CLI metadata is used to generate a checked-in reference; keep its renderer stable.
-typer==0.24.1
-click==8.3.2
+typer==0.23.1
+click==8.3.3
 rich>=13.7.0
 openai>=1.35.0
 python-dotenv>=1.0.0
