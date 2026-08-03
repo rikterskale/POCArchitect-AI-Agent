@@ -58,7 +58,7 @@ def test_process_batch_file_reports_success_failure_and_failed_urls(
         encoding="utf-8",
     )
 
-    def fake_process_single_url(url, **kwargs):  # noqa: ANN001
+    def fake_process_single_url(url, **kwargs):
         if url.endswith("/bad"):
             raise RuntimeError("boom")
 
@@ -98,7 +98,7 @@ def test_process_batch_file_dry_run_reports_skipped_count(tmp_path, monkeypatch)
         encoding="utf-8",
     )
 
-    def fake_process_single_url(url, **kwargs):  # noqa: ANN001
+    def fake_process_single_url(url, **kwargs):
         raise typer.Exit(0)
 
     output = io.StringIO()
@@ -156,7 +156,7 @@ def test_process_batch_file_continues_after_non_dry_typer_exit(tmp_path, monkeyp
         encoding="utf-8",
     )
 
-    def fake_process_single_url(url, **kwargs):  # noqa: ANN001
+    def fake_process_single_url(url, **kwargs):
         if url.endswith("/exit"):
             raise typer.Exit(1)
 
@@ -192,7 +192,7 @@ def test_process_batch_file_continues_after_non_dry_typer_exit(tmp_path, monkeyp
 def test_build_grounding_context_uses_non_interactive_timed_git_clone(monkeypatch):
     calls = []
 
-    def fake_run(cmd, **kwargs):  # noqa: ANN001
+    def fake_run(cmd, **kwargs):
         calls.append((cmd, kwargs))
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
@@ -210,3 +210,34 @@ def test_build_grounding_context_uses_non_interactive_timed_git_clone(monkeypatc
     assert kwargs["text"] is True
     assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
     assert kwargs["env"]["PATH"] == os.environ["PATH"]
+
+
+def test_save_report_contains_safe_metadata(tmp_path, monkeypatch):
+    output = io.StringIO()
+    monkeypatch.setattr(
+        cli,
+        "console",
+        Console(file=output, force_terminal=False, color_system=None),
+    )
+
+    report = cli.save_report(
+        "# Report\n\nresult",
+        "https://github.com/example/repo",
+        tmp_path,
+        "local",
+        "test-model",
+        True,
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert 'source_url: "https://github.com/example/repo"' in text
+    assert 'provider: "local"' in text
+    assert "content_sha256:" in text
+    assert "test-model" in text
+
+
+def test_sensitive_input_detection_does_not_return_secret():
+    secret = "OPENAI_API_KEY=sk-test-1234567890abcdef"
+    categories = cli.detect_sensitive_input(secret)
+    assert categories
+    assert all("sk-test" not in category for category in categories)

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-import sys
+import importlib
 import os
 import subprocess
-import importlib
+import sys
 from pathlib import Path
 from typing import Optional
+
 from dotenv import dotenv_values
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 console = Console()
 
@@ -40,9 +41,9 @@ def _is_valid_key_value(value: Optional[str]) -> bool:
 def check_dependency(name: str) -> tuple[bool, str]:
     try:
         importlib.import_module(name)
-        return True, "✓ Installed"
+        return True, "OK: Installed"
     except ImportError:
-        return False, "✗ Missing"
+        return False, "FAIL: Missing"
 
 
 def check_api_key() -> tuple[bool, str]:
@@ -53,10 +54,10 @@ def check_api_key() -> tuple[bool, str]:
         env_value = os.getenv(key)
         file_value = env_file_values.get(key)
         if _is_valid_key_value(env_value):
-            return True, f"✓ {key} in environment"
+            return True, f"OK: {key} in environment"
         if _is_valid_key_value(file_value):
-            return True, f"✓ {key} in .env"
-    return False, "✗ No API key found"
+            return True, f"OK: {key} in .env"
+    return False, "FAIL: No API key found"
 
 
 def check_prompt_file() -> tuple[bool, str]:
@@ -66,8 +67,8 @@ def check_prompt_file() -> tuple[bool, str]:
     ]
     for p in prompt_candidates:
         if p.exists():
-            return True, f"✓ Found at {p.name}"
-    return False, "✗ Prompt file missing"
+            return True, f"OK: Found at {p.name}"
+    return False, "FAIL: Prompt file missing"
 
 
 def check_output_directory_writable() -> tuple[bool, str]:
@@ -79,9 +80,12 @@ def check_output_directory_writable() -> tuple[bool, str]:
         test_file = out_dir / ".write_test"
         test_file.touch()
         test_file.unlink()
-        return True, f"✓ {out_dir} writable"
-    except Exception:
-        return False, "✗ Output directory not writable"
+        return True, f"OK: {out_dir} writable"
+    except OSError as error:
+        return (
+            False,
+            f"FAIL: {out_dir} is not writable ({error}); use --output-dir <writable-folder>",
+        )
 
 
 def check_cli_command() -> tuple[bool, str]:
@@ -92,13 +96,13 @@ def check_cli_command() -> tuple[bool, str]:
     for cmd in candidates:
         try:
             subprocess.run(cmd, capture_output=True, check=True)
-            return True, f"✓ Available via: {' '.join(cmd[:3])}".strip()
+            return True, f"OK: Available via: {' '.join(cmd[:3])}".strip()
         except Exception:
             continue
-    return False, "✗ Not found"
+    return False, "FAIL: Not found"
 
 
-def main():
+def main(require_api_key: bool = True, offline: bool = False):
     console.print(
         Panel("[bold green]POCArchitect Preflight Check[/bold green]", expand=False)
     )
@@ -111,7 +115,7 @@ def main():
 
     # Python version
     py_ok = sys.version_info >= (3, 9)
-    status = "✓" if py_ok else "✗"
+    status = "OK" if py_ok else "FAIL"
     if not py_ok:
         has_failure = True
     table.add_row("Python >=3.9", status)
@@ -135,11 +139,14 @@ def main():
         has_failure = True
     table.add_row("System prompt", msg)
 
-    # API key
-    ok, msg = check_api_key()
-    if not ok:
-        has_failure = True
-    table.add_row("API key", msg)
+    # API keys are only required when a provider call is intended.
+    if require_api_key and not offline:
+        ok, msg = check_api_key()
+        if not ok:
+            has_failure = True
+        table.add_row("API key", msg)
+    else:
+        table.add_row("API key", "OK: Not required for offline checks")
 
     # Output directory
     ok, msg = check_output_directory_writable()
@@ -150,11 +157,14 @@ def main():
     console.print(table)
 
     if has_failure:
-        console.print("[bold red]❌ Preflight failed. Fix the issues above.[/]")
+        console.print(
+            "[bold red]FAIL: Preflight failed.[/] Review the failed rows above, then "
+            "rerun `python -m pocarchitect preflight --offline`."
+        )
         sys.exit(1)
     else:
         console.print(
-            "[bold green]✅ All checks passed! You are ready to run POCArchitect.[/]"
+            "[bold green]OK: All checks passed! You are ready to run POCArchitect.[/]"
         )
 
 

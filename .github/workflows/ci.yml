@@ -48,6 +48,9 @@ jobs:
       - name: Mypy type check
         run: mypy pocarchitect tests
 
+      - name: Documentation generation check
+        run: python scripts/generate_docs.py --check
+
   test:
     needs: quality
     runs-on: ubuntu-latest

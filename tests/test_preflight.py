@@ -6,7 +6,7 @@ from pocarchitect import preflight
 def test_check_cli_command_uses_module_entrypoint_first(monkeypatch):
     calls = []
 
-    def fake_run(cmd, capture_output, check):  # noqa: ANN001
+    def fake_run(cmd, capture_output, check):
         calls.append(cmd)
         if cmd[:3] == [preflight.sys.executable, "-m", "pocarchitect"]:
             return subprocess.CompletedProcess(cmd, 0)
@@ -23,7 +23,7 @@ def test_check_cli_command_uses_module_entrypoint_first(monkeypatch):
 def test_check_cli_command_falls_back_to_cli_binary(monkeypatch):
     calls = []
 
-    def fake_run(cmd, capture_output, check):  # noqa: ANN001
+    def fake_run(cmd, capture_output, check):
         calls.append(cmd)
         if cmd[0] == "pocarchitect":
             return subprocess.CompletedProcess(cmd, 0)
@@ -38,14 +38,14 @@ def test_check_cli_command_falls_back_to_cli_binary(monkeypatch):
 
 
 def test_check_cli_command_reports_not_found(monkeypatch):
-    def fake_run(cmd, capture_output, check):  # noqa: ANN001
+    def fake_run(cmd, capture_output, check):
         raise subprocess.CalledProcessError(1, cmd)
 
     monkeypatch.setattr(preflight.subprocess, "run", fake_run)
 
     ok, msg = preflight.check_cli_command()
     assert ok is False
-    assert msg == "✗ Not found"
+    assert msg == "FAIL: Not found"
 
 
 def test_check_api_key_ignores_placeholder_values(tmp_path, monkeypatch):
@@ -56,7 +56,7 @@ def test_check_api_key_ignores_placeholder_values(tmp_path, monkeypatch):
 
     ok, msg = preflight.check_api_key()
     assert ok is False
-    assert msg == "✗ No API key found"
+    assert msg == "FAIL: No API key found"
 
 
 def test_check_api_key_accepts_real_env_file_value(tmp_path, monkeypatch):
@@ -67,4 +67,22 @@ def test_check_api_key_accepts_real_env_file_value(tmp_path, monkeypatch):
 
     ok, msg = preflight.check_api_key()
     assert ok is True
-    assert msg == "✓ OPENAI_API_KEY in .env"
+    assert msg == "OK: OPENAI_API_KEY in .env"
+
+
+def test_offline_preflight_does_not_require_api_key(monkeypatch):
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        preflight, "check_output_directory_writable", lambda: (True, "ok")
+    )
+    monkeypatch.setattr(
+        preflight,
+        "check_api_key",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("API key check should be skipped")
+        ),
+    )
+
+    preflight.main(require_api_key=False, offline=True)

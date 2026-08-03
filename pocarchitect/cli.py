@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-import typer
+import hashlib
+import json
 import os
-import tempfile
+import re
 import subprocess
+import tempfile
+from datetime import datetime, timezone
+from importlib.resources import files
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Literal, Optional
+from urllib.parse import urlparse
+
+import typer
 from dotenv import load_dotenv
+from openai import OpenAI
 from rich.console import Console
 from rich.panel import Panel
-from openai import OpenAI
-from importlib.resources import files
-import re
-from datetime import datetime
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
-from urllib.parse import urlparse
 
 # ── Preflight support ─────────────────────────────────────
 from .preflight import main as run_preflight
@@ -45,9 +48,15 @@ DEFAULT_MODELS = {
 
 
 @app.command("preflight")
-def preflight():
+def preflight(
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Check installation without requiring an API key or provider access.",
+    ),
+):
     """Run environment preflight checks"""
-    run_preflight()
+    run_preflight(require_api_key=not offline, offline=offline)
 
 
 def load_prompt() -> str:
@@ -55,7 +64,7 @@ def load_prompt() -> str:
         prompt_file = files("pocarchitect") / "POC_Architect_Prompt.md"
         return prompt_file.read_text(encoding="utf-8")
     except Exception as e:
-        console.print(f"[bold red]Error loading prompt: {e}[/]")
+        console.print(f"[bold red]Prompt error:[/] {friendly_error_message(e)}")
         raise typer.Exit(1)
 
 
@@ -72,16 +81,88 @@ def get_default_output_dir() -> Path:
     return Path.cwd() / "reports"
 
 
-def save_report(content: str, url: str, output_dir: Path) -> Path:
+def save_report(
+    content: str,
+    url: str,
+    output_dir: Path,
+    provider: str,
+    model: str,
+    no_ingest: bool,
+) -> Path:
     slug = slugify(url.split("/")[-1] or "unknown-poc")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"POCAnalysis_{slug}_{timestamp}.md"
     output_path = output_dir / filename
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(content, encoding="utf-8")
+    metadata = {
+        "project": "POCArchitect AI Agent",
+        "source_url": url,
+        "provider": provider,
+        "model": model,
+        "prompt_asset": "pocarchitect/POC_Architect_Prompt.md",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "ingestion": "disabled" if no_ingest else "github-shallow-clone",
+        "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    }
+    metadata_block = (
+        "---\n"
+        + "\n".join(f"{key}: {json.dumps(value)}" for key, value in metadata.items())
+        + "\n---\n\n"
+    )
+    output_path.write_text(metadata_block + content, encoding="utf-8")
     console.print(f"[green]Report saved:[/] {output_path.name}")
     return output_path
+
+
+SECRET_PATTERNS = (
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    re.compile(r"(?i)\b(?:api[_ -]?key|access[_ -]?token|secret)\s*[:=]\s*[^\s]+"),
+    re.compile(r"(?i)\b(?:sk|xai|gsk)-[A-Za-z0-9_-]{12,}"),
+)
+
+
+def detect_sensitive_input(text: str) -> list[str]:
+    """Return generic secret categories without echoing matched values."""
+    categories = []
+    if SECRET_PATTERNS[0].search(text):
+        categories.append("private-key material")
+    if SECRET_PATTERNS[1].search(text):
+        categories.append("key/token assignment")
+    if SECRET_PATTERNS[2].search(text):
+        categories.append("provider-token format")
+    return categories
+
+
+def print_sensitive_input_warning(text: str) -> None:
+    categories = detect_sensitive_input(text)
+    if categories:
+        console.print(
+            "[bold yellow]Warning:[/] source content appears to contain "
+            f"{', '.join(categories)}. Review the source and report destination "
+            "before sending it to the selected provider; matched values are not "
+            "printed by POCArchitect. Use --no-ingest for a local dry run."
+        )
+
+
+def friendly_error_message(error: Exception) -> str:
+    if isinstance(error, subprocess.TimeoutExpired):
+        return (
+            "The operation timed out. Check network access or retry with --no-ingest."
+        )
+    if isinstance(error, FileNotFoundError):
+        return "A required file or executable was not found. Check the working directory and rerun preflight --offline."
+    if isinstance(error, subprocess.CalledProcessError):
+        return "Git failed while ingesting the repository. Confirm the URL is public and valid, then retry."
+    message = str(error).strip()
+    if "401" in message or "unauthorized" in message.lower():
+        return "The provider rejected the credential. Check the selected provider environment variable without printing the key."
+    if "429" in message or "rate limit" in message.lower():
+        return "The provider rate limit was reached. Wait and retry, or choose a permitted local provider."
+    return (
+        message
+        or "The operation failed without a diagnostic message. Rerun with --verbose."
+    )
 
 
 def normalize_github_repo_url(poc_url: str) -> tuple[str, str]:
@@ -352,6 +433,7 @@ Operator Preferences (respect these exactly):
         )
         raise typer.Exit(0)
 
+    print_sensitive_input_warning(grounding)
     result = get_llm_response(
         provider=provider,
         api_key=api_key,
@@ -362,7 +444,7 @@ Operator Preferences (respect these exactly):
         user_message=user_message,
     )
 
-    save_report(result, url, output_dir)
+    return save_report(result, url, output_dir, provider, model, no_ingest)
 
 
 # ── Batch processing (#2) ────────────────────────────────────────────
@@ -380,6 +462,7 @@ def process_batch_file(
     no_ingest: bool,
     dry_run: bool = False,
     verbose: bool = False,
+    state_path: Optional[Path] = None,
 ):
     """Read URLs from a text file and process each one sequentially."""
     if not batch_path.exists():
@@ -406,8 +489,22 @@ def process_batch_file(
     success_count = 0
     failure_count = 0
     failed_urls = []
+    state_path = state_path or output_dir / "batch_progress.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        state = {"version": 1, "items": {}}
+    skipped_completed = 0
+
+    def write_state() -> None:
+        state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
 
     for i, url in enumerate(urls, 1):
+        if state.get("items", {}).get(url, {}).get("status") == "success":
+            skipped_completed += 1
+            console.print(f"[dim]Skipping completed URL {i}/{len(urls)}: {url}[/]")
+            continue
         processed_count += 1
         console.print(f"\n[bold]── URL {i}/{len(urls)} ──[/]")
         try:
@@ -427,6 +524,11 @@ def process_batch_file(
                 verbose=verbose,
             )
             success_count += 1
+            state.setdefault("items", {})[url] = {
+                "status": "success",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            write_state()
         except typer.Exit as e:
             if dry_run:
                 if e.exit_code == 0:
@@ -437,19 +539,32 @@ def process_batch_file(
                 break  # dry-run exits after first URL
             failure_count += 1
             failed_urls.append(url)
+            state.setdefault("items", {})[url] = {
+                "status": "failed",
+                "error": f"exit code {e.exit_code}",
+            }
+            write_state()
             console.print(
-                f"[bold red]Error processing {url}:[/] exit code {e.exit_code}"
+                f"[bold red]Batch item failed:[/] {url} (exit code {e.exit_code})."
             )
             console.print("[yellow]Continuing to next URL...[/]")
         except Exception as e:
             failure_count += 1
             failed_urls.append(url)
-            console.print(f"[bold red]Error processing {url}:[/] {e}")
+            state.setdefault("items", {})[url] = {
+                "status": "failed",
+                "error": friendly_error_message(e),
+            }
+            write_state()
+            console.print(
+                f"[bold red]Batch item failed:[/] {url}: {friendly_error_message(e)}"
+            )
             console.print("[yellow]Continuing to next URL...[/]")
 
     console.print(
         f"\n[bold green]Batch complete:[/] total={len(urls)} processed={processed_count} "
-        f"success={success_count} failed={failure_count} skipped={len(urls) - processed_count}"
+        f"success={success_count} failed={failure_count} skipped={len(urls) - processed_count} "
+        f"resumed={skipped_completed} state={state_path}"
     )
     if dry_run and processed_count < len(urls):
         console.print("[yellow]Dry-run mode processed only the first URL by design.[/]")
@@ -457,6 +572,10 @@ def process_batch_file(
         console.print("[yellow]Failed URLs:[/]")
         for failed_url in failed_urls:
             console.print(f" - {failed_url}")
+    if skipped_completed:
+        console.print(
+            f"[dim]Resumed batch: {skipped_completed} completed URL(s) skipped.[/]"
+        )
 
 
 # ── Main CLI entry point ─────────────────────────────────────────────
@@ -491,6 +610,11 @@ def main(
         "-v",
         help="Enable verbose output (extra details during grounding)",
     ),
+    batch_state: Optional[Path] = typer.Option(
+        None,
+        "--batch-state",
+        help="JSON progress file used to resume completed batch URLs.",
+    ),
     version: bool = typer.Option(
         False, "--version", "-V", help="Show version and exit"
     ),
@@ -506,7 +630,7 @@ def main(
 
     # (#10) Skip preflight in dry-run mode (dry-run does not need API keys)
     if not dry_run:
-        run_preflight()
+        run_preflight(require_api_key=True)
 
     # (#9) Resolve provider-specific default model if not explicitly set
     if model is None:
@@ -552,6 +676,7 @@ def main(
             no_ingest=no_ingest,
             dry_run=dry_run,
             verbose=verbose,
+            state_path=batch_state,
         )
     else:
         console.print("[bold red]Error:[/] Provide --url or --batch")
