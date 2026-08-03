@@ -60,7 +60,7 @@ Every generated report begins with a metadata block containing the source URL, p
 
 | Platform/path | Status | Notes |
 |---|---|---|
-| Linux Bash | Supported in CI | CI exercises Ubuntu with Python 3.9–3.13. |
+| Linux Bash | Supported in CI | CI exercises Ubuntu with Python 3.10–3.13. |
 | Windows PowerShell | Supported by code; validate locally | Use `python -m pocarchitect`; native Windows CI is not configured. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
 | Docker Desktop/Linux Docker | Supported by Dockerfile; validate locally | Mount a writable host directory to `/reports`. |

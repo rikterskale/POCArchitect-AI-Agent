@@ -109,11 +109,11 @@ def main():
     has_failure = False
 
     # Python version
-    py_ok = sys.version_info >= (3, 9)
+    py_ok = sys.version_info >= (3, 10)
     status = "✓" if py_ok else "✗"
     if not py_ok:
         has_failure = True
-    table.add_row("Python >=3.9", status)
+    table.add_row("Python >=3.10", status)
 
     # Dependencies
     for dep in REQUIRED_DEPS:

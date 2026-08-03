@@ -61,7 +61,7 @@ Save to ./reports/ (or /reports in Docker)
 
 ## Technology Stack
 
-- **Language**: Python 3.9+
+- **Language**: Python 3.10+
 - **CLI Framework**: Typer + Rich
 - **LLM Client**: OpenAI SDK (unified for xAI, OpenAI, Groq, local Ollama)
 - **Grounding**: GitPython (shallow clone)

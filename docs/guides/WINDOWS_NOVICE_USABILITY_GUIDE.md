@@ -4,7 +4,7 @@ Status: **PARTIALLY VERIFIED**. The CLI was verified with Python 3.12 on Windows
 
 ## Before you begin
 
-Use Windows Terminal with PowerShell. Install Git and Python 3.9+. Check them with `git --version` and `py --version`. This tool analyzes authorized GitHub PoC source with an LLM; it does not execute the retrieved PoC. Provider keys are secrets.
+Use Windows Terminal with PowerShell. Install Git and Python 3.10+. Check them with `git --version` and `py --version`. This tool analyzes authorized GitHub PoC source with an LLM; it does not execute the retrieved PoC. Provider keys are secrets.
 
 ## Install
 
@@ -51,7 +51,7 @@ Only analyze repositories you are authorized to inspect. POCArchitect clones sou
 
 ## Supported environment
 
-Use 64-bit Windows with PowerShell, Git, and Python 3.9 or newer. Docker is optional.
+Use 64-bit Windows with PowerShell, Git, and Python 3.10 or newer. Docker is optional.
 
 ## Prepare a workspace
 

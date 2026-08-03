@@ -4,7 +4,7 @@ Status: **PARTIALLY VERIFIED**. The implementation is exercised in Ubuntu GitHub
 
 ## Before you begin
 
-Use Bash on a supported Linux distribution. Install Git and Python 3.9+. Check them with `git --version` and `python3 --version`. This tool analyzes authorized GitHub PoC source with an LLM; it does not execute the retrieved PoC. Provider keys are secrets.
+Use Bash on a supported Linux distribution. Install Git and Python 3.10+. Check them with `git --version` and `python3 --version`. This tool analyzes authorized GitHub PoC source with an LLM; it does not execute the retrieved PoC. Provider keys are secrets.
 
 ## Install
 
@@ -51,7 +51,7 @@ Only analyze repositories you are authorized to inspect. POCArchitect clones sou
 
 ## Supported environment
 
-Use a 64-bit Linux system with Bash, Git, and Python 3.9 or newer. Docker is optional.
+Use a 64-bit Linux system with Bash, Git, and Python 3.10 or newer. Docker is optional.
 
 ## Prepare a workspace
 
