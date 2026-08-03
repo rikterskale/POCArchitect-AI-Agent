@@ -786,24 +786,45 @@ def batch_reset(
 def main(
     ctx: typer.Context,
     url: Optional[str] = typer.Option(
-        None, "--url", "-u", help="Single PoC GitHub URL"
+        None,
+        "--url",
+        "-u",
+        help="Single PoC URL; public GitHub repositories can be grounded.",
     ),
     batch: Optional[Path] = typer.Option(
-        None, "--batch", "-b", help="Path to .txt file with multiple URLs"
+        None, "--batch", "-b", help="Text file containing one PoC URL per line."
     ),
     provider: Literal["xai", "openai", "groq", "local"] = typer.Option(
-        "xai", "--provider", "-p"
+        "xai", "--provider", "-p", help="LLM provider to use."
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model name (default: provider-specific)"
     ),
-    temperature: float = typer.Option(0.2, "--temperature", "-t"),
-    base_url: Optional[str] = typer.Option(None, "--base-url"),
-    output_dir: Optional[Path] = typer.Option(None, "--output-dir"),
-    risk_level: str = typer.Option("High", "--risk-level"),
-    target_os: str = typer.Option("Linux", "--target-os"),
-    include_mitigations: bool = typer.Option(True, "--include-mitigations"),
-    no_ingest: bool = typer.Option(False, "--no-ingest"),
+    temperature: float = typer.Option(
+        0.2, "--temperature", "-t", help="Provider sampling temperature."
+    ),
+    base_url: Optional[str] = typer.Option(
+        None, "--base-url", help="OpenAI-compatible endpoint for --provider local."
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output-dir", help="Directory where successful reports are written."
+    ),
+    risk_level: str = typer.Option(
+        "High", "--risk-level", help="Free-text risk label sent to the provider."
+    ),
+    target_os: str = typer.Option(
+        "Linux",
+        "--target-os",
+        help="Free-text target environment sent to the provider.",
+    ),
+    include_mitigations: bool = typer.Option(
+        True,
+        "--include-mitigations",
+        help="Include mitigation instructions; the CLI has no switch to disable it.",
+    ),
+    no_ingest: bool = typer.Option(
+        False, "--no-ingest", help="Skip GitHub repository grounding."
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show full prompt and exit without calling LLM"
     ),

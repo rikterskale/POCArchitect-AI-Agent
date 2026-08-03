@@ -8,22 +8,22 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 
 | Option | Type | Default | Purpose |
 |---|---|---|---|
-| `--url`, `-u` | TEXT | None | Single PoC GitHub URL |
-| `--batch`, `-b` | PATH | None | Path to .txt file with multiple URLs |
-| `--provider`, `-p` | xai | openai | groq | local | xai | — |
+| `--url`, `-u` | TEXT | None | Single PoC URL; public GitHub repositories can be grounded. |
+| `--batch`, `-b` | PATH | None | Text file containing one PoC URL per line. |
+| `--provider`, `-p` | xai \| openai \| groq \| local | xai | LLM provider to use. |
 | `--model`, `-m` | TEXT | None | Model name (default: provider-specific) |
-| `--temperature`, `-t` | FLOAT | 0.2 | — |
-| `--base-url` | TEXT | None | — |
-| `--output-dir` | PATH | None | — |
-| `--risk-level` | TEXT | High | — |
-| `--target-os` | TEXT | Linux | — |
-| `--include-mitigations` | BOOLEAN | True | — |
-| `--no-ingest` | BOOLEAN | False | — |
+| `--temperature`, `-t` | FLOAT | 0.2 | Provider sampling temperature. |
+| `--base-url` | TEXT | None | OpenAI-compatible endpoint for --provider local. |
+| `--output-dir` | PATH | None | Directory where successful reports are written. |
+| `--risk-level` | TEXT | High | Free-text risk label sent to the provider. |
+| `--target-os` | TEXT | Linux | Free-text target environment sent to the provider. |
+| `--include-mitigations` | BOOLEAN | True | Include mitigation instructions; the CLI has no switch to disable it. |
+| `--no-ingest` | BOOLEAN | False | Skip GitHub repository grounding. |
 | `--dry-run` | BOOLEAN | False | Show full prompt and exit without calling LLM |
 | `--verbose`, `-v` | BOOLEAN | False | Enable verbose output (extra details during grounding) |
 | `--batch-state` | PATH | None | JSON progress file used to resume completed batch URLs. |
 | `--yes` | BOOLEAN | False | Confirm source transfer without an interactive prompt. |
-| `--format` | text | json | text | Output mode: text or JSON Lines. |
+| `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 | `--version`, `-V` | BOOLEAN | False | Show version and exit |
 
@@ -34,9 +34,9 @@ Run environment preflight checks
 | Option | Type | Default | Purpose |
 |---|---|---|---|
 | `--offline` | BOOLEAN | False | Check installation without requiring an API key or provider access. |
-| `--provider`, `-p` | xai | openai | groq | local | xai | Provider whose readiness to check. |
+| `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
 | `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
-| `--format` | text | json | text | Output mode: text or JSON Lines. |
+| `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 
 ## Command: `batch-status`

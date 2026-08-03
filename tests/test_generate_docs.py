@@ -23,3 +23,4 @@ def test_cli_reference_is_metadata_based_and_platform_neutral():
     assert "reports/batch_progress.json" in first
     assert "terminal layout" in first
     assert "+- Options" not in first
+    assert "xai \\| openai \\| groq \\| local" in first

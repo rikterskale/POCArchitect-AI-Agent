@@ -1,5 +1,7 @@
 # POCArchitect Report: Extremely Dangerous Python POC Analysis
 
+> **Static, non-functional format example.** This file does not describe a real target or a runnable workflow. Its illustrative commands, endpoint, key value, and code must not be copied into a live environment.
+
 **Source:** https://www.github.com/(not real/(not realer)  
 **Date Analyzed:** 2026-04-02  
 **Status:** Research-Only  

@@ -1,12 +1,13 @@
 # Docker Guide - POCArchitect AI Agent
 
-This guide explains how to build, run, and use **POCArchitect** inside Docker (v0.2.0+).
+This guide covers the repository Dockerfile reviewed with POCArchitect 0.2.0. The image uses Python 3.12, installs Git for GitHub grounding, runs as the non-root `pocuser` user, and exposes `/reports` as a writable volume.
 
 ## Prerequisites
 
 - Docker installed and running
-- API key for your preferred LLM provider (xAI/Grok recommended)
-- (Optional) `.env` file with your keys
+- An authorized public GitHub repository URL for any real grounding run
+- A provider credential in a local `.env` file for cloud-provider runs, or a reachable local OpenAI-compatible endpoint
+- A writable host folder to mount at `/reports` when a report should be retained
 
 ---
 
@@ -16,7 +17,7 @@ This guide explains how to build, run, and use **POCArchitect** inside Docker (v
 docker build -t pocarchitect:latest .
 ```
 
-This uses a multi-stage build → final image is ~180–220 MB and runs as non-root user.
+The Dockerfile uses a multi-stage build and runs the final container as the non-root `pocuser` user. Image size is not asserted because it varies by Docker platform and cache state.
 
 ---
 
@@ -28,45 +29,63 @@ This uses a multi-stage build → final image is ~180–220 MB and runs as non-r
 docker run --rm pocarchitect --help
 ```
 
-### Single URL Mode (Recommended)
+### Safe first run
+
+Run this from the repository root after building the image:
 
 ```bash
-docker run --rm \
-  -v "$(pwd)/reports:/reports" \
-  -e XAI_API_KEY=your_xai_key_here \
-  pocarchitect \
-  --url https://github.com/example/poc-repo
+docker run --rm pocarchitect:latest \
+  --url https://github.com/example/poc \
+  --no-ingest --dry-run --no-color
 ```
+
+This does not clone the URL, call a provider, require a key, or write a report. A successful run prints `DRY RUN MODE` and the prompt.
+
+### Interactive cloud-provider run
+
+Use an interactive terminal so POCArchitect can display the source-transfer preview and ask for confirmation. Replace `<AUTHORIZED_GITHUB_URL>` with a public repository you are allowed to inspect.
+
+```bash
+docker run --rm -it \
+  -v "$(pwd)/reports:/reports" \
+  --env-file .env \
+  pocarchitect:latest \
+  --url <AUTHORIZED_GITHUB_URL> --provider xai
+```
+
+The command creates a report in the mounted host `reports/` folder only after the provider call succeeds. Do not put a provider key directly on a command line; `--env-file .env` keeps it out of shell history.
 
 ### Using a `.env` File (Cleanest)
 
 ```bash
-docker run --rm \
+docker run --rm -it \
   --env-file .env \
   -v "$(pwd)/reports:/reports" \
-  pocarchitect \
-  --url https://github.com/example/poc-repo
+  pocarchitect:latest \
+  --url <AUTHORIZED_GITHUB_URL> --provider xai
 ```
 
 ### Batch Mode
 
 ```bash
-docker run --rm \
+docker run --rm -it \
   --env-file .env \
   -v "$(pwd)/reports:/reports" \
   -v "$(pwd)/batch_urls.txt:/batch_urls.txt" \
-  pocarchitect \
+  pocarchitect:latest \
   --batch /batch_urls.txt
 ```
+
+The batch file must contain one URL per line. The container asks for a source-transfer confirmation for each item. Add `--yes` only to a noninteractive job whose URLs and transfer are already authorized and reviewed.
 
 ### Full Example with Custom Options
 
 ```bash
-docker run --rm \
+docker run --rm -it \
   --env-file .env \
   -v "$(pwd)/reports:/reports" \
-  pocarchitect \
-  --url https://github.com/example/poc-repo \
+  pocarchitect:latest \
+  --url <AUTHORIZED_GITHUB_URL> \
   --provider xai \
   --model grok-3 \
   --output-dir /reports \
@@ -89,7 +108,7 @@ docker run --rm \
 
 ## 4. Tips & Best Practices
 
-- Always mount `-v "$(pwd)/reports:/reports"` — reports are written to this volume.
+- Mount `-v "$(pwd)/reports:/reports"` whenever you want reports or batch state retained on the host. The container default output is `/reports`.
 - Use `--rm` to auto-clean the container after it finishes.
 - Create a shell alias for daily use:
 
@@ -99,17 +118,17 @@ alias pocarch='docker run --rm --env-file .env -v "$(pwd)/reports:/reports" poca
 
 Then just run: `pocarch --url <url>`
 
-- Python-side PoC ingestion (grounding context) works automatically inside Docker — no extra setup needed.
+- GitHub grounding uses an unauthenticated shallow Git clone. It is intended for public GitHub repositories; do not assume private repository access is configured in this image.
 
 ---
 
 ## 5. Troubleshooting
 
-- **"Permission denied" on reports** → The container runs as non-root `pocuser`. Make sure your host `./reports` folder is writable (`chmod 775 reports` or `mkdir -p reports`).
-- **Git clone fails** → Public repos work out of the box. Private repos need authentication configured separately.
-- **API key not found** → Use `--env-file .env` or explicit `-e KEY=...`.
+- **"Permission denied" on reports** → The container runs as non-root `pocuser`. Create a host `reports` folder you can write to, mount it at `/reports`, then repeat the safe dry run before a real run.
+- **Git clone fails** → Confirm the URL is a public GitHub repository and that the container has network access. To validate the CLI without cloning, repeat the command with `--no-ingest --dry-run`.
+- **API key not found** → Check that `.env` is in the directory where you run Docker and contains the key matching `--provider`; then rerun `docker run --rm --env-file .env pocarchitect:latest preflight --provider xai`.
 - **Rebuild after changes** → `docker build --no-cache -t pocarchitect:latest .`
 
 ---
 
-*Last Updated: April 2026 (matches Dockerfile v0.2.0)*
+**Validation status:** Docker build and `docker run --rm pocarchitect:test --help` are exercised by CI on Ubuntu. Native Docker Desktop runs and provider-backed runs were not executed during this documentation review.

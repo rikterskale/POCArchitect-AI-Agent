@@ -54,6 +54,9 @@ jobs:
       - name: Novice guide validation
         run: python scripts/validate_novice_guides.py
 
+      - name: Documentation link validation
+        run: python scripts/validate_documentation_links.py
+
   test:
     needs: quality
     runs-on: ubuntu-latest

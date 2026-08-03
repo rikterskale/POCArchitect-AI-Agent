@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail CI when the canonical Windows/Linux novice journeys lose key guidance."""
+"""Fail CI when the canonical novice journeys lose key guidance."""
 
 from __future__ import annotations
 
@@ -11,6 +11,18 @@ GUIDES = {
     "Windows": ROOT / "docs" / "guides" / "WINDOWS_NOVICE_USABILITY_GUIDE.md",
     "Linux": ROOT / "docs" / "guides" / "LINUX_NOVICE_USABILITY_GUIDE.md",
 }
+CANONICAL_GUIDE = ROOT / "docs" / "NOVICE_USABILITY_GUIDE.md"
+REQUIRED_CANONICAL_HEADINGS = (
+    "## 1. What This Guide Helps You Do",
+    "## 6. Before You Begin",
+    "## 9. Obtain or Clone the Repository",
+    "## 12. Install Project Dependencies",
+    "## 15. Run the Safest First Example",
+    "## 16. Verify the First Run Succeeded",
+    "## 17. If Verification Fails: Diagnose and Fix It",
+    "## 25. Troubleshooting Matrix",
+    "## 29. Glossary",
+)
 REQUIRED_COMMANDS = (
     "python -m pocarchitect --version",
     "python -m pocarchitect preflight --offline",
@@ -46,12 +58,31 @@ def validate_guide(platform: str, path: Path) -> list[str]:
     return errors
 
 
+def validate_canonical_guide(path: Path) -> list[str]:
+    if not path.exists():
+        return [f"Canonical guide is missing: {path}"]
+    text = path.read_text(encoding="utf-8")
+    errors = []
+    if "**PARTIALLY VERIFIED**" not in text:
+        errors.append("Canonical guide must state its current validation status")
+    for heading in REQUIRED_CANONICAL_HEADINGS:
+        if heading not in text:
+            errors.append(f"Canonical guide is missing required heading: {heading}")
+    for command in REQUIRED_COMMANDS:
+        if command not in text:
+            errors.append(f"Canonical guide is missing required command: {command}")
+    if "https://github.com/example/poc" not in text:
+        errors.append("Canonical guide is missing the safe example URL")
+    return errors
+
+
 def main() -> int:
     errors = [
         error
         for platform, path in GUIDES.items()
         for error in validate_guide(platform, path)
     ]
+    errors.extend(validate_canonical_guide(CANONICAL_GUIDE))
     if errors:
         print("Novice guide validation failed:")
         print("\n".join(f"- {error}" for error in errors))

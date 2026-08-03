@@ -2,6 +2,8 @@
 
 Status: **PARTIALLY VERIFIED**. The implementation is exercised in Ubuntu GitHub Actions, but a clean Linux installation was not run during this review.
 
+> Begin with the repository-wide [Novice Usability Guide](../NOVICE_USABILITY_GUIDE.md). This page remains a Bash supplement and command ledger.
+
 ## Before you begin
 
 Use Bash on a supported Linux distribution. Install Git and Python 3.10+. Check them with `git --version` and `python3 --version`. This tool analyzes authorized GitHub PoC source with an LLM; it does not execute the retrieved PoC. Provider keys are secrets.

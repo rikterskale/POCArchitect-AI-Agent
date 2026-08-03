@@ -1,16 +1,16 @@
-# Ollama Setup Guide for POCArchitect (April 2026)
+# Ollama Setup Guide for POCArchitect
 
-This guide helps you run **completely local** LLMs with POCArchitect — no cloud API keys required.
+This guide explains how to use Ollama as POCArchitect's `local` provider. The CLI works with any reachable OpenAI-compatible local endpoint; Ollama is one option. A local provider does not require a cloud-provider key, but GitHub grounding still needs network access when `--no-ingest` is not used.
 
-## Why Use Ollama with POCArchitect?
-- 100% private (nothing leaves your machine)
-- Zero refusals on exploit code or red-team techniques
-- Works perfectly with `--provider local`
+## Scope and limitations
+
+- POCArchitect uses `http://localhost:11434/v1` as the default local endpoint.
+- The CLI does not install, start, or select an Ollama model for you.
+- Local-provider behavior, data handling, and model responses are controlled by your local service and model; POCArchitect makes no privacy or response-guarantee claim.
 
 ## 1. Install Ollama
 - **Windows**: Download and run the installer from https://ollama.com/download
-- **macOS**: `brew install ollama` or download from the website
-- **Linux**: `curl -fsSL https://ollama.com/install.sh | sh`
+- **macOS and Linux**: use an installation method published by Ollama for your operating system.
 
 Verify:
 
@@ -25,46 +25,49 @@ Keep this running in a separate terminal:
 ollama serve
 ```
 
-## 3. Recommended Models (Best for PoC Analysis)
+## 3. Choose a model
 
 ```bash
-# Best overall for exploit writing & code analysis (recommended)
+# The POCArchitect default model name for --provider local.
 ollama pull qwen2.5-coder:32b
 
-# Faster alternative (still very capable)
+# Alternative model names must be passed with --model.
 ollama pull qwen2.5-coder:14b
-
-# Strong reasoning model
-ollama pull deepseek-r1:32b
 ```
 
 > **Note:** The included preflight checker (`docs/ollama_preflight_check.py`) tests for `qwen2.5-coder:32b` by default. If you use a different model, update the `TEST_MODEL` variable in that script to match.
 
-## 4. Test Ollama (Recommended)
+## 4. Test Ollama
 Run the included preflight checker:
 
 ```bash
 python docs/ollama_preflight_check.py
 ```
 
-This validates the server, model availability, and the OpenAI-compatible endpoint (`/v1/chat/completions`) that POCArchitect actually uses.
+This helper validates the server, the `qwen2.5-coder:32b` model name, and the OpenAI-compatible endpoint (`/v1/chat/completions`) that POCArchitect uses. It sends a short local test request and therefore may use local compute.
 
 > **Prerequisite:** The checker requires the `requests` library. Install it with `pip install requests` if not already available.
+
+Before a real run, check the same endpoint through POCArchitect:
+
+```bash
+python -m pocarchitect preflight --provider local --base-url http://localhost:11434/v1
+```
 
 ## 5. Run POCArchitect with Local Ollama
 
 ```bash
-pocarchitect --url https://github.com/example/poc-repo \
+python -m pocarchitect --url https://github.com/example/poc-repo \
   --provider local \
   --base-url http://localhost:11434/v1 \
   --model qwen2.5-coder:32b
 ```
 
+Run this in an interactive terminal. POCArchitect shows a redacted source-transfer preview before it sends any selected GitHub source to the local endpoint. Use `--no-ingest --dry-run` first if you only want to inspect the prompt.
+
 You can combine with any other flags:
 
-```bash
---dry-run --verbose --risk-level Critical --target-os Windows --no-ingest
-```
+`--dry-run`, `--verbose`, `--risk-level`, `--target-os`, and `--no-ingest` can be combined with the command. `--dry-run --no-ingest` is the safe, no-provider-call combination.
 
 ## Common Issues & Fixes
 
@@ -72,9 +75,7 @@ You can combine with any other flags:
 |---|---|
 | Connection refused | Run `ollama serve` in another terminal |
 | Model not found | Run `ollama pull <model>` |
-| Out of memory | Use the 14b version or add `--num-gpu 0` |
-| Slow generation | Use quantized model (`qwen2.5-coder:14b-q4_K_M`) |
+| Out of memory | Choose and pull a smaller model in Ollama, then pass its exact name with `--model` |
+| Slow generation | Choose a model appropriate for the local hardware; POCArchitect has no performance-control flag for Ollama |
 
-You are now ready to run fully local, uncensored PoC analysis.
-
-**Last Updated:** April 03, 2026
+**Validation status:** The POCArchitect local-endpoint preflight behavior is covered by tests. Ollama installation, model download, and a live local endpoint were not run during this documentation review.

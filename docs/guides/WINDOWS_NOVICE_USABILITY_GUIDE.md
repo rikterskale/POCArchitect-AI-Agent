@@ -2,6 +2,8 @@
 
 Status: **PARTIALLY VERIFIED**. The CLI was verified with Python 3.12 on Windows; native clean-room, Docker, and provider-backed runs require local validation.
 
+> Begin with the repository-wide [Novice Usability Guide](../NOVICE_USABILITY_GUIDE.md). This page remains a Windows PowerShell supplement and command ledger.
+
 ## Before you begin
 
 Use Windows Terminal with PowerShell. Install Git and Python 3.10+. Check them with `git --version` and `py --version`. This tool analyzes authorized GitHub PoC source with an LLM; it does not execute the retrieved PoC. Provider keys are secrets.
