@@ -21,6 +21,9 @@ wheels/
 *.egg
 MANIFEST
 
+# Locally generated review artifacts.
+/review-output/
+
 # Virtual environments
 .venv
 venv/
