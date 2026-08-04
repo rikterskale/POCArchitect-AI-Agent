@@ -84,6 +84,7 @@ python scripts/generate_docs.py
 ## Documentation
 
 - [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md) — installation, safe first use, troubleshooting, cleanup, and update instructions.
+- [Command Guide](docs/command-guide.md) — end-to-end Windows, macOS/Linux, provider, batch, automation, Docker, and development commands.
 - [CLI Reference](docs/cli-reference.md) — generated option and subcommand reference.
 - [Configuration Reference](docs/configuration-reference.md) — provider keys, defaults, precedence, and output settings.
 - [Docker Guide](docs/docker-guide.md) — image build, safe runs, provider confirmation, and report mounts.
