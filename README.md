@@ -8,18 +8,28 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 
 ## Features
 
+- Guided first-run `setup` wizard and a `config` command that shows effective settings (keys masked)
 - Shallow GitHub clone and source-file selection for grounding
-- Batch mode (`--batch batch_urls.txt`) — process multiple URLs from a text file
-- Operator controls: `--risk-level`, `--target-os`, `--include-mitigations`, `--no-ingest`
-- Provider-aware preflight checks for real runs; `--dry-run` skips provider readiness checks
+- `owner/repo` shorthand and early URL validation
+- Batch mode (`--batch batch_urls.txt`) with a live progress bar and ETA
+- Operator controls: `--risk-level`, `--target-os`, `--include-mitigations/--no-mitigations`, `--no-ingest`
+- Provider-aware preflight checks with actionable fix hints; `--dry-run` skips provider readiness checks
+- Ingestion preview with a rough cost estimate before any provider call
 - Cloud providers (`xai`, `openai`, `groq`) and a local OpenAI-compatible endpoint (`local`)
 - Docker image with a writable `/reports` volume
-- Retry logic + timeouts on LLM calls
-- `--dry-run` and `--verbose` flags
+- Retry logic + timeouts on LLM calls; fast, friendly errors for unknown models
+- Reports print their absolute path with an optional `--open`, plus a short preview
+- Shell completion (`--install-completion`), `--dry-run` (summary, or `--full`), and `--verbose`
 
 ## Start here
 
 If you are new to terminals, Git, or Python, begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
+
+After installing, the quickest guided path is the interactive wizard, which stores a provider key in a local `.env` and checks readiness:
+
+```bash
+pocarchitect setup
+```
 
 From the repository root, a safe first run is:
 
@@ -55,16 +65,18 @@ Batch runs write a resumable JSON ledger to `reports/batch_progress.json` by def
 
 | Option | Description | Default |
 |---|---|---|
-| `--url`, `-u` | Single PoC GitHub URL | Required (or use `--batch`) |
+| `--url`, `-u` | Single PoC GitHub URL (or `owner/repo` shorthand) | Required (or use `--batch`) |
 | `--batch`, `-b` | Path to `.txt` file with multiple URLs | None |
 | `--provider`, `-p` | LLM provider | `xai` |
 | `--model`, `-m` | Model name | Provider-specific (e.g., `grok-3`) |
 | `--temperature`, `-t` | Provider temperature | `0.2` |
 | `--risk-level` | Free-text risk label sent to the provider | `High` |
 | `--target-os` | Free-text target label sent to the provider | `Linux` |
-| `--include-mitigations` | Enables mitigation instructions; the current CLI has no flag to disable it | `true` |
+| `--include-mitigations` / `--no-mitigations` | Include mitigation instructions; use `--no-mitigations` to omit | `true` |
 | `--no-ingest` | Skip GitHub grounding | `false` |
-| `--dry-run` | Show full prompt and exit (no API call) | `false` |
+| `--dry-run` | Show a prompt summary and exit (no API call); add `--full` for the entire prompt | `false` |
+| `--full` | With `--dry-run`, print the entire prompt instead of a summary | `false` |
+| `--open` | Open each finished report in the OS default viewer | `false` |
 | `--verbose`, `-v` | Extra grounding details | `false` |
 | `--batch-state` | Custom resumable batch-ledger path | `reports/batch_progress.json` for batch runs |
 | `--format` | Text or JSON Lines output for main runs and `preflight` | `text` |

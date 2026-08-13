@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from contextlib import AbstractContextManager, nullcontext
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
@@ -13,13 +14,22 @@ from typing import Literal, Optional
 from urllib.parse import urlparse
 
 import typer
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from openai import OpenAI
 from rich.console import Console
 from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskID,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.table import Table
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -40,19 +50,31 @@ load_dotenv(override=False)
 app = typer.Typer(
     name="pocarchitect",
     help="POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.",
-    add_completion=False,
+    add_completion=True,
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
 console = Console()
 output_format = "text"
+no_color_state = False
 
 
 def configure_output(format_name: str, no_color: bool) -> None:
     """Configure the shared presentation layer before any command emits output."""
-    global console, output_format
+    global console, output_format, no_color_state
     output_format = format_name
+    no_color_state = no_color
+    # Windows consoles default to a legacy code page (cp1252) that cannot encode
+    # emoji or box-drawing characters; reconfigure to UTF-8 so output never
+    # crashes when piped or redirected. Best-effort and harmless elsewhere.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):
+                pass
     console = Console(no_color=no_color)
 
 
@@ -76,6 +98,118 @@ DEFAULT_MODELS = {
     "groq": "llama-3.1-70b-versatile",
     "local": "qwen2.5-coder:32b",
 }
+
+# Known-good models per provider, surfaced when a provider rejects a model name.
+KNOWN_MODELS = {
+    "xai": ["grok-3", "grok-3-mini", "grok-2"],
+    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+    "groq": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+    "local": ["qwen2.5-coder:32b", "llama3.1:8b", "(any locally pulled model)"],
+}
+
+# Rough input-token prices (USD per 1M input tokens) for a friendly cost hint.
+# These are approximate and only used to help a novice gauge order of magnitude;
+# actual charges depend on the provider, model, and output length.
+MODEL_INPUT_PRICES_PER_MTOK = {
+    "gpt-4o": 2.50,
+    "gpt-4o-mini": 0.15,
+    "gpt-4-turbo": 10.00,
+    "grok-3": 3.00,
+    "grok-3-mini": 0.30,
+    "grok-2": 2.00,
+    "llama-3.1-70b-versatile": 0.59,
+    "llama-3.1-8b-instant": 0.05,
+}
+
+
+class FatalProviderError(RuntimeError):
+    """A provider error that must not be retried (bad model, bad credential)."""
+
+
+def _looks_like_model_error(message: str) -> bool:
+    low = message.lower()
+    return (
+        ("model" in low and ("not found" in low or "does not exist" in low))
+        or "model_not_found" in low
+        or "unknown model" in low
+        or ("404" in low and "model" in low)
+    )
+
+
+def _looks_like_auth_error(message: str) -> bool:
+    low = message.lower()
+    return "401" in low or "unauthorized" in low or "invalid api key" in low
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Retry transient failures only; permanent errors should fail fast."""
+    if isinstance(exc, (typer.Exit, FatalProviderError)):
+        return False
+    message = str(exc)
+    if _looks_like_model_error(message) or _looks_like_auth_error(message):
+        return False
+    return True
+
+
+def estimate_cost_usd(model: str, input_tokens: int) -> Optional[float]:
+    """Return an approximate USD cost for the input tokens, or None if unknown."""
+    price = MODEL_INPUT_PRICES_PER_MTOK.get(model)
+    if price is None:
+        return None
+    return (input_tokens / 1_000_000) * price
+
+
+def expand_url_shorthand(value: str) -> str:
+    """Expand ``owner/repo`` shorthand into a full github.com URL.
+
+    A value that already has a scheme, or that is not a bare ``owner/repo``
+    pair, is returned unchanged so existing behavior is preserved.
+    """
+    candidate = value.strip()
+    if "://" in candidate or candidate.startswith("git@"):
+        return candidate
+    parts = [p for p in candidate.split("/") if p]
+    if len(parts) == 2 and " " not in candidate and "." not in parts[0]:
+        return f"https://github.com/{parts[0]}/{parts[1]}"
+    return candidate
+
+
+def validate_poc_url(value: str, no_ingest: bool) -> str:
+    """Normalize shorthand and reject clearly invalid GitHub URLs early."""
+    expanded = expand_url_shorthand(value)
+    parsed = urlparse(expanded.strip())
+    host = parsed.netloc.lower()
+    if host in {"github.com", "www.github.com"} and not no_ingest:
+        # Surface a clear, early error instead of a deep git clone failure.
+        normalize_github_repo_url(expanded)
+    return expanded
+
+
+def open_in_default_viewer(path: Path) -> bool:
+    """Best-effort open of a file in the OS default application."""
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=False)
+        else:
+            subprocess.run(["xdg-open", str(path)], check=False)
+        return True
+    except Exception:
+        return False
+
+
+def report_digest(content: str, max_lines: int = 8) -> str:
+    """Return the first meaningful lines of a report for a quick preview."""
+    lines = []
+    for raw in content.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        lines.append(stripped)
+        if len(lines) >= max_lines:
+            break
+    return "\n".join(lines)
 
 
 @app.command("preflight")
@@ -131,6 +265,34 @@ def get_default_output_dir() -> Path:
     return Path.cwd() / "reports"
 
 
+DEFAULT_BATCH_STATE = Path("reports/batch_progress.json")
+
+
+def resolve_batch_state_path(explicit: Path) -> Optional[Path]:
+    """Find an existing batch ledger, tolerating a different --output-dir.
+
+    Returns the first existing candidate, or None when no ledger exists yet so
+    callers can show a friendly 'no batch has been run' message. When the user
+    passed a non-default path we honor it verbatim even if it is missing, so an
+    explicit typo surfaces plainly rather than silently resolving elsewhere.
+    """
+    if explicit != DEFAULT_BATCH_STATE:
+        return explicit if explicit.exists() else None
+    candidates = [
+        explicit,
+        get_default_output_dir() / "batch_progress.json",
+        Path.cwd() / "reports" / "batch_progress.json",
+    ]
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def save_report(
     content: str,
     url: str,
@@ -138,6 +300,7 @@ def save_report(
     provider: str,
     model: str,
     no_ingest: bool,
+    open_report: bool = False,
 ) -> Path:
     slug = slugify(url.split("/")[-1] or "unknown-poc")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -161,7 +324,28 @@ def save_report(
         + "\n---\n\n"
     )
     output_path.write_text(metadata_block + content, encoding="utf-8")
-    emit("report_saved", f"Report saved: {output_path.name}", path=str(output_path))
+    absolute_path = output_path.resolve()
+    emit(
+        "report_saved",
+        f"Report saved: {output_path.name}\nLocation: {absolute_path}",
+        path=str(output_path),
+        absolute_path=str(absolute_path),
+    )
+
+    # (#5) Show a short preview so the user sees they got a real result.
+    digest = report_digest(content)
+    if digest:
+        emit("report_digest", f"Preview:\n{digest}", digest=digest)
+
+    # (#4) Optionally open the report in the OS default viewer.
+    if open_report:
+        if open_in_default_viewer(absolute_path):
+            emit("report_opened", "Opened the report in your default viewer.")
+        else:
+            emit(
+                "report_open_failed",
+                f"Could not open the report automatically. Open it manually: {absolute_path}",
+            )
     return output_path
 
 
@@ -212,15 +396,26 @@ def confirm_ingestion(
     """Preview a redacted transfer and require explicit approval by default."""
     redacted, categories, redaction_count = redact_sensitive_input(source_text)
     classification = "source content" if not categories else ", ".join(categories)
+    estimated_tokens = max(1, len(redacted) // 4)
+    estimated_cost = estimate_cost_usd(model, estimated_tokens)
+    cost_note = (
+        f"≈ ${estimated_cost:.4f} (input only, {model})"
+        if estimated_cost is not None
+        else "cost estimate unavailable for this model"
+    )
     emit(
         "ingestion_preview",
-        "Ingestion preview: source will be sent to the selected provider after redaction.",
+        "Ingestion preview: source will be sent to the selected provider after redaction. "
+        f"Estimated input cost: {cost_note}.",
         provider=provider,
         model=model,
         classification=classification,
         redaction_count=redaction_count,
         character_count=len(redacted),
-        estimated_tokens=max(1, len(redacted) // 4),
+        estimated_tokens=estimated_tokens,
+        estimated_cost_usd=(
+            round(estimated_cost, 6) if estimated_cost is not None else None
+        ),
     )
     if confirmed:
         return redacted
@@ -248,7 +443,12 @@ def friendly_error_message(error: Exception) -> str:
     if isinstance(error, subprocess.CalledProcessError):
         return "Git failed while ingesting the repository. Confirm the URL is public and valid, then retry."
     message, _, _ = redact_sensitive_input(str(error).strip())
-    if "401" in message or "unauthorized" in message.lower():
+    if _looks_like_model_error(message):
+        return (
+            "The provider did not recognize the requested model. "
+            "Check --model, or omit it to use the provider default."
+        )
+    if _looks_like_auth_error(message):
         return "The provider rejected the credential. Check the selected provider environment variable without printing the key."
     if "429" in message or "rate limit" in message.lower():
         return "The provider rate limit was reached. Wait and retry, or choose a permitted local provider."
@@ -428,7 +628,7 @@ def build_grounding_context(
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((Exception,)),
+    retry=retry_if_exception(_is_retryable),
     reraise=True,
 )
 def get_llm_response(
@@ -470,14 +670,29 @@ def get_llm_response(
         emit("error", f"Unsupported provider: {provider}")
         raise typer.Exit(1)
 
-    response = client.chat.completions.create(
-        model=model,
-        temperature=temperature,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+    except Exception as error:  # noqa: BLE001 — normalize provider SDK errors
+        message, _, _ = redact_sensitive_input(str(error))
+        if _looks_like_model_error(message):
+            valid = ", ".join(KNOWN_MODELS.get(p, [])) or "the provider's model list"
+            emit(
+                "error",
+                f"The provider rejected model '{model}'. "
+                f"Known-good {p} models: {valid}. "
+                "Pass a valid --model, or omit --model to use the provider default.",
+                provider=p,
+                model=model,
+            )
+            raise FatalProviderError(f"unknown model: {model}") from error
+        raise
 
     # (#8) Guard against None content
     content = response.choices[0].message.content
@@ -502,6 +717,9 @@ def process_single_url(
     dry_run: bool = False,
     verbose: bool = False,
     confirmed: bool = True,
+    open_report: bool = False,
+    dry_run_full: bool = False,
+    show_spinner: bool = False,
 ):
     emit("processing", f"Processing: {url}", url=url)
 
@@ -538,28 +756,64 @@ Operator Preferences (respect these exactly):
         console.print(
             "[bold green]🚀 DRY RUN MODE — No LLM call will be made[/bold green]"
         )
-        full_prompt = f"--- SYSTEM PROMPT ---\n{system_prompt}\n\n--- USER MESSAGE ---\n{user_message}"
-        console.print(
-            Panel(
-                full_prompt,
-                title="Full Prompt (Ready for LLM)",
-                border_style="blue",
-                expand=True,
+        if dry_run_full:
+            console.print(
+                Panel(
+                    full_prompt,
+                    title="Full Prompt (Ready for LLM)",
+                    border_style="blue",
+                    expand=True,
+                )
             )
-        )
+        else:
+            # (#8) Default to a compact summary; the whole prompt is huge and
+            # overwhelming for a first-time user. --full prints everything.
+            prompt_lines = full_prompt.splitlines()
+            preview = "\n".join(prompt_lines[:40])
+            summary = (
+                f"System prompt: {len(system_prompt):,} chars\n"
+                f"User message:  {len(user_message):,} chars\n"
+                f"Total prompt:  {len(full_prompt):,} chars "
+                f"(≈ {max(1, len(full_prompt) // 4):,} tokens)\n"
+                f"Lines:         {len(prompt_lines):,}\n\n"
+                "First 40 lines shown below. Re-run with --full to see the entire prompt.\n"
+                "──────────────────────────────────────────────\n"
+                f"{preview}"
+            )
+            console.print(
+                Panel(
+                    summary,
+                    title="Dry-Run Summary",
+                    border_style="blue",
+                    expand=True,
+                )
+            )
         raise typer.Exit(0)
 
-    result = get_llm_response(
-        provider=provider,
-        api_key=api_key,
-        model=model,
-        temperature=temperature,
-        base_url=base_url,
-        system_prompt=system_prompt,
-        user_message=user_message,
+    # (#3) Show a spinner while the provider call blocks (text + interactive only).
+    status_cm = (
+        console.status(f"Analyzing with {provider}/{model}…", spinner="dots")
+        if show_spinner
+        else nullcontext()
     )
+    try:
+        with status_cm:
+            result = get_llm_response(
+                provider=provider,
+                api_key=api_key,
+                model=model,
+                temperature=temperature,
+                base_url=base_url,
+                system_prompt=system_prompt,
+                user_message=user_message,
+            )
+    except FatalProviderError:
+        # A friendly, actionable message was already emitted; fail without a trace.
+        raise typer.Exit(1)
 
-    return save_report(result, url, output_dir, provider, model, no_ingest)
+    return save_report(
+        result, url, output_dir, provider, model, no_ingest, open_report=open_report
+    )
 
 
 # ── Batch processing (#2) ────────────────────────────────────────────
@@ -579,6 +833,8 @@ def process_batch_file(
     verbose: bool = False,
     state_path: Optional[Path] = None,
     confirmed: bool = True,
+    open_report: bool = False,
+    dry_run_full: bool = False,
 ):
     """Read URLs from a text file and process each one sequentially."""
     if not batch_path.exists():
@@ -616,75 +872,110 @@ def process_batch_file(
     def persist_state() -> None:
         write_state(state_path, state)
 
-    for i, url in enumerate(urls, 1):
-        if state.get("items", {}).get(url, {}).get("status") == "success":
-            skipped_completed += 1
-            emit(
-                "batch_skipped",
-                f"Skipping completed URL {i}/{len(urls)}: {url}",
-                url=url,
-            )
-            continue
-        processed_count += 1
-        emit("batch_item", f"URL {i}/{len(urls)}", url=url, index=i)
-        try:
-            process_single_url(
-                url=url,
-                provider=provider,
-                api_key=api_key,
-                model=model,
-                temperature=temperature,
-                base_url=base_url,
-                output_dir=output_dir,
-                risk_level=risk_level,
-                target_os=target_os,
-                include_mitigations=include_mitigations,
-                no_ingest=no_ingest,
-                dry_run=dry_run,
-                verbose=verbose,
-                confirmed=confirmed,
-            )
-            success_count += 1
-            state.setdefault("items", {})[url] = {
-                "status": "success",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-            persist_state()
-        except typer.Exit as e:
-            if dry_run:
-                if e.exit_code == 0:
-                    success_count += 1
-                else:
-                    failure_count += 1
-                    failed_urls.append(url)
-                break  # dry-run exits after first URL
-            failure_count += 1
-            failed_urls.append(url)
-            state.setdefault("items", {})[url] = {
-                "status": "failed",
-                "error": f"exit code {e.exit_code}",
-            }
-            persist_state()
-            emit(
-                "batch_item_failed",
-                f"Batch item failed: {url} (exit code {e.exit_code}).",
-                url=url,
-            )
-            emit("batch_continue", "Continuing to next URL...")
-        except Exception as e:
-            failure_count += 1
-            failed_urls.append(url)
-            state.setdefault("items", {})[url] = {
-                "status": "failed",
-                "error": friendly_error_message(e),
-            }
-            persist_state()
-            emit(
-                "batch_item_failed",
-                f"Batch item failed: {url}: {friendly_error_message(e)}",
-                url=url,
-            )
-            emit("batch_continue", "Continuing to next URL...")
+    # (#12) Live progress bar with ETA for interactive terminals; non-terminal
+    # and JSON runs keep the plain per-URL event lines only.
+    use_progress = (
+        output_format == "text" and not dry_run and console.is_terminal
+    )
+    progress: Optional[Progress] = None
+    task_id: Optional[TaskID] = None
+    if use_progress:
+        progress = Progress(
+            TextColumn("[cyan]Batch[/cyan]"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total}"),
+            TextColumn("•"),
+            TimeElapsedColumn(),
+            TextColumn("elapsed •"),
+            TimeRemainingColumn(),
+            TextColumn("ETA"),
+            console=console,
+        )
+    progress_cm: AbstractContextManager = progress or nullcontext()
+
+    with progress_cm:
+        if progress is not None:
+            task_id = progress.add_task("batch", total=len(urls))
+
+        def advance() -> None:
+            if progress is not None and task_id is not None:
+                progress.advance(task_id)
+
+        for i, url in enumerate(urls, 1):
+            if state.get("items", {}).get(url, {}).get("status") == "success":
+                skipped_completed += 1
+                emit(
+                    "batch_skipped",
+                    f"Skipping completed URL {i}/{len(urls)}: {url}",
+                    url=url,
+                )
+                advance()
+                continue
+            processed_count += 1
+            emit("batch_item", f"URL {i}/{len(urls)}", url=url, index=i)
+            try:
+                process_single_url(
+                    url=url,
+                    provider=provider,
+                    api_key=api_key,
+                    model=model,
+                    temperature=temperature,
+                    base_url=base_url,
+                    output_dir=output_dir,
+                    risk_level=risk_level,
+                    target_os=target_os,
+                    include_mitigations=include_mitigations,
+                    no_ingest=no_ingest,
+                    dry_run=dry_run,
+                    verbose=verbose,
+                    confirmed=confirmed,
+                    open_report=open_report,
+                    dry_run_full=dry_run_full,
+                    show_spinner=False,
+                )
+                success_count += 1
+                state.setdefault("items", {})[url] = {
+                    "status": "success",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                persist_state()
+            except typer.Exit as e:
+                if dry_run:
+                    if e.exit_code == 0:
+                        success_count += 1
+                    else:
+                        failure_count += 1
+                        failed_urls.append(url)
+                    advance()
+                    break  # dry-run exits after first URL
+                failure_count += 1
+                failed_urls.append(url)
+                state.setdefault("items", {})[url] = {
+                    "status": "failed",
+                    "error": f"exit code {e.exit_code}",
+                }
+                persist_state()
+                emit(
+                    "batch_item_failed",
+                    f"Batch item failed: {url} (exit code {e.exit_code}).",
+                    url=url,
+                )
+                emit("batch_continue", "Continuing to next URL...")
+            except Exception as e:
+                failure_count += 1
+                failed_urls.append(url)
+                state.setdefault("items", {})[url] = {
+                    "status": "failed",
+                    "error": friendly_error_message(e),
+                }
+                persist_state()
+                emit(
+                    "batch_item_failed",
+                    f"Batch item failed: {url}: {friendly_error_message(e)}",
+                    url=url,
+                )
+                emit("batch_continue", "Continuing to next URL...")
+            advance()
 
     emit(
         "batch_complete",
@@ -717,12 +1008,22 @@ def process_batch_file(
 @app.command("batch-status")
 def batch_status(
     batch_state: Path = typer.Option(
-        Path("reports/batch_progress.json"),
+        DEFAULT_BATCH_STATE,
         "--batch-state",
         help="Batch ledger to inspect.",
     ),
 ):
     """Show a concise, machine-readable summary of batch recovery state."""
+    resolved = resolve_batch_state_path(batch_state)
+    if resolved is None:
+        emit(
+            "batch_status_empty",
+            "No batch has been run yet (no ledger found). "
+            "Run a batch with `--batch <file>` first, or pass --batch-state <path>.",
+            state_path=str(batch_state),
+        )
+        raise typer.Exit(0)
+    batch_state = resolved
     try:
         state = load_state(batch_state)
     except BatchStateError as error:
@@ -782,6 +1083,191 @@ def batch_reset(
         )
 
 
+PROVIDER_KEY_ENV = {
+    "xai": "XAI_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "groq": "GROQ_API_KEY",
+}
+
+
+def _mask_secret(value: Optional[str]) -> str:
+    """Return a non-reversible hint for a secret value."""
+    if not value:
+        return "(unset)"
+    cleaned = value.strip()
+    if len(cleaned) <= 8:
+        return "set (••••)"
+    return f"set ({cleaned[:4]}…{cleaned[-2:]})"
+
+
+def _upsert_env_file(env_path: Path, key: str, value: str) -> None:
+    """Add or replace a single KEY=value line, preserving other entries."""
+    lines: list[str] = []
+    replaced = False
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith(f"{key}=") or line.strip().startswith(
+                f"{key} ="
+            ):
+                lines.append(f"{key}={value}")
+                replaced = True
+            else:
+                lines.append(line)
+    if not replaced:
+        lines.append(f"{key}={value}")
+    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+@app.command("setup")
+def setup() -> None:
+    """Interactive first-run wizard: choose a provider, store a key, verify readiness."""
+    if not sys.stdin.isatty():
+        emit(
+            "error",
+            "Setup is interactive; run it in a terminal, or set the provider key "
+            "environment variable and use `preflight` instead.",
+        )
+        raise typer.Exit(2)
+
+    console.print(
+        Panel(
+            "[bold green]POCArchitect Setup[/bold green]\n"
+            "This wizard stores a provider key in a local .env file and checks readiness.\n"
+            "Your key is written only to .env in the current folder and is never printed.",
+            expand=False,
+        )
+    )
+
+    provider = typer.prompt(
+        "Provider [xai/openai/groq/local]", default="xai"
+    ).strip().lower()
+    while provider not in {"xai", "openai", "groq", "local"}:
+        console.print("[red]Choose one of: xai, openai, groq, local[/red]")
+        provider = typer.prompt("Provider", default="xai").strip().lower()
+
+    if provider == "local":
+        base_url = typer.prompt(
+            "Local OpenAI-compatible endpoint", default=DEFAULT_LOCAL_BASE_URL
+        ).strip()
+        console.print(
+            "Local providers need no API key. Verifying the endpoint is reachable…"
+        )
+        run_preflight(
+            provider="local",
+            base_url=base_url,
+            require_api_key=True,
+            output_format=output_format,
+            no_color=no_color_state,
+        )
+    else:
+        env_var = PROVIDER_KEY_ENV[provider]
+        key = typer.prompt(f"Paste your {env_var}", hide_input=True).strip()
+        if not key:
+            emit("error", "No key entered; nothing was written.")
+            raise typer.Exit(2)
+        env_path = Path.cwd() / ".env"
+        _upsert_env_file(env_path, env_var, key)
+        emit(
+            "setup_key_saved",
+            f"Saved {env_var} to {env_path} (value not shown).",
+            provider=provider,
+        )
+        console.print("Verifying provider readiness…")
+        run_preflight(
+            provider=provider,
+            base_url=None,
+            require_api_key=True,
+            output_format=output_format,
+            no_color=no_color_state,
+        )
+
+    if typer.confirm(
+        "Run a safe dry-run now (no provider call, no report)?", default=True
+    ):
+        console.print(
+            "\nRunning: [cyan]pocarchitect --url https://github.com/example/poc "
+            "--no-ingest --dry-run[/cyan]\n"
+        )
+        try:
+            process_single_url(
+                url="https://github.com/example/poc",
+                provider=provider,
+                api_key=None,
+                model=DEFAULT_MODELS.get(provider, "grok-3"),
+                temperature=0.2,
+                base_url=None,
+                output_dir=get_default_output_dir(),
+                risk_level="High",
+                target_os="Linux",
+                include_mitigations=True,
+                no_ingest=True,
+                dry_run=True,
+                verbose=False,
+                confirmed=True,
+            )
+        except typer.Exit:
+            pass
+
+    console.print(
+        "\n[bold green]Setup complete.[/bold green] Next, try a real run, e.g.:\n"
+        f"  [cyan]pocarchitect --url <owner/repo> --provider {provider}[/cyan]"
+    )
+
+
+@app.command("config")
+def config_command() -> None:
+    """Show effective settings and where each value comes from (keys masked)."""
+    env_path = Path.cwd() / ".env"
+    file_values = dotenv_values(env_path) if env_path.exists() else {}
+
+    rows: list[dict[str, str]] = []
+
+    def add(setting: str, value: str, source: str) -> None:
+        rows.append({"setting": setting, "value": value, "source": source})
+
+    for provider, env_var in PROVIDER_KEY_ENV.items():
+        env_value = os.getenv(env_var)
+        file_value = file_values.get(env_var)
+        if env_value and (file_value is None or env_value != file_value):
+            source = "environment"
+        elif file_value and env_value == file_value:
+            source = f".env ({env_path})"
+        elif file_value:
+            source = f".env ({env_path})"
+        else:
+            source = "unset"
+        add(env_var, _mask_secret(env_value or file_value), source)
+
+    add(
+        "default output dir",
+        str(get_default_output_dir()),
+        "IN_DOCKER" if (Path("/.dockerenv").exists() or os.getenv("IN_DOCKER")) else "cwd",
+    )
+    add("IN_DOCKER", os.getenv("IN_DOCKER") or "(unset)", "environment")
+    for provider, model_name in DEFAULT_MODELS.items():
+        add(f"default model ({provider})", model_name, "built-in default")
+
+    if output_format == "json":
+        emit(
+            "config",
+            "Effective configuration.",
+            settings=rows,
+            env_file=str(env_path) if env_path.exists() else None,
+        )
+        return
+
+    table = Table(title="Effective Configuration")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_column("Source", style="magenta")
+    for row in rows:
+        table.add_row(row["setting"], row["value"], row["source"])
+    console.print(table)
+    console.print(
+        "Provider keys are masked. Real environment variables take precedence over .env."
+    )
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -819,14 +1305,24 @@ def main(
     ),
     include_mitigations: bool = typer.Option(
         True,
-        "--include-mitigations",
-        help="Include mitigation instructions; the CLI has no switch to disable it.",
+        "--include-mitigations/--no-mitigations",
+        help="Include mitigation instructions in the report (use --no-mitigations to omit).",
     ),
     no_ingest: bool = typer.Option(
         False, "--no-ingest", help="Skip GitHub repository grounding."
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show full prompt and exit without calling LLM"
+        False, "--dry-run", help="Show the prompt summary and exit without calling LLM"
+    ),
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help="With --dry-run, print the entire prompt instead of a summary.",
+    ),
+    open_report: bool = typer.Option(
+        False,
+        "--open",
+        help="Open each finished report in your default viewer.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -887,7 +1383,18 @@ def main(
         emit("error", "Provide either --url or --batch, not both")
         raise typer.Exit(2)
 
+    # (#3) Only show a spinner in an interactive, human-readable session.
+    show_spinner = (
+        output_format == "text" and not dry_run and console.is_terminal
+    )
+
     if url:
+        # (#6/#7) Accept owner/repo shorthand and reject a malformed GitHub URL early.
+        try:
+            url = validate_poc_url(url, no_ingest)
+        except ValueError as error:
+            emit("error", f"Invalid PoC URL: {error}", url=url)
+            raise typer.Exit(2)
         process_single_url(
             url=url,
             provider=provider,
@@ -903,6 +1410,9 @@ def main(
             dry_run=dry_run,
             verbose=verbose,
             confirmed=yes,
+            open_report=open_report,
+            dry_run_full=full,
+            show_spinner=show_spinner,
         )
     elif batch:
         process_batch_file(
@@ -921,6 +1431,8 @@ def main(
             verbose=verbose,
             state_path=batch_state,
             confirmed=yes,
+            open_report=open_report,
+            dry_run_full=full,
         )
     else:
         emit("error", "Provide --url or --batch")

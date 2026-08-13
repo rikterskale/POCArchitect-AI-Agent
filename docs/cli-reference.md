@@ -17,15 +17,19 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 | `--output-dir` | PATH | None | Directory where successful reports are written. |
 | `--risk-level` | TEXT | High | Free-text risk label sent to the provider. |
 | `--target-os` | TEXT | Linux | Free-text target environment sent to the provider. |
-| `--include-mitigations` | BOOLEAN | True | Include mitigation instructions; the CLI has no switch to disable it. |
+| `--include-mitigations`, `--no-mitigations` | BOOLEAN | True | Include mitigation instructions in the report (use --no-mitigations to omit). |
 | `--no-ingest` | BOOLEAN | False | Skip GitHub repository grounding. |
-| `--dry-run` | BOOLEAN | False | Show full prompt and exit without calling LLM |
+| `--dry-run` | BOOLEAN | False | Show the prompt summary and exit without calling LLM |
+| `--full` | BOOLEAN | False | With --dry-run, print the entire prompt instead of a summary. |
+| `--open` | BOOLEAN | False | Open each finished report in your default viewer. |
 | `--verbose`, `-v` | BOOLEAN | False | Enable verbose output (extra details during grounding) |
 | `--batch-state` | PATH | None | JSON progress file used to resume completed batch URLs. |
 | `--yes` | BOOLEAN | False | Confirm source transfer without an interactive prompt. |
 | `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 | `--version`, `-V` | BOOLEAN | False | Show version and exit |
+| `--install-completion` | BOOLEAN | None | Install completion for the current shell. |
+| `--show-completion` | BOOLEAN | None | Show completion for the current shell, to copy it or customize the installation. |
 
 ## Command: `preflight`
 
@@ -56,6 +60,22 @@ Reset a ledger by moving its prior contents to a timestamped backup.
 | `--batch-state` | PATH | reports/batch_progress.json | Batch ledger to reset. |
 | `--yes` | BOOLEAN | False | Confirm the recoverable reset without an interactive prompt. |
 
+## Command: `setup`
+
+Interactive first-run wizard: choose a provider, store a key, verify readiness.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| — | — | — | No options |
+
+## Command: `config`
+
+Show effective settings and where each value comes from (keys masked).
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| — | — | — | No options |
+
 ## Commands
 
 | Command | Purpose |
@@ -63,6 +83,8 @@ Reset a ledger by moving its prior contents to a timestamped backup.
 | `preflight` | Run environment preflight checks |
 | `batch-status` | Show a concise, machine-readable summary of batch recovery state. |
 | `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. |
+| `setup` | Interactive first-run wizard: choose a provider, store a key, verify readiness. |
+| `config` | Show effective settings and where each value comes from (keys masked). |
 
 ## Safe examples
 
