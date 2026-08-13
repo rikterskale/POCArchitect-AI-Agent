@@ -6,9 +6,9 @@
 | Guide purpose | Beginner installation, first use, verification, recovery, and common operations |
 | Status | **PARTIALLY VERIFIED** |
 | Reviewed branch | <code>main</code> |
-| Reviewed commit | <code>60d55d47c7ceb621df2f124764f01403a99f346b</code> |
+| Reviewed commit | <code>0c45740521c6f92b85247451c9ad54c77231a2b9</code> |
 | Detected project version | <code>0.2.0</code> |
-| Last verified | 2026-08-03 |
+| Last verified | 2026-08-13 |
 | Verified platforms | Existing Windows PowerShell virtual environment; Ubuntu CI uses Python 3.10–3.13; Docker CI builds the image and runs <code>--help</code> |
 | Validation limitations | No clean-room installation, live provider request, live Ollama request, or native Docker Desktop run was performed in this review |
 

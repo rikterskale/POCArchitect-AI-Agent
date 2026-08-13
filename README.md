@@ -1,5 +1,7 @@
 # POCArchitect AI Agent
 
+> Turn messy PoCs into clean, reproducible blueprints.
+
 POCArchitect is a command-line tool that creates a structured Markdown analysis report from an authorized Proof-of-Concept (PoC) URL. For GitHub repository URLs, it can shallow-clone and select source files as grounding before sending a redacted preview to the selected LLM provider.
 
 It does not execute the retrieved PoC. A report is generated only after a real provider call succeeds; report content depends on the selected provider and the available source material.
@@ -17,7 +19,7 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 
 ## Start here
 
-New to terminals, Git, or Python should begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
+If you are new to terminals, Git, or Python, begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
 
 From the repository root, a safe first run is:
 
@@ -47,7 +49,7 @@ python -m pocarchitect preflight --offline --format json --no-color
 
 ## Batch progress and recovery
 
-Batch runs write a resumable JSON ledger to `reports/batch_progress.json` by default. Pass `--batch-state path\to\state.json` to choose another location. Completed URLs are skipped on the next run; failed URLs remain eligible for retry.
+Batch runs write a resumable JSON ledger to `reports/batch_progress.json` by default. Pass `--batch-state path\to\state.json` to choose another location. Completed URLs are skipped on the next run; failed URLs remain eligible for retry. Inspect or reset a ledger with the `batch-status` and `batch-reset` subcommands (see the [CLI Reference](docs/cli-reference.md)).
 
 ## Common command options
 
