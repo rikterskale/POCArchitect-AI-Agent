@@ -874,9 +874,7 @@ def process_batch_file(
 
     # (#12) Live progress bar with ETA for interactive terminals; non-terminal
     # and JSON runs keep the plain per-URL event lines only.
-    use_progress = (
-        output_format == "text" and not dry_run and console.is_terminal
-    )
+    use_progress = output_format == "text" and not dry_run and console.is_terminal
     progress: Optional[Progress] = None
     task_id: Optional[TaskID] = None
     if use_progress:
@@ -1138,9 +1136,9 @@ def setup() -> None:
         )
     )
 
-    provider = typer.prompt(
-        "Provider [xai/openai/groq/local]", default="xai"
-    ).strip().lower()
+    provider = (
+        typer.prompt("Provider [xai/openai/groq/local]", default="xai").strip().lower()
+    )
     while provider not in {"xai", "openai", "groq", "local"}:
         console.print("[red]Choose one of: xai, openai, groq, local[/red]")
         provider = typer.prompt("Provider", default="xai").strip().lower()
@@ -1241,7 +1239,11 @@ def config_command() -> None:
     add(
         "default output dir",
         str(get_default_output_dir()),
-        "IN_DOCKER" if (Path("/.dockerenv").exists() or os.getenv("IN_DOCKER")) else "cwd",
+        (
+            "IN_DOCKER"
+            if (Path("/.dockerenv").exists() or os.getenv("IN_DOCKER"))
+            else "cwd"
+        ),
     )
     add("IN_DOCKER", os.getenv("IN_DOCKER") or "(unset)", "environment")
     for provider, model_name in DEFAULT_MODELS.items():
@@ -1384,9 +1386,7 @@ def main(
         raise typer.Exit(2)
 
     # (#3) Only show a spinner in an interactive, human-readable session.
-    show_spinner = (
-        output_format == "text" and not dry_run and console.is_terminal
-    )
+    show_spinner = output_format == "text" and not dry_run and console.is_terminal
 
     if url:
         # (#6/#7) Accept owner/repo shorthand and reject a malformed GitHub URL early.

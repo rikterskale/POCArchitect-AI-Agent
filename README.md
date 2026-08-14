@@ -104,6 +104,7 @@ python scripts/generate_docs.py
 - [Docker Guide](docs/docker-guide.md) — image build, safe runs, provider confirmation, and report mounts.
 - [Local OpenAI-Compatible Provider Guide](docs/ollama-setup-guide.md) — Ollama-specific setup notes and limitations.
 - [Architecture](docs/architecture.md) — implementation-oriented component overview.
+- [Release Readiness Standard](docs/RELEASE_READINESS.md) — the five-pillar new-user readiness gate enforced in CI.
 - [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — traceability matrix and validation record for this review.
 
 ## Safety and authorization

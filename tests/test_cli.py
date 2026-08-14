@@ -306,8 +306,7 @@ def test_expand_url_shorthand_expands_owner_repo():
         == "https://github.com/octocat/Hello-World"
     )
     assert (
-        cli.expand_url_shorthand("https://example.com/a/b")
-        == "https://example.com/a/b"
+        cli.expand_url_shorthand("https://example.com/a/b") == "https://example.com/a/b"
     )
     # A hostname-looking first segment is not shorthand.
     assert cli.expand_url_shorthand("example.com/repo") == "example.com/repo"
