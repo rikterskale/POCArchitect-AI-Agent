@@ -31,8 +31,12 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import Iterator
 
 # A run of token-shaped characters long enough to be an unmasked secret. The
 # masking helper only ever reveals a 4-char prefix, so a match means a real leak.
@@ -50,6 +54,49 @@ REQUIRED_COMMANDS = {
     "batch-reset",
 }
 SAFE_EXAMPLE_URL = "https://github.com/example/poc"
+
+# Values the hermetic mock provider advertises so a run can prove that the
+# operator's --model/--temperature choices actually reach the provider call.
+MOCK_MODEL = "mock-provider-model-x7"
+MOCK_TEMPERATURE = 0.73
+MOCK_MARKER = "POCARCHITECT_MOCK_REPORT_MARKER_7f3a9d"
+
+# Every long option a new user can pass must be *functionally* exercised by this
+# gate (covered) or explicitly, and narrowly, waived with a stated reason. The
+# coverage check in Pillar 3 reads the live CLI metadata and fails if a new
+# option ships without landing in one of these sets — that is what makes
+# "all options, no exceptions" enforceable rather than aspirational.
+COVERED_OPTIONS: dict[str, str] = {
+    "--version": "`--version` is run and asserted in Pillar 1.",
+    "--show-completion": "Shell completion is emitted and asserted in Pillar 1.",
+    "--offline": "`preflight --offline` is asserted in Pillar 1.",
+    "--url": "Single-URL journeys drive Pillars 2 and 3.",
+    "--batch": "Batch resume is asserted in Pillar 4.",
+    "--batch-state": "Ledger inspection/reset is asserted in Pillar 4.",
+    "--provider": "Selected provider is exercised end-to-end via the mock in Pillar 3.",
+    "--model": "Model reaches the provider call (mock captures it) in Pillar 3.",
+    "--temperature": "Temperature reaches the provider call (mock captures it) in Pillar 3.",
+    "--base-url": "Local endpoint routing is proven against the mock in Pillar 3.",
+    "--output-dir": "Report is written to the chosen directory in Pillar 3.",
+    "--risk-level": "Reflected in the assembled prompt in Pillar 3.",
+    "--target-os": "Reflected in the assembled prompt in Pillar 3.",
+    "--include-mitigations": "Default 'Yes' is asserted in the prompt in Pillar 3.",
+    "--no-mitigations": "Toggled 'No' is asserted in the prompt in Pillar 3.",
+    "--no-ingest": "Grounding-skip path is used throughout Pillars 2-4.",
+    "--dry-run": "Summary/JSON dry-run is asserted in Pillar 3.",
+    "--full": "`--dry-run --full` prints the whole prompt in Pillar 3.",
+    "--open": "Report-open path is exercised end-to-end in Pillar 3.",
+    "--verbose": "Verbose model selection is asserted in Pillar 3.",
+    "--yes": "Non-interactive confirmation is used in Pillars 3 and 4.",
+    "--format": "Text and JSON modes are asserted throughout.",
+    "--no-color": "Color-free output is used throughout.",
+}
+WAIVED_OPTIONS: dict[str, str] = {
+    "--install-completion": (
+        "Writes to the user's shell profile (a side effect a gate must not cause); "
+        "its read-only sibling --show-completion is exercised instead."
+    ),
+}
 
 
 @dataclass
@@ -87,17 +134,123 @@ def _clean_env() -> dict[str, str]:
 def run_cli(
     args: list[str], cwd: Path, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """Invoke the installed CLI through its module entry point."""
+    """Invoke the installed CLI through its module entry point.
+
+    stdin is an empty pipe (never a TTY) so interactive prompts abort
+    deterministically as "non-interactive" on every platform — notably Windows,
+    where a redirected NUL device still reports ``isatty() == True``.
+    """
     return subprocess.run(
         CLI + args,
         cwd=str(cwd),
         env=env or _clean_env(),
+        input="",
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
         timeout=120,
     )
+
+
+# ── Hermetic mock provider ───────────────────────────────────────────────────
+class _MockProviderHandler(BaseHTTPRequestHandler):
+    """A minimal OpenAI-compatible endpoint that records the requests it gets.
+
+    It answers the two calls a real ``--provider local`` run makes: the
+    ``GET /models`` reachability probe that preflight issues, and the
+    ``POST /chat/completions`` the analysis performs. Capturing the POST body
+    lets the gate prove that ``--model`` and ``--temperature`` reached the wire.
+    """
+
+    requests: list[dict] = []
+
+    def log_message(self, *args: object) -> None:  # noqa: D401 — silence logging
+        pass
+
+    def _send(self, code: int, obj: dict) -> None:
+        body = json.dumps(obj).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802 — http.server API
+        if self.path.endswith("/models"):
+            self._send(200, {"object": "list", "data": [{"id": MOCK_MODEL}]})
+        else:
+            self._send(404, {"error": "not found"})
+
+    def do_POST(self) -> None:  # noqa: N802 — http.server API
+        length = int(self.headers.get("Content-Length", "0"))
+        try:
+            payload = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            payload = {}
+        type(self).requests.append(payload)
+        self._send(
+            200,
+            {
+                "id": "chatcmpl-mock",
+                "object": "chat.completion",
+                "created": 0,
+                "model": payload.get("model", MOCK_MODEL),
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": f"# Mock Analysis\n\n{MOCK_MARKER}\n",
+                        },
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                    "total_tokens": 2,
+                },
+            },
+        )
+
+
+@contextmanager
+def mock_provider() -> Iterator[tuple[str, list[dict]]]:
+    """Run the mock endpoint on an ephemeral port for the duration of a block."""
+    _MockProviderHandler.requests = []
+    server = HTTPServer(("127.0.0.1", 0), _MockProviderHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}/v1"
+        yield base_url, _MockProviderHandler.requests
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def all_long_options() -> set[str]:
+    """Every ``--long`` option the CLI accepts, across the root and subcommands."""
+    from typer.main import get_command
+
+    from pocarchitect.cli import app
+
+    root = get_command(app)
+    options: set[str] = set()
+
+    def collect(command) -> None:  # noqa: ANN001 — click object
+        for param in command.params:
+            names = list(getattr(param, "opts", [])) + list(
+                getattr(param, "secondary_opts", [])
+            )
+            options.update(name for name in names if name.startswith("--"))
+
+    collect(root)
+    for command in root.commands.values():  # type: ignore[attr-defined]
+        collect(command)
+    return options
 
 
 def json_events(stdout: str) -> list[dict]:
@@ -150,6 +303,14 @@ def pillar_installation(work: Path) -> Pillar:
         p.record("`pocarchitect` console script registered", False, str(error))
     else:
         p.record("`pocarchitect` console script registered", has_script)
+
+    # Shell completion ships and is emitted without touching the user's profile.
+    completion = run_cli(["--show-completion"], work)
+    p.record(
+        "`--show-completion` emits a completion script",
+        completion.returncode == 0 and bool(completion.stdout.strip()),
+        completion.stderr.strip()[:80],
+    )
 
     return p
 
@@ -207,6 +368,21 @@ def pillar_troubleshooting(work: Path) -> Pillar:
         bad.stdout.strip()[-120:],
     )
 
+    # The interactive wizard refuses to run non-interactively and points the
+    # user at the scriptable alternative instead of hanging or aborting raw.
+    setup = run_cli(["--format", "json", "setup"], work)
+    setup_event = next(
+        (e for e in json_events(setup.stdout) if e.get("event") == "error"), None
+    )
+    setup_msg = (setup_event or {}).get("message", "")
+    p.record(
+        "`setup` refuses non-interactive use with actionable guidance",
+        setup.returncode == 2
+        and "interactive" in setup_msg
+        and "preflight" in setup_msg,
+        setup_msg[:80],
+    )
+
     # The novice guide ships a troubleshooting matrix.
     guide = (ROOT / "docs" / "NOVICE_USABILITY_GUIDE.md").read_text(encoding="utf-8")
     p.record(
@@ -232,6 +408,21 @@ def pillar_features(work: Path) -> Pillar:
         "All required commands are present",
         not missing,
         f"missing: {sorted(missing)}" if missing else "ok",
+    )
+
+    # "No exceptions" made enforceable: every long option the CLI exposes must be
+    # functionally covered by this gate or explicitly waived. A newly shipped
+    # option that is neither trips this check until it is validated.
+    options = all_long_options()
+    accounted = set(COVERED_OPTIONS) | set(WAIVED_OPTIONS)
+    uncovered = sorted(options - accounted)
+    stale = sorted(accounted - options)
+    p.record(
+        "Every CLI option is covered by the gate (no exceptions)",
+        not uncovered and not stale,
+        (f"uncovered: {uncovered}; " if uncovered else "")
+        + (f"stale entries: {stale}" if stale else "")
+        or f"{len(options)} options accounted for",
     )
 
     # config exposes effective settings as machine-readable data.
@@ -322,6 +513,138 @@ def pillar_features(work: Path) -> Pillar:
     p.record(
         "`--no-mitigations` is reflected in the prompt",
         "Include Mitigations: No" in prompt,
+    )
+
+    # --risk-level, --target-os, and the default --include-mitigations all reach
+    # the operator-preferences block the provider is instructed to honor.
+    prefs = run_cli(
+        [
+            "--url",
+            "octocat/Hello-World",
+            "--no-ingest",
+            "--dry-run",
+            "--risk-level",
+            "Critical",
+            "--target-os",
+            "Windows Server 2022",
+            "--format",
+            "json",
+            "--no-color",
+        ],
+        work,
+    )
+    prefs_prompt = (json_events(prefs.stdout)[-1:] or [{}])[0].get("prompt", "")
+    p.record(
+        "`--risk-level`/`--target-os`/`--include-mitigations` shape the prompt",
+        "Risk Level: Critical" in prefs_prompt
+        and "Target OS / Environment: Windows Server 2022" in prefs_prompt
+        and "Include Mitigations: Yes" in prefs_prompt,
+    )
+
+    # --verbose surfaces the default-model selection a novice would want to see.
+    verbose = run_cli(
+        [
+            "--url",
+            "octocat/Hello-World",
+            "--no-ingest",
+            "--dry-run",
+            "--verbose",
+            "--format",
+            "json",
+            "--no-color",
+        ],
+        work,
+    )
+    p.record(
+        "`--verbose` reports which model was selected",
+        any(e.get("event") == "model_selected" for e in json_events(verbose.stdout)),
+    )
+
+    # A real (but hermetic) provider run: --provider local + --base-url routes to
+    # the mock, --model/--temperature reach the wire, --output-dir receives the
+    # report, and --open exercises the viewer-launch path. This closes the old
+    # "no automated live run" boundary for everything except a paid credential.
+    out_dir = work / "mock-out"
+    open_supported = sys.platform != "win32"  # avoid launching a GUI app locally
+    with mock_provider() as (base_url, captured):
+        pre = run_cli(
+            [
+                "preflight",
+                "--provider",
+                "local",
+                "--base-url",
+                base_url,
+                "--format",
+                "json",
+            ],
+            work,
+        )
+        pre_events = json_events(pre.stdout)
+        p.record(
+            "`preflight --base-url` validates a reachable local endpoint",
+            pre.returncode == 0
+            and bool(pre_events)
+            and pre_events[-1].get("message") == "Preflight passed.",
+            pre_events[-1].get("message", "") if pre_events else pre.stderr.strip(),
+        )
+
+        run_args = [
+            "--url",
+            "octocat/Hello-World",
+            "--no-ingest",
+            "--provider",
+            "local",
+            "--base-url",
+            base_url,
+            "--model",
+            MOCK_MODEL,
+            "--temperature",
+            str(MOCK_TEMPERATURE),
+            "--output-dir",
+            str(out_dir),
+            "--format",
+            "json",
+            "--yes",
+            "--no-color",
+        ]
+        if open_supported:
+            run_args.append("--open")
+        e2e = run_cli(run_args, work)
+
+    e2e_events = json_events(e2e.stdout)
+    e2e_names = [e.get("event") for e in e2e_events]
+    saved = next((e for e in e2e_events if e.get("event") == "report_saved"), None)
+    report_files = list(out_dir.glob("*.md")) if out_dir.exists() else []
+    report_text = report_files[0].read_text(encoding="utf-8") if report_files else ""
+
+    p.record(
+        "`--provider local`/`--base-url` reach the provider and return a report",
+        e2e.returncode == 0 and saved is not None and MOCK_MARKER in report_text,
+        ",".join(n for n in e2e_names if n),
+    )
+    p.record(
+        "`--model`/`--temperature` reach the provider call unchanged",
+        bool(captured)
+        and captured[-1].get("model") == MOCK_MODEL
+        and abs(float(captured[-1].get("temperature", -1)) - MOCK_TEMPERATURE) < 1e-9,
+        json.dumps(captured[-1]) if captured else "no request captured",
+    )
+    p.record(
+        "`--output-dir` receives the report with faithful metadata",
+        bool(report_files)
+        and f"model: {json.dumps(MOCK_MODEL)}" in report_text
+        and 'provider: "local"' in report_text,
+        str(report_files[0]) if report_files else "no report written",
+    )
+    p.record(
+        "`--open` drives the report-viewer path",
+        (not open_supported)  # exercised at the Linux CI enforcement point
+        or ("report_opened" in e2e_names or "report_open_failed" in e2e_names),
+        (
+            "skipped on win32 (GUI side effect); enforced in CI"
+            if not open_supported
+            else ",".join(n for n in e2e_names if n)
+        ),
     )
     return p
 
