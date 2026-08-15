@@ -6,18 +6,20 @@ This is a short orientation page. The complete, generated option list is the [CL
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--url` / `-u` | Single PoC GitHub URL | Required (or use `--batch`) |
+| `--url` / `-u` | Single PoC URL or GitHub `owner/repo` shorthand | Required (or use `--batch`) |
 | `--batch` / `-b` | Text input: blank lines and full-line `#` comments ignored | None |
 | `--provider` / `-p` | LLM provider: `xai`, `openai`, `groq`, `local` | `xai` |
 | `--model` / `-m` | Model name | Provider-specific (e.g., `grok-3` for xai, `gpt-4o` for openai) |
 | `--temperature` / `-t` | Provider temperature | `0.2` |
 | `--risk-level` | Free-text label sent to the provider | `High` |
 | `--target-os` | Free-text label sent to the provider | `Linux` |
-| `--include-mitigations` | Enables mitigation instructions; there is currently no public CLI switch to disable it | `true` |
+| `--include-mitigations` / `--no-mitigations` | Include or omit mitigation instructions | `true` |
 | `--no-ingest` | Skip GitHub grounding | `false` |
 | `--output-dir` | Output directory | `./reports` |
 | `--verbose` / `-v` | Verbose output | `false` |
-| `--dry-run` | Show full prompt without calling LLM | `false` |
+| `--dry-run` | Show a prompt summary without calling LLM | `false` |
+| `--full` | With text dry run, show the complete prompt instead of a summary | `false` |
+| `--open` | Open a completed report in the default viewer | `false` |
 | `--batch-state` | Custom JSON batch recovery ledger | `reports/batch_progress.json` during batch runs |
 | `--yes` | Approve source transfer for noninteractive jobs | `false` |
 | `--format` | Text or JSON Lines output; place before subcommands | `text` |
@@ -29,6 +31,15 @@ This is a short orientation page. The complete, generated option list is the [CL
 ```bash
 python -m pocarchitect --url https://github.com/example/poc-repo --no-ingest --dry-run --no-color
 ```
+
+Text output defaults to a compact summary; add `--full` for the complete prompt.
+JSON dry-run output includes the complete prompt.
+
+## Guided setup and configuration
+
+`pocarchitect setup` is an interactive first-run wizard. `pocarchitect config`
+shows masked effective settings and their sources. Use direct environment
+configuration plus `preflight` for noninteractive automation.
 
 ## Batch Mode
 
@@ -42,8 +53,9 @@ python -m pocarchitect --batch example_usage/batch_urls.txt --provider xai
 ```
 
 The tool attempts every eligible URL. Dry run previews every non-resumed item.
-Real item failures are persisted while later items continue; the command exits
-1 after the summary if any item failed.
+Interactive real batches show progress and ETA. Real item failures are persisted
+while later items continue; the command exits 1 after the summary if any item
+failed.
 
 ## Examples
 
@@ -65,9 +77,10 @@ python -m pocarchitect --format json --no-color batch-status --batch-state repor
 
 ## Dry-Run Mode
 
-Use `--dry-run` to inspect the exact prompt without making an LLM call. It
-bypasses automatic preflight entirely, so use `preflight --offline` separately
-when you also need installation/output checks. This is useful for:
+Use `--dry-run --full` to inspect the exact prompt without making an LLM call.
+Plain text `--dry-run` shows a summary. Dry run bypasses automatic preflight
+entirely, so use `preflight --offline` separately when you also need
+installation/output checks. This is useful for:
 
 - Debugging prompt quality
 - Tuning operator flags

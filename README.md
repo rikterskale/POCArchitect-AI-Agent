@@ -1,23 +1,35 @@
 # POCArchitect AI Agent
 
+> Turn messy PoCs into clean, reproducible blueprints.
+
 POCArchitect is a command-line tool that creates a structured Markdown analysis report from an authorized Proof-of-Concept (PoC) URL. For GitHub repository URLs, it can shallow-clone and select source files as grounding before sending a redacted preview to the selected LLM provider.
 
 It does not execute the retrieved PoC. A report is generated only after a real provider call succeeds; report content depends on the selected provider and the available source material.
 
 ## Features
 
+- Guided first-run `setup` wizard and a `config` command that shows effective settings (keys masked)
 - Shallow GitHub clone and source-file selection for grounding
-- Batch mode (`--batch batch_urls.txt`) — process multiple URLs from a text file
-- Operator controls: `--risk-level`, `--target-os`, `--include-mitigations`, `--no-ingest`
-- Provider-aware preflight checks for real runs; `--dry-run` bypasses automatic preflight entirely
+- `owner/repo` shorthand and early URL validation
+- Batch mode (`--batch batch_urls.txt`) with a live progress bar and ETA
+- Operator controls: `--risk-level`, `--target-os`, `--include-mitigations/--no-mitigations`, `--no-ingest`
+- Provider-aware preflight checks with actionable fix hints; `--dry-run` bypasses automatic preflight entirely
+- Ingestion preview with a rough cost estimate before any provider call
 - Cloud providers (`xai`, `openai`, `groq`) and a local OpenAI-compatible endpoint (`local`)
 - Docker image with a writable `/reports` volume
-- Retry logic + timeouts on LLM calls
-- `--dry-run` and `--verbose` flags
+- Retry logic + timeouts on LLM calls; fast, friendly errors for unknown models
+- Reports print their absolute path with an optional `--open`, plus a short preview
+- Shell completion (`--install-completion`), `--dry-run` (summary, or `--full`), and `--verbose`
 
 ## Start here
 
-New to terminals, Git, or Python should begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
+If you are new to terminals, Git, or Python, begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
+
+After installing, the quickest guided path is the interactive wizard, which stores a provider key in a local `.env` and checks readiness:
+
+```bash
+pocarchitect setup
+```
 
 From the repository root, a safe first run is:
 
@@ -59,7 +71,8 @@ Batch runs write a version-2 resumable JSON ledger to
 are skipped on the next run; failed URLs remain eligible for retry. The command
 processes every eligible dry-run item and exits 1 after a completed batch if any
 item failed, so automation can use both the exit code and the final
-`batch_complete.failed` field.
+`batch_complete.failed` field. Inspect or reset a ledger with `batch-status` and
+`batch-reset`; see the [CLI Reference](docs/cli-reference.md).
 
 ## Provider model defaults
 
@@ -79,16 +92,18 @@ provider choices. Configure another OpenAI-compatible endpoint through
 
 | Option | Description | Default |
 |---|---|---|
-| `--url`, `-u` | Single PoC GitHub URL | Required (or use `--batch`) |
+| `--url`, `-u` | Single PoC GitHub URL (or `owner/repo` shorthand) | Required (or use `--batch`) |
 | `--batch`, `-b` | Path to `.txt` file with multiple URLs | None |
 | `--provider`, `-p` | LLM provider | `xai` |
 | `--model`, `-m` | Model name | Provider-specific (e.g., `grok-3`) |
 | `--temperature`, `-t` | Provider temperature | `0.2` |
 | `--risk-level` | Free-text risk label sent to the provider | `High` |
 | `--target-os` | Free-text target label sent to the provider | `Linux` |
-| `--include-mitigations` | Enables mitigation instructions; the current CLI has no flag to disable it | `true` |
+| `--include-mitigations` / `--no-mitigations` | Include mitigation instructions; use `--no-mitigations` to omit | `true` |
 | `--no-ingest` | Skip GitHub grounding | `false` |
-| `--dry-run` | Show full prompt and exit (no API call) | `false` |
+| `--dry-run` | Show a prompt summary and exit (no API call); add `--full` for the entire prompt | `false` |
+| `--full` | With `--dry-run`, print the entire prompt instead of a summary | `false` |
+| `--open` | Open each finished report in the OS default viewer | `false` |
 | `--verbose`, `-v` | Extra grounding details | `false` |
 | `--batch-state` | Custom resumable batch-ledger path | `reports/batch_progress.json` for batch runs |
 | `--format` | Text or JSON Lines output for main runs and `preflight` | `text` |
@@ -120,6 +135,7 @@ python scripts/generate_docs.py
 - [Local OpenAI-Compatible Provider Guide](docs/ollama-setup-guide.md) — Ollama-specific setup notes and limitations.
 - [Architecture](docs/architecture.md) — implementation-oriented component overview.
 - [Documentation Gap Analysis](docs/DOCUMENTATION_GAP_ANALYSIS.md) — current-tree evidence, all 28 findings, and verified remediation closure matrix.
+- [Release Readiness Standard](docs/RELEASE_READINESS.md) — the five-pillar new-user readiness gate enforced in CI.
 - [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — **historical snapshot** of commit `60d55d47c7ceb621df2f124764f01403a99f346b`; do not use it as current behavior or validation evidence.
 
 ## Safety and authorization

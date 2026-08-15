@@ -42,6 +42,7 @@ def run_safe_probes() -> list[str]:
         temp = Path(temporary)
         state = temp / "batch_progress.json"
         output_dir = temp / "reports"
+        write_state(state, empty_state())
         probes = (
             (["--format", "json", "--no-color", "--version"], "version"),
             (
@@ -103,7 +104,6 @@ def run_safe_probes() -> list[str]:
                     f"{' '.join(arguments)}"
                 )
 
-        write_state(state, empty_state())
         reset = RUNNER.invoke(
             cli.app,
             [

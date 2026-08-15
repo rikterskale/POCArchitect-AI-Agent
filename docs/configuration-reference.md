@@ -54,7 +54,7 @@ chooses to make.
 | `--no-color` | flag | Optional | Off | Present or absent | No | `pocarchitect/cli.py` |
 | `--risk-level` | string | Optional | `High` | Free text; no CLI validation | No | `pocarchitect/cli.py` |
 | `--target-os` | string | Optional | `Linux` | Free text; no CLI validation | No | `pocarchitect/cli.py` |
-| `--include-mitigations` | flag | Optional | On | Present or absent; the public CLI currently has no switch to set it false | No | `pocarchitect/cli.py` |
+| `--include-mitigations` / `--no-mitigations` | flag | Optional | On | Use `--no-mitigations` to omit mitigation instructions | No | `pocarchitect/cli.py` |
 | `--no-ingest` | flag | Optional | Off | Present or absent | No | `pocarchitect/cli.py` |
 
 For a complete option list, see [CLI Reference](cli-reference.md). Root

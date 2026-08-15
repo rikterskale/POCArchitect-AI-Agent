@@ -8,6 +8,8 @@ credentials on a command line or commit `.env`.
 
 | Goal | Command |
 |---|---|
+| Run guided first-time setup | `pocarchitect setup` |
+| Inspect effective masked configuration | `pocarchitect config` |
 | Show CLI help | `python -m pocarchitect --help` |
 | Verify installation without provider access | `python -m pocarchitect preflight --offline` |
 | Verify a custom report path | `python -m pocarchitect preflight --offline --output-dir <PATH>` |
@@ -58,6 +60,30 @@ python -m pocarchitect --help
 Both resolve to `pocarchitect.cli:app`. Runtime implementation lives only under
 `pocarchitect/`; former root-level `cli.py` and `preflight.py` copies were
 retired because they diverged from the packaged command.
+
+## Guided setup and effective configuration
+
+Run the interactive wizard in a terminal:
+
+```bash
+pocarchitect setup
+```
+
+For a cloud provider, it writes only the selected key to `.env` in the current
+directory without printing the value, runs provider-aware preflight, and offers
+a safe dry run. For `local`, it asks for an OpenAI-compatible endpoint and does
+not request a cloud key. In automation, configure the environment directly and
+use `preflight`; `setup` exits 2 when no interactive terminal is available.
+
+Inspect effective settings without exposing full keys:
+
+```bash
+pocarchitect config
+pocarchitect --format json --no-color config
+```
+
+The output masks credentials and reports whether each value comes from the
+process environment, `.env`, or a built-in default.
 
 ## Preflight and dry-run boundaries
 
@@ -113,7 +139,8 @@ python -m pocarchitect --url https://github.com/example/poc \
 ```
 
 This makes no clone or provider call, requires no credential, and writes no
-report.
+report. Text mode shows a compact summary; add `--full` to print the complete
+prompt. JSON dry-run output includes the full prompt for automation.
 
 ### Grounding preview without provider access
 
@@ -137,14 +164,24 @@ warning/URL-only context and can still reach the provider after approval; cancel
 unless URL-only analysis is acceptable. Successful report metadata records
 `url-only-ingestion-failed`, not a successful clone.
 
+`--url owner/repository` expands to the corresponding GitHub URL. Malformed
+GitHub repository shapes fail early. Interactive text runs show a spinner while
+the provider responds; the transfer preview may include an approximate input
+cost for a model with a configured estimate. Treat it only as an order-of-
+magnitude hint.
+
 For reviewed noninteractive automation, `--yes` bypasses confirmation. Use it
 only after independently reviewing every authorized target and transfer.
 
 ## Main options and provider defaults
 
 The generated [CLI Reference](cli-reference.md) is the complete option source.
-`--risk-level` and `--target-os` accept free text. Mitigations are enabled; no
-public negative mitigation switch exists.
+`--risk-level` and `--target-os` accept free text. Mitigations are enabled by
+default; use `--no-mitigations` to omit them.
+
+Use `--open` to ask the operating system to open a successfully saved report.
+The CLI also prints its absolute path and a short content preview. Viewer launch
+is best-effort and does not change report generation success.
 
 | Provider | Required cloud setting | Default model |
 |---|---|---|
@@ -195,6 +232,8 @@ python -m pocarchitect --batch example_usage/dry_run_batch_urls.txt \
 ```
 
 Dry run previews every non-resumed URL and does not write success records.
+Interactive real batches display completed/total counts, elapsed time, and ETA;
+JSON, redirected, and dry-run output stays event-based.
 
 Run an authorized real batch:
 
@@ -320,6 +359,7 @@ python scripts/validate_documentation_links.py
 python scripts/validate_documentation_commands.py
 python scripts/validate_documentation_reports.py
 python scripts/validate_ci_workflow.py
+python scripts/release_readiness.py --format text
 ```
 
 Run the test/security/build equivalents:
@@ -347,6 +387,7 @@ Documentation controls have intentionally bounded claims:
 | `validate_documentation_reports.py` | Report structure, closure evidence ranges/fingerprint, historical banner | Behavioral truth of cited code |
 | `validate_ci_workflow.py` | Required checked-in CI invariants and absence of retired mutators | Hosted CI success |
 | `validate_distribution.py` | Local Markdown targets inside the built sdist | External links or wheel-installed docs |
+| `release_readiness.py` | Five hermetic first-day pillars and live option coverage, ideally against an installed wheel | External provider, native Docker, or every host environment |
 
 The former `apply_ci_fixes.py`, its embedded template, and
 `repair_apply_ci_fixes.py` were removed because they could overwrite the

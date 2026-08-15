@@ -136,6 +136,18 @@ python -m pip install -e '.[all]'
 
 No configuration is needed for the safe preview or <code>preflight --offline</code>.
 
+For an interactive guided setup, run:
+
+~~~bash
+pocarchitect setup
+~~~
+
+The wizard chooses a provider, writes a cloud key only to the current
+directory's <code>.env</code> (or asks for a local endpoint), runs readiness
+checks, and offers a safe dry run. It does not support redirected or
+noninteractive input. Review masked effective settings later with
+<code>pocarchitect config</code>.
+
 For a real cloud-provider run, copy <code>.env.example</code> to <code>.env</code> in the repository root and replace **one** <code>your_key_here</code> value with a credential for the selected provider:
 
 | Provider option | Required <code>.env</code> name |
@@ -228,6 +240,8 @@ In an interactive terminal, replace <code>&lt;AUTHORIZED_GITHUB_URL&gt;</code> w
 python -m pocarchitect --url <AUTHORIZED_GITHUB_URL> --provider xai
 ~~~
 
+You may also use <code>--url owner/repository</code> shorthand for GitHub.
+
 POCArchitect performs preflight, displays a redacted transfer preview, and asks
 for confirmation before sending source to the provider. Inspect the preview for
 <code>WARNING: Ingestion failed</code>. A clone failure falls back to URL-only
@@ -266,10 +280,12 @@ not add CLI providers; another OpenAI-compatible service uses
 
 <code>--risk-level</code> and <code>--target-os</code> accept free text and are
 added to the provider request. <code>--include-mitigations</code> defaults to
-enabled; the public CLI has no switch to set it false. Root
+enabled; use <code>--no-mitigations</code> to omit them. Root
 <code>--format json</code> and <code>--no-color</code> also apply to
 <code>batch-status</code> and <code>batch-reset</code> when placed before the
-subcommand. See the generated [CLI Reference](cli-reference.md).
+subcommand. Text dry runs show a summary unless <code>--full</code> is present.
+Use <code>--open</code> to ask the operating system to open a completed report.
+See the generated [CLI Reference](cli-reference.md).
 
 ## 20. Where Results, Logs, and Generated Files Are Stored
 
@@ -282,6 +298,10 @@ count, and a SHA-256 of the provider response. Ingestion is one of
 <code>disabled</code>, <code>url-only-non-github</code>,
 <code>url-only-ingestion-failed</code>, or <code>github-shallow-clone</code>.
 Dry runs create no reports.
+
+Real text runs print the report's absolute path and a short preview. Viewer
+opening through <code>--open</code> is best-effort. Interactive batches may show
+progress and ETA; JSON and redirected output stays event-based.
 
 Batch recovery state defaults to <code>reports/batch_progress.json</code>.
 Version 2 requires a top-level <code>version: 2</code> and object-valued

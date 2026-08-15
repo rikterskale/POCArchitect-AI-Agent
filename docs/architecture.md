@@ -34,9 +34,11 @@ URL or batch file
   -> resolved output directory
 ```
 
-`--dry-run` bypasses **all automatic preflight checks**, constructs and prints
-the provider-facing prompt, and exits before a provider call or report write.
-Use `pocarchitect preflight --offline` when installation checks are also needed.
+`--dry-run` bypasses **all automatic preflight checks**, constructs the
+provider-facing prompt, and exits before a provider call or report write. Text
+mode prints a compact summary unless `--full` is supplied; JSON output includes
+the full prompt. Use `pocarchitect preflight --offline` when installation checks
+are also needed.
 
 ## Core components
 
@@ -48,6 +50,23 @@ Use `pocarchitect preflight --offline` when installation checks are also needed.
 | Batch state | `pocarchitect/state.py` | Versioned load, atomic writes, summaries, and recoverable reset |
 | System prompt | `pocarchitect/POC_Architect_Prompt.md` | Provider instructions and report structure |
 | Grounding and report saving | `pocarchitect/cli.py` | Clone/selection, ingestion outcomes, metadata, and body hash |
+
+## Guided and novice-facing surfaces
+
+- `setup` is an interactive terminal wizard. It writes a selected cloud key
+  only to the current directory's `.env`, or checks a supplied local endpoint,
+  then offers a safe dry run.
+- `config` reports effective provider-key sources with masked values plus
+  default models/output settings.
+- The main command accepts `owner/repo` shorthand, validates GitHub repository
+  shapes early, and supports paired `--include-mitigations/--no-mitigations`.
+- Text dry runs default to a bounded summary; `--full` prints the complete
+  prompt. `--open` asks the operating system to open a completed report.
+- Interactive real calls use a spinner, and interactive real batches use a
+  progress bar with elapsed time and ETA. JSON/non-terminal output remains
+  event-based.
+- The ingestion preview may show an approximate input-cost hint for models with
+  a configured estimate. It is not a quote or billing guarantee.
 
 ## Preflight boundaries
 
@@ -115,10 +134,11 @@ outcomes and the number of files included for a successful clone.
 
 Batch input ignores blank lines and full-line comments whose trimmed content
 starts with `#`; inline comments are not removed. Every eligible dry-run URL is
-previewed. Real successes and failures are written atomically to the version-2
-ledger. Processing continues after an item failure, then the command exits 1
-after its summary when any item failed. A zero exit therefore means no processed
-item failed; consumers may also inspect `batch_complete.failed` or the ledger.
+previewed. Interactive real batches show progress and ETA. Real successes and
+failures are written atomically to the version-2 ledger. Processing continues
+after an item failure, then the command exits 1 after its summary when any item
+failed. A zero exit therefore means no processed item failed; consumers may
+also inspect `batch_complete.failed` or the ledger.
 
 ## Provider defaults
 

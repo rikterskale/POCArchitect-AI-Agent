@@ -419,6 +419,154 @@ def test_dry_run_bypasses_automatic_preflight(monkeypatch):
     assert result.exit_code == 0
 
 
+def test_expand_url_shorthand_expands_owner_repo():
+    assert (
+        cli.expand_url_shorthand("octocat/Hello-World")
+        == "https://github.com/octocat/Hello-World"
+    )
+    # Full URLs and non-shorthand values pass through unchanged.
+    assert (
+        cli.expand_url_shorthand("https://github.com/octocat/Hello-World")
+        == "https://github.com/octocat/Hello-World"
+    )
+    assert (
+        cli.expand_url_shorthand("https://example.com/a/b") == "https://example.com/a/b"
+    )
+    # A hostname-looking first segment is not shorthand.
+    assert cli.expand_url_shorthand("example.com/repo") == "example.com/repo"
+
+
+def test_validate_poc_url_rejects_malformed_github_url():
+    import pytest
+
+    with pytest.raises(ValueError):
+        cli.validate_poc_url("https://github.com/onlyowner", no_ingest=False)
+    # With --no-ingest, no early clone-shaped validation is applied.
+    assert (
+        cli.validate_poc_url("https://github.com/onlyowner", no_ingest=True)
+        == "https://github.com/onlyowner"
+    )
+
+
+def test_estimate_cost_usd_known_and_unknown_models():
+    cost = cli.estimate_cost_usd("gpt-4o", 1_000_000)
+    assert cost == 2.50
+    assert cli.estimate_cost_usd("no-such-model", 1_000_000) is None
+
+
+def test_save_report_emits_absolute_path_and_digest(tmp_path, monkeypatch):
+    events = []
+    monkeypatch.setattr(cli, "output_format", "json")
+    monkeypatch.setattr(
+        cli,
+        "console",
+        Console(file=io.StringIO(), force_terminal=False, color_system=None),
+    )
+    real_emit = cli.emit
+
+    def capture(event, message, **details):
+        events.append((event, details))
+        real_emit(event, message, **details)
+
+    monkeypatch.setattr(cli, "emit", capture)
+
+    cli.save_report(
+        "# Title\n\nFirst meaningful line\nSecond line",
+        "https://github.com/example/repo",
+        tmp_path,
+        "local",
+        "test-model",
+        cli.GroundingResult("Grounding disabled", "disabled"),
+    )
+
+    names = [event for event, _ in events]
+    assert "report_saved" in names
+    assert "report_digest" in names
+    saved = dict(events[[e for e, _ in events].index("report_saved")][1])
+    assert "absolute_path" in saved
+
+
+def test_resolve_batch_state_path_prefers_existing(tmp_path):
+    # Non-default explicit path returns as-is only when it exists.
+    missing = tmp_path / "nope.json"
+    assert cli.resolve_batch_state_path(missing) is None
+    missing.write_text("{}", encoding="utf-8")
+    assert cli.resolve_batch_state_path(missing) == missing
+
+
+def test_batch_status_reports_no_batch_when_ledger_absent(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = RUNNER.invoke(cli.app, ["batch-status"])
+    assert result.exit_code == 0
+    assert "No batch has been run yet" in result.stdout
+
+
+def test_config_command_masks_keys(tmp_path, monkeypatch):
+    for key in ("XAI_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "OPENAI_API_KEY=sk-secret-value-1234\n", encoding="utf-8"
+    )
+
+    result = RUNNER.invoke(cli.app, ["--format", "json", "config"])
+    assert result.exit_code == 0
+    events = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    config_event = next(e for e in events if e["event"] == "config")
+    settings = {row["setting"]: row for row in config_event["settings"]}
+    assert "sk-secret-value-1234" not in result.stdout
+    assert settings["OPENAI_API_KEY"]["value"].startswith("set (")
+
+
+def test_no_mitigations_flag_is_reflected_in_prompt():
+    result = RUNNER.invoke(
+        cli.app,
+        [
+            "--url",
+            "https://github.com/example/repo",
+            "--no-ingest",
+            "--no-mitigations",
+            "--dry-run",
+            "--format",
+            "json",
+            "--no-color",
+        ],
+    )
+    assert result.exit_code == 0
+    events = [json.loads(line) for line in result.stdout.splitlines() if line]
+    prompt = events[-1]["prompt"]
+    assert "Include Mitigations: No" in prompt
+
+
+def test_get_llm_response_fails_fast_on_unknown_model(monkeypatch):
+    calls = {"n": 0}
+
+    class _Completions:
+        def create(self, **_kwargs):
+            calls["n"] += 1
+            raise Exception("Error code: 404 - model `bogus` does not exist")
+
+    class _Chat:
+        completions = _Completions()
+
+    class _Client:
+        chat = _Chat()
+
+    monkeypatch.setattr(cli, "OpenAI", lambda **_kwargs: _Client())
+    monkeypatch.setattr(
+        cli,
+        "console",
+        Console(file=io.StringIO(), force_terminal=False, color_system=None),
+    )
+
+    import pytest
+
+    with pytest.raises(cli.FatalProviderError):
+        cli.get_llm_response("openai", "sk-x", "bogus", 0.2, None, "sys", "user")
+    # No retry storm: the create call happened exactly once.
+    assert calls["n"] == 1
+
+
 def test_corrupt_batch_state_is_preserved_until_explicit_reset(tmp_path):
     state_path = tmp_path / "batch_progress.json"
     state_path.write_text("{not valid json", encoding="utf-8")

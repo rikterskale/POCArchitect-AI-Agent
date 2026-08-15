@@ -162,53 +162,91 @@ def main(
     table = Table(title="Preflight Results")
     table.add_column("Check", style="cyan")
     table.add_column("Status", style="green")
+    table.add_column("Fix", style="yellow")
     results = []
 
-    def add_row(check: str, status: str) -> None:
-        results.append({"check": check, "status": status})
-        table.add_row(check, status)
+    def add_row(check: str, status: str, ok: bool = True, fix: str = "") -> None:
+        remediation = "" if ok else fix
+        results.append({"check": check, "status": status, "remediation": remediation})
+        table.add_row(check, status, remediation or "—")
 
     has_failure = False
+
+    install_hint = f'{sys.executable} -m pip install -e ".[all]"'
 
     # Python version
     py_ok = sys.version_info >= (3, 10)
     status = "OK" if py_ok else "FAIL"
     if not py_ok:
         has_failure = True
-    add_row("Python >=3.10", status)
+    add_row(
+        "Python >=3.10",
+        status,
+        ok=py_ok,
+        fix="Install Python 3.10+ and recreate the virtual environment.",
+    )
 
     # Dependencies
     for dep in REQUIRED_DEPS:
         ok, msg = check_dependency(dep)
         if not ok:
             has_failure = True
-        add_row(f"Dependency: {dep}", msg)
+        add_row(f"Dependency: {dep}", msg, ok=ok, fix=f"Run: {install_hint}")
 
     ok, msg = check_git_command()
     if not ok:
         has_failure = True
-    add_row("Git executable", msg)
+    add_row(
+        "Git executable",
+        msg,
+        ok=ok,
+        fix="Install Git, reopen the terminal, and rerun preflight.",
+    )
 
     # CLI command
     ok, msg = check_cli_command()
     if not ok:
         has_failure = True
-    add_row("CLI command", msg)
+    add_row(
+        "CLI command",
+        msg,
+        ok=ok,
+        fix=f"Reinstall the package: {install_hint}",
+    )
 
     # Prompt file
     ok, msg = check_prompt_file()
     if not ok:
         has_failure = True
-    add_row("System prompt", msg)
+    add_row(
+        "System prompt",
+        msg,
+        ok=ok,
+        fix="Run from the repository root, or reinstall so package data is present.",
+    )
 
     # Provider credentials/readiness are only required when a provider call is intended.
     if require_api_key and not offline:
         if provider == "local":
             ok, msg = check_local_endpoint(base_url)
-            add_row("Local endpoint", msg)
+            add_row(
+                "Local endpoint",
+                msg,
+                ok=ok,
+                fix="Start the local server (e.g. `ollama serve`) or pass --base-url.",
+            )
         else:
             ok, msg = check_api_key(provider)
-            add_row(f"API key ({provider})", msg)
+            key_name = PROVIDER_KEY_NAMES[provider]
+            add_row(
+                f"API key ({provider})",
+                msg,
+                ok=ok,
+                fix=(
+                    f"Run `pocarchitect setup`, or set {key_name} in your environment "
+                    "or a local .env file."
+                ),
+            )
         if not ok:
             has_failure = True
     else:
@@ -218,7 +256,12 @@ def main(
     ok, msg = check_output_directory_writable(output_dir)
     if not ok:
         has_failure = True
-    add_row("Output directory", msg)
+    add_row(
+        "Output directory",
+        msg,
+        ok=ok,
+        fix="Pass --output-dir <writable-folder> or fix folder permissions.",
+    )
 
     if output_format == "json":
         console.print(

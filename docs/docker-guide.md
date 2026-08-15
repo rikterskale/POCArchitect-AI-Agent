@@ -26,7 +26,7 @@ The Dockerfile uses a multi-stage build and runs the final container as the non-
 ### Show Help
 
 ```bash
-docker run --rm pocarchitect --help
+docker run --rm pocarchitect:latest --help
 ```
 
 ### Safe first run
