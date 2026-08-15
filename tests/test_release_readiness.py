@@ -12,8 +12,19 @@ from pathlib import Path
 
 import pytest
 
+from scripts.release_readiness import COVERED_OPTIONS, all_long_options
+
 ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "scripts" / "release_readiness.py"
+
+
+def test_option_inventory_is_scoped_by_command():
+    options = all_long_options()
+
+    assert ("root", "--output-dir") in options
+    assert ("preflight", "--output-dir") in options
+    assert ("root", "--output-dir") in COVERED_OPTIONS
+    assert ("preflight", "--output-dir") in COVERED_OPTIONS
 
 
 @pytest.fixture(scope="module")

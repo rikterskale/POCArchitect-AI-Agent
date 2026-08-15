@@ -66,33 +66,50 @@ MOCK_MARKER = "POCARCHITECT_MOCK_REPORT_MARKER_7f3a9d"
 # coverage check in Pillar 3 reads the live CLI metadata and fails if a new
 # option ships without landing in one of these sets — that is what makes
 # "all options, no exceptions" enforceable rather than aspirational.
-COVERED_OPTIONS: dict[str, str] = {
-    "--version": "`--version` is run and asserted in Pillar 1.",
-    "--show-completion": "Shell completion is emitted and asserted in Pillar 1.",
-    "--offline": "`preflight --offline` is asserted in Pillar 1.",
-    "--url": "Single-URL journeys drive Pillars 2 and 3.",
-    "--batch": "Batch resume is asserted in Pillar 4.",
-    "--batch-state": "Ledger inspection/reset is asserted in Pillar 4.",
-    "--provider": "Selected provider is exercised end-to-end via the mock in Pillar 3.",
-    "--model": "Model reaches the provider call (mock captures it) in Pillar 3.",
-    "--temperature": "Temperature reaches the provider call (mock captures it) in Pillar 3.",
-    "--base-url": "Local endpoint routing is proven against the mock in Pillar 3.",
-    "--output-dir": "Report is written to the chosen directory in Pillar 3.",
-    "--risk-level": "Reflected in the assembled prompt in Pillar 3.",
-    "--target-os": "Reflected in the assembled prompt in Pillar 3.",
-    "--include-mitigations": "Default 'Yes' is asserted in the prompt in Pillar 3.",
-    "--no-mitigations": "Toggled 'No' is asserted in the prompt in Pillar 3.",
-    "--no-ingest": "Grounding-skip path is used throughout Pillars 2-4.",
-    "--dry-run": "Summary/JSON dry-run is asserted in Pillar 3.",
-    "--full": "`--dry-run --full` prints the whole prompt in Pillar 3.",
-    "--open": "Report-open path is exercised end-to-end in Pillar 3.",
-    "--verbose": "Verbose model selection is asserted in Pillar 3.",
-    "--yes": "Non-interactive confirmation is used in Pillars 3 and 4.",
-    "--format": "Text and JSON modes are asserted throughout.",
-    "--no-color": "Color-free output is used throughout.",
+COVERED_OPTIONS: dict[tuple[str, str], str] = {
+    ("root", "--version"): "`--version` is run and asserted in Pillar 1.",
+    (
+        "root",
+        "--show-completion",
+    ): "Shell completion is emitted and asserted in Pillar 1.",
+    ("preflight", "--offline"): "`preflight --offline` is asserted in Pillar 1.",
+    ("root", "--url"): "Single-URL journeys drive Pillars 2 and 3.",
+    ("root", "--batch"): "Batch resume is asserted in Pillar 4.",
+    ("root", "--batch-state"): "The batch ledger is selected in Pillar 4.",
+    ("batch-status", "--batch-state"): "Ledger inspection is asserted in Pillar 4.",
+    ("batch-reset", "--batch-state"): "Ledger reset is asserted in Pillar 4.",
+    (
+        "root",
+        "--provider",
+    ): "The selected provider is exercised via the mock in Pillar 3.",
+    ("preflight", "--provider"): "Local-provider preflight is asserted in Pillar 3.",
+    ("root", "--model"): "Model reaches the provider call in Pillar 3.",
+    ("root", "--temperature"): "Temperature reaches the provider call in Pillar 3.",
+    ("root", "--base-url"): "Local endpoint routing is proven in Pillar 3.",
+    ("preflight", "--base-url"): "Preflight reaches the local mock in Pillar 3.",
+    ("root", "--output-dir"): "Report output location is asserted in Pillar 3.",
+    (
+        "preflight",
+        "--output-dir",
+    ): "Preflight checks a custom output directory in Pillar 1.",
+    ("root", "--risk-level"): "Reflected in the assembled prompt in Pillar 3.",
+    ("root", "--target-os"): "Reflected in the assembled prompt in Pillar 3.",
+    ("root", "--include-mitigations"): "Default 'Yes' is asserted in Pillar 3.",
+    ("root", "--no-mitigations"): "Toggled 'No' is asserted in Pillar 3.",
+    ("root", "--no-ingest"): "Grounding-skip paths are used in Pillars 2-4.",
+    ("root", "--dry-run"): "Summary/JSON dry-run is asserted in Pillar 3.",
+    ("root", "--full"): "`--dry-run --full` is asserted in Pillar 3.",
+    ("root", "--open"): "Report-open behavior is exercised in Pillar 3.",
+    ("root", "--verbose"): "Verbose model selection is asserted in Pillar 3.",
+    ("root", "--yes"): "Source-transfer confirmation bypass is asserted in Pillar 3.",
+    ("batch-reset", "--yes"): "Non-interactive ledger reset is asserted in Pillar 4.",
+    ("root", "--format"): "Root JSON output is asserted throughout.",
+    ("preflight", "--format"): "Preflight JSON output is asserted in Pillars 1 and 3.",
+    ("root", "--no-color"): "Root color-free output is used throughout.",
+    ("preflight", "--no-color"): "Color-free preflight output is asserted in Pillar 1.",
 }
-WAIVED_OPTIONS: dict[str, str] = {
-    "--install-completion": (
+WAIVED_OPTIONS: dict[tuple[str, str], str] = {
+    ("root", "--install-completion"): (
         "Writes to the user's shell profile (a side effect a gate must not cause); "
         "its read-only sibling --show-completion is exercised instead."
     ),
@@ -231,25 +248,27 @@ def mock_provider() -> Iterator[tuple[str, list[dict]]]:
         thread.join(timeout=5)
 
 
-def all_long_options() -> set[str]:
+def all_long_options() -> set[tuple[str, str]]:
     """Every ``--long`` option the CLI accepts, across the root and subcommands."""
     from typer.main import get_command
 
     from pocarchitect.cli import app
 
     root = get_command(app)
-    options: set[str] = set()
+    options: set[tuple[str, str]] = set()
 
-    def collect(command) -> None:  # noqa: ANN001 — click object
+    def collect(command_path: str, command) -> None:  # noqa: ANN001 — click object
         for param in command.params:
             names = list(getattr(param, "opts", [])) + list(
                 getattr(param, "secondary_opts", [])
             )
-            options.update(name for name in names if name.startswith("--"))
+            options.update(
+                (command_path, name) for name in names if name.startswith("--")
+            )
 
-    collect(root)
-    for command in root.commands.values():  # type: ignore[attr-defined]
-        collect(command)
+    collect("root", root)
+    for name, command in root.commands.items():  # type: ignore[attr-defined]
+        collect(name, command)
     return options
 
 
@@ -283,12 +302,24 @@ def pillar_installation(work: Path) -> Pillar:
         help_result.returncode == 0 and "Usage" in help_result.stdout,
     )
 
-    preflight = run_cli(["preflight", "--offline", "--format", "json"], work)
+    preflight_output = work / "preflight-output"
+    preflight = run_cli(
+        [
+            "preflight",
+            "--offline",
+            "--output-dir",
+            str(preflight_output),
+            "--format",
+            "json",
+            "--no-color",
+        ],
+        work,
+    )
     events = json_events(preflight.stdout)
     passed = bool(events) and events[-1].get("message") == "Preflight passed."
     p.record(
         "`preflight --offline` passes in a clean install",
-        preflight.returncode == 0 and passed,
+        preflight.returncode == 0 and passed and preflight_output.is_dir(),
         events[-1].get("message", "") if events else preflight.stderr.strip(),
     )
 
@@ -588,6 +619,40 @@ def pillar_features(work: Path) -> Pillar:
             pre_events[-1].get("message", "") if pre_events else pre.stderr.strip(),
         )
 
+        confirmation_args = [
+            "--url",
+            "https://example.invalid/poc",
+            "--provider",
+            "local",
+            "--base-url",
+            base_url,
+            "--model",
+            MOCK_MODEL,
+            "--output-dir",
+            str(work / "confirmation-out"),
+            "--format",
+            "json",
+            "--no-color",
+        ]
+        request_count = len(captured)
+        unconfirmed = run_cli(confirmation_args, work)
+        unconfirmed_events = json_events(unconfirmed.stdout)
+        requests_after_refusal = len(captured)
+        confirmed = run_cli([*confirmation_args, "--yes"], work)
+        confirmed_events = json_events(confirmed.stdout)
+        p.record(
+            "`--yes` controls non-interactive source transfer",
+            unconfirmed.returncode == 2
+            and any(
+                event.get("event") == "confirmation_required"
+                for event in unconfirmed_events
+            )
+            and requests_after_refusal == request_count
+            and confirmed.returncode == 0
+            and any(event.get("event") == "report_saved" for event in confirmed_events)
+            and len(captured) == request_count + 1,
+        )
+
         run_args = [
             "--url",
             "octocat/Hello-World",
@@ -698,7 +763,11 @@ def pillar_recovery(work: Path) -> Pillar:
         ],
         work,
     )
-    resume_events = [e.get("event") for e in json_events(resume.stdout)]
+    resume_events = [
+        event
+        for item in json_events(resume.stdout)
+        if isinstance((event := item.get("event")), str)
+    ]
     p.record(
         "Completed URLs are skipped on resume",
         "batch_skipped" in resume_events,

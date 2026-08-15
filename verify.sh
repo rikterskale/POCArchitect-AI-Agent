@@ -34,6 +34,7 @@ echo
 echo "4. 🔗 Single URL test (dry-run)..."
 pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent \
   --provider openai \
+  --no-ingest \
   --dry-run
 echo "✅ Single URL dry-run passed"
 echo
@@ -45,6 +46,7 @@ pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent \
   --risk-level Critical \
   --target-os Windows \
   --include-mitigations \
+  --no-ingest \
   --verbose \
   --dry-run
 echo "✅ Operator flags + verbose dry-run passed"

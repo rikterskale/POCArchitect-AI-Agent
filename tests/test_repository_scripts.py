@@ -10,10 +10,17 @@ BASH = shutil.which("bash")
 
 def test_no_network_verifier_uses_offline_preflight_and_safe_batch_fixture():
     script = (ROOT / "verify.sh").read_text(encoding="utf-8")
+    logical_lines = script.replace("\\\n", " ").splitlines()
+    offline_commands = [
+        line.strip()
+        for line in logical_lines
+        if line.strip().startswith(("pocarchitect --url", "pocarchitect --batch"))
+    ]
 
     assert "pocarchitect preflight --offline" in script
     assert "example_usage/dry_run_batch_urls.txt" in script
-    assert "--no-ingest" in script
+    assert len(offline_commands) == 3
+    assert all("--no-ingest" in command for command in offline_commands)
     assert "production-ready" not in script
 
 
