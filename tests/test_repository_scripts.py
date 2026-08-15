@@ -1,6 +1,11 @@
+import shutil
+import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+BASH = shutil.which("bash")
 
 
 def test_no_network_verifier_uses_offline_preflight_and_safe_batch_fixture():
@@ -17,8 +22,32 @@ def test_real_provider_script_checks_openai_and_refuses_placeholder_fixtures():
 
     assert "pocarchitect preflight --provider openai" in script
     assert 'REAL_BATCH_FILE="${1:-}"' in script
+    assert 'REAL_BATCH_PATH="$(canonical_path "$REAL_BATCH_FILE")"' in script
     assert "Refusing placeholder fixture" in script
-    assert 'pocarchitect --batch "$REAL_BATCH_FILE"' in script
+    assert 'pocarchitect --batch "$REAL_BATCH_PATH"' in script
+
+
+@pytest.mark.skipif(BASH is None, reason="Bash is required for shell-script checks")
+@pytest.mark.parametrize(
+    "batch_argument",
+    [
+        "./example_usage/batch_urls.txt",
+        str((ROOT / "example_usage" / "batch_urls.txt").resolve()),
+        "./example_usage/dry_run_batch_urls.txt",
+        str((ROOT / "example_usage" / "dry_run_batch_urls.txt").resolve()),
+    ],
+)
+def test_real_provider_script_refuses_equivalent_placeholder_paths(batch_argument):
+    result = subprocess.run(
+        [BASH, "test-full.sh", batch_argument],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 2
+    assert "Refusing placeholder fixture for a billable provider run" in result.stdout
 
 
 def test_batch_template_is_prominently_labeled_and_separate_from_safe_fixture():

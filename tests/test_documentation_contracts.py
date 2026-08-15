@@ -23,3 +23,4 @@ def test_manifest_packages_documentation_navigation_targets():
     assert "recursive-include docs *.md" in manifest
     assert "prune docs" not in manifest
     assert "include POCArchitect_Quickstart.txt" in manifest
+    assert "include .github/workflows/ci.yml" in manifest

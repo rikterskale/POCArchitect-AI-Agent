@@ -26,6 +26,7 @@ include test-full.sh
 # Exclude tests and repository-only automation from the distribution
 prune tests
 prune .github
+include .github/workflows/ci.yml
 prune .pytest_cache
 prune .ruff_cache
 prune .mypy_cache

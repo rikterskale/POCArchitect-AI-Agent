@@ -35,21 +35,36 @@ def closure_rows(text: str) -> dict[str, tuple[str, str]]:
     return rows
 
 
-def evidence_paths(rows: dict[str, tuple[str, str]]) -> set[Path]:
-    paths: set[Path] = set()
-    for _, evidence in rows.values():
-        for raw_path, _, _ in CITATION_PATTERN.findall(evidence):
-            paths.add(Path(raw_path))
-    return paths
+def _normalized_file_bytes(path: Path) -> bytes:
+    return path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
 
 
-def evidence_fingerprint(root: Path, paths: set[Path]) -> str:
+def evidence_fingerprint(root: Path, rows: dict[str, tuple[str, str]]) -> str:
+    """Bind finding IDs and citation coordinates to normalized evidence bytes."""
     digest = hashlib.sha256()
+    digest.update(b"documentation-closure-v2\0")
+    paths: set[Path] = set()
+    for finding_id in sorted(rows):
+        status, evidence = rows[finding_id]
+        digest.update(finding_id.strip().upper().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(status.strip().encode("utf-8"))
+        digest.update(b"\0")
+        citations = sorted(CITATION_PATTERN.findall(evidence))
+        for raw_path, raw_start, raw_end in citations:
+            relative = Path(raw_path)
+            paths.add(relative)
+            coordinate = (
+                f"{relative.as_posix()}:{int(raw_start)}-{int(raw_end or raw_start)}"
+            )
+            digest.update(coordinate.encode("utf-8"))
+            digest.update(b"\0")
+
     for relative in sorted(paths, key=lambda item: item.as_posix()):
         path = root / relative
         digest.update(relative.as_posix().encode("utf-8"))
         digest.update(b"\0")
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
+        digest.update(hashlib.sha256(_normalized_file_bytes(path)).digest())
         digest.update(b"\0")
     return digest.hexdigest()
 
@@ -110,13 +125,13 @@ def validate(root: Path = ROOT) -> list[str]:
         if status != "Closed":
             errors.append(f"{finding_id}: status must be Closed, found {status!r}")
 
-    citation_errors, paths = validate_citations(root, rows)
+    citation_errors, _ = validate_citations(root, rows)
     errors.extend(citation_errors)
     fingerprint_match = FINGERPRINT_PATTERN.search(gap)
     if fingerprint_match is None:
         errors.append("Gap report is missing closure evidence fingerprint")
     elif not citation_errors:
-        current = evidence_fingerprint(root, paths)
+        current = evidence_fingerprint(root, rows)
         if fingerprint_match.group(1) != current:
             errors.append(
                 "Closure evidence fingerprint is stale; recalculate current "

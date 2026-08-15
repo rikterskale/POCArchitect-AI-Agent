@@ -7,8 +7,8 @@
 > `path:line` citations intentionally identify that baseline snapshot. Section
 > 10 is the authoritative current-tree closure matrix; its citations and
 > evidence fingerprint are recalculated after remediation. The CI controls
-> validate structure, local targets, citation ranges, and evidence-file
-> currentness. These structural controls do not prove behavioral accuracy;
+> validate structure, local targets, citation ranges, normalized evidence-file
+> content, and the finding-to-coordinate mapping. Structural controls do not prove behavioral accuracy;
 > executable behavior is established by the separately listed tests and checks.
 
 **Repository audited:** `C:\Users\tsaxon\Documents\Github\POCArchitect-AI-Agent`
@@ -492,40 +492,41 @@ Ordering is severity first, then breadth of affected workflow. Each row is deriv
 ## 10. Remediation closure matrix
 
 The final matrix is populated from the completed, validated tree. Every evidence
-cell uses recalculated current `path:line` citations. Its fingerprint covers all
-cited files so later edits require an explicit report refresh.
+cell uses recalculated current `path:line` citations. Its fingerprint binds each
+finding to its citation coordinates and normalized cited-file content so line-
+ending conversion does not create drift while evidence or coordinate changes do.
 
-<!-- closure-evidence-sha256: b495abbddba314836ddfb487466ee7f4f75c5670be09aa4550a96a6bc18ccef3 -->
+<!-- closure-evidence-sha256: a270821524d29f169b22f33f5d1cc33ba02685979cbbef1255b3d176841e5f2b -->
 
 | Finding | Status | Current evidence | Verified resolution |
 |---|---|---|---|
 | DOC-001 | Closed | `docs/architecture.md:15-22`; `tests/test_entrypoints.py:4-10` | The divergent root implementations were deleted; both supported invocations resolve to the package app, and an absence test prevents reintroduction. |
-| DOC-002 | Closed | `POCArchitect_Quickstart.txt:1-18`; `scripts/validate_documentation_reports.py:146-149` | The root quickstart is now a short canonical redirect with one safe command; the report control rejects the former unsupported mitigation flag. |
-| DOC-003 | Closed | `docs/cli-reference.md:69-76`; `tests/test_cli.py:305-358` | Generated guidance places root format options before subcommands, and status/reset tests verify JSON events. |
-| DOC-004 | Closed | `pocarchitect/cli.py:907-918`; `pocarchitect/preflight.py:115-124`; `tests/test_cli.py:379-397` | Main resolves the report path before preflight, passes it through, and the standalone preflight accepts the same explicit output option. |
-| DOC-005 | Closed | `docs/architecture.md:37-39`; `tests/test_cli.py:400-419` | Current guidance says dry run bypasses all automatic preflight, and the CLI test proves the preflight callback is not invoked. |
-| DOC-006 | Closed | `docs/architecture.md:72-87`; `pocarchitect/cli.py:448-456`; `tests/test_cli.py:251-263` | Ingestion failures retain a visible warning, return an explicit URL-only outcome, and are documented as requiring operator rejection unless reduced context is acceptable. |
-| DOC-007 | Closed | `docs/architecture.md:89-103`; `pocarchitect/cli.py:359-445` | The architecture now lists every keyword, extension, byte threshold, character limit, file cap, and ordering/completeness boundary. |
-| DOC-008 | Closed | `pocarchitect/cli.py:721-745`; `docs/command-guide.md:207-217`; `tests/test_cli.py:53-94` | Batch processing still attempts later items but raises exit 1 after the summary when failures exist; docs and tests define the contract. |
-| DOC-009 | Closed | `pocarchitect/cli.py:678-690`; `tests/test_cli.py:97-133`; `verify.sh:53-59` | Dry run continues through every eligible item, the two-item behavior is tested, and the verifier uses a safe multi-item fixture. |
-| DOC-010 | Closed | `pocarchitect/cli.py:613-618`; `docs/command-guide.md:174-184` | Batch grammar now explicitly covers blank lines, full-line comments, and the lack of inline-comment stripping. |
-| DOC-011 | Closed | `pocarchitect/state.py:23-43`; `docs/command-guide.md:219-253`; `tests/test_state.py:7-16` | Version 2 and object-valued items are enforced without overwrite; the schema, unknown status boundary, timestamps, errors, and recoverable reset are documented. |
-| DOC-012 | Closed | `pocarchitect/cli.py:140-175`; `docs/architecture.md:105-112`; `tests/test_cli.py:221-263` | Report metadata now records the actual grounding outcome and selected-file count, with tests for disabled, non-GitHub, and failed-ingestion paths. |
-| DOC-013 | Closed | `MANIFEST.in:18-24`; `scripts/validate_distribution.py:20-85`; `tests/test_distribution.py:25-61` | Documentation and examples are included in the sdist, and built-archive local Markdown targets plus both reports are validated. |
+| DOC-002 | Closed | `POCArchitect_Quickstart.txt:1-18`; `docs/cli-reference.md:14-23`; `scripts/validate_documentation_reports.py:161-164` | The root quickstart is a canonical redirect rather than a duplicate option list; generated metadata exposes the real paired mitigation option, and the report control rejects the obsolete flag spelling. |
+| DOC-003 | Closed | `docs/cli-reference.md:88-98`; `tests/test_cli.py:305-358` | Generated guidance places root format options before subcommands, and status/reset tests verify JSON events. |
+| DOC-004 | Closed | `pocarchitect/cli.py:1408-1420`; `pocarchitect/preflight.py:115-128`; `tests/test_cli.py:379-397` | Main resolves the report path before preflight, passes it through, and the standalone preflight accepts the same explicit output option. |
+| DOC-005 | Closed | `docs/architecture.md:37-41`; `tests/test_cli.py:400-419` | Current guidance says dry run bypasses all automatic preflight, and the CLI test proves the preflight callback is not invoked. |
+| DOC-006 | Closed | `docs/architecture.md:93-106`; `pocarchitect/cli.py:649-657`; `tests/test_cli.py:251-263` | Ingestion failures retain a visible warning, return an explicit URL-only outcome, and are documented as requiring operator rejection unless reduced context is acceptable. |
+| DOC-007 | Closed | `docs/architecture.md:108-122`; `pocarchitect/cli.py:558-646` | The architecture lists every keyword, extension, byte threshold, character limit, file cap, and ordering/completeness boundary. |
+| DOC-008 | Closed | `pocarchitect/cli.py:1017-1041`; `docs/command-guide.md:246-256`; `tests/test_cli.py:53-94` | Batch processing still attempts later items but raises exit 1 after the summary when failures exist; docs and tests define the contract. |
+| DOC-009 | Closed | `pocarchitect/cli.py:972-985`; `tests/test_cli.py:97-133`; `verify.sh:53-59` | Dry run continues through every eligible item, the two-item behavior is tested, and the verifier uses a safe multi-item fixture. |
+| DOC-010 | Closed | `pocarchitect/cli.py:876-881`; `docs/command-guide.md:211-221` | Batch grammar explicitly covers blank lines, full-line comments, and the lack of inline-comment stripping. |
+| DOC-011 | Closed | `pocarchitect/state.py:23-43`; `docs/command-guide.md:258-294`; `tests/test_state.py:7-16` | Version 2 and object-valued items are enforced without overwrite; the schema, unknown status boundary, timestamps, errors, and recoverable reset are documented. |
+| DOC-012 | Closed | `pocarchitect/cli.py:276-356`; `docs/architecture.md:124-131`; `tests/test_cli.py:221-263` | Report metadata records the actual grounding outcome and selected-file count, with tests for disabled, non-GitHub, and failed-ingestion paths. |
+| DOC-013 | Closed | `MANIFEST.in:18-29`; `scripts/validate_distribution.py:20-85`; `tests/test_distribution.py:25-61` | Documentation, examples, and the workflow linked by release-readiness guidance are included in the sdist; built-archive local Markdown targets plus both reports are validated. |
 | DOC-014 | Closed | `docs/docker-guide.md:113-132`; `tests/test_documentation_contracts.py:6-10` | The real-run alias includes interactive terminal flags and a separate no-provider preview alias is documented and tested. |
-| DOC-015 | Closed | `verify.sh:28-30`; `test-full.sh:43-45`; `tests/test_repository_scripts.py:6-21` | The no-network script uses offline preflight, while the billable OpenAI script checks the OpenAI provider; static contract tests cover both. |
-| DOC-016 | Closed | `scripts/validate_ci_workflow.py:8-54`; `tests/test_ci_workflow.py:16-34`; `docs/command-guide.md:351-354` | All mutating patch/template/repair scripts were retired; a read-only validator enforces the sole canonical workflow and their continued absence. |
-| DOC-017 | Closed | `pocarchitect/config.py:8-32`; `scripts/generate_docs.py:95-121`; `tests/test_generate_docs.py:30-38` | Provider maps and effective defaults now come from shared runtime constants; generated text truthfully identifies which prose remains maintained in the generator. |
-| DOC-018 | Closed | `docs/command-guide.md:307-337`; `.github/workflows/ci.yml:39-69`; `.github/workflows/ci.yml:98-169` | The local reproduction section now mirrors quality, documentation, tests, security, Docker, build, and distribution gates while labeling hosted-only outcomes. |
-| DOC-019 | Closed | `scripts/validate_documentation_links.py:10-20`; `scripts/validate_documentation_commands.py:19-125`; `scripts/validate_documentation_reports.py:21-124`; `docs/command-guide.md:339-349` | Link scope now includes every repository documentation tree and prompt; selected safe commands are executed; report structure/currentness is checked; all controls state their non-goals. |
-| DOC-020 | Closed | `README.md:44-52`; `docs/guides/WINDOWS_NOVICE_USABILITY_GUIDE.md:12-15`; `docs/guides/LINUX_NOVICE_USABILITY_GUIDE.md:12-15` | macOS has an explicit untested matrix row and unsupported processor-architecture requirements were removed. |
+| DOC-015 | Closed | `verify.sh:28-30`; `test-full.sh:51-53`; `tests/test_repository_scripts.py:11-27` | The no-network script uses offline preflight, while the billable OpenAI script checks the OpenAI provider; contract tests cover both. |
+| DOC-016 | Closed | `scripts/validate_ci_workflow.py:8-56`; `tests/test_ci_workflow.py:16-34`; `docs/command-guide.md:392-395` | All mutating patch/template/repair scripts were retired; a read-only validator enforces the sole canonical workflow, release-readiness job, and their continued absence. |
+| DOC-017 | Closed | `pocarchitect/config.py:8-32`; `scripts/generate_docs.py:95-121`; `tests/test_generate_docs.py:30-38` | Provider maps and effective defaults come from shared runtime constants; generated text truthfully identifies which prose remains maintained in the generator. |
+| DOC-018 | Closed | `docs/command-guide.md:346-377`; `.github/workflows/ci.yml:39-205` | The local reproduction section mirrors quality, documentation, tests, security, Docker, release-readiness, build, and distribution gates while labeling hosted-only outcomes. |
+| DOC-019 | Closed | `scripts/validate_documentation_links.py:10-20`; `scripts/validate_documentation_commands.py:19-126`; `scripts/validate_documentation_reports.py:21-139`; `docs/command-guide.md:379-390` | Link scope includes every documentation tree and prompt; selected safe commands execute; report fingerprints normalize line endings and bind finding/citation coordinates; all controls state their non-goals. |
+| DOC-020 | Closed | `README.md:56-64`; `docs/guides/WINDOWS_NOVICE_USABILITY_GUIDE.md:12-15`; `docs/guides/LINUX_NOVICE_USABILITY_GUIDE.md:12-15` | macOS has an explicit untested matrix row and unsupported processor-architecture requirements were removed. |
 | DOC-021 | Closed | `docs/guides/WINDOWS_NOVICE_USABILITY_GUIDE.md:52-64`; `docs/guides/LINUX_NOVICE_USABILITY_GUIDE.md:45-57` | Platform deltas distinguish cloud keys from local operation and show provider-matched OpenAI/local diagnostics including local base URL. |
-| DOC-022 | Closed | `example_usage/batch_urls.txt:1-4`; `test-full.sh:10-26`; `tests/test_repository_scripts.py:24-34` | The real template is prominently marked, the billable script requires and guards an explicit authorized file, and dry-run verification has a separate fixture. |
-| DOC-023 | Closed | `pocarchitect/config.py:14-25`; `README.md:64-76`; `pocarchitect/POC_Architect_Prompt.md:1-3` | All four model defaults are published from shared constants and Claude/Gemini wording is explicitly bounded to prompt portability. |
-| DOC-024 | Closed | `pocarchitect/preflight.py:72-124`; `pocarchitect/preflight.py:166-221`; `docs/architecture.md:54-70` | Preflight now checks Git in addition to the exact import/runtime surfaces, uses the resolved output path, and explicitly limits local readiness to the models endpoint. |
-| DOC-025 | Closed | `pytest.ini:12-18`; `tests/test_documentation_contracts.py:13-18` | The slow marker now states that tests are included unless an invocation filters them, with a regression assertion against the old claim. |
+| DOC-022 | Closed | `example_usage/batch_urls.txt:1-4`; `test-full.sh:22-35`; `tests/test_repository_scripts.py:30-50`; `tests/test_repository_scripts.py:53-63` | The real template is prominently marked; the billable script canonicalizes and rejects equivalent relative or absolute protected paths; executable tests cover both fixtures and dry-run verification remains separate. |
+| DOC-023 | Closed | `pocarchitect/config.py:14-25`; `README.md:77-89`; `pocarchitect/POC_Architect_Prompt.md:1-3` | All four model defaults are published from shared constants and Claude/Gemini wording is explicitly bounded to prompt portability. |
+| DOC-024 | Closed | `pocarchitect/preflight.py:72-128`; `pocarchitect/preflight.py:175-264`; `docs/architecture.md:73-89` | Preflight checks Git in addition to the exact import/runtime surfaces, gives actionable remediation, uses the resolved output path, and limits local readiness to the models endpoint. |
+| DOC-025 | Closed | `pytest.ini:12-19`; `tests/test_documentation_contracts.py:13-18` | The slow marker states that tests are included unless an invocation filters them, with a regression assertion against the old claim. |
 | DOC-026 | Closed | `docs/guides/WINDOWS_NOVICE_USABILITY_GUIDE.md:1-10`; `docs/guides/LINUX_NOVICE_USABILITY_GUIDE.md:1-10`; `scripts/validate_novice_guides.py:57-78`; `tests/test_novice_guides.py:29-34` | Platform pages are concise deltas linked to the canonical guide; validation checks platform content and ledgers instead of enforcing duplicated heading counts. |
-| DOC-027 | Closed | `docs/DOCUMENTATION_REVIEW_REPORT.md:1-9`; `README.md:121-123`; `scripts/validate_documentation_reports.py:126-144` | The prior report has a top historical-snapshot banner, both reports are accurately characterized in navigation, and CI enforces those boundaries. |
+| DOC-027 | Closed | `docs/DOCUMENTATION_REVIEW_REPORT.md:1-9`; `README.md:137-139`; `scripts/validate_documentation_reports.py:141-159` | The prior report has a top historical-snapshot banner, both reports are accurately characterized in navigation, and CI enforces those boundaries. |
 | DOC-028 | Closed | `docs/ollama_preflight_check.py:86-125`; `docs/ollama-setup-guide.md:47-59`; `tests/test_ollama_preflight_check.py:23-39` | Helper success names the tested URL/model and only the three completed checks; guide and test preserve the full-prompt, report, quality, and resource limitations. |
 
 ## Appendix A. Complete baseline tracked-file coverage ledger

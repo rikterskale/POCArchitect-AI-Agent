@@ -35,9 +35,35 @@ def test_evidence_fingerprint_changes_with_cited_file(tmp_path):
     validator = load_validator()
     evidence = tmp_path / "evidence.md"
     evidence.write_text("first\n", encoding="utf-8")
-    paths = {Path("evidence.md")}
-    before = validator.evidence_fingerprint(tmp_path, paths)
+    rows = {"DOC-001": ("Closed", "`evidence.md:1`")}
+    before = validator.evidence_fingerprint(tmp_path, rows)
 
     evidence.write_text("second\n", encoding="utf-8")
 
-    assert validator.evidence_fingerprint(tmp_path, paths) != before
+    assert validator.evidence_fingerprint(tmp_path, rows) != before
+
+
+def test_evidence_fingerprint_normalizes_lf_and_crlf(tmp_path):
+    validator = load_validator()
+    evidence = tmp_path / "evidence.md"
+    rows = {"DOC-001": ("Closed", "`evidence.md:1-2`")}
+    evidence.write_bytes(b"first\nsecond\n")
+    lf_fingerprint = validator.evidence_fingerprint(tmp_path, rows)
+
+    evidence.write_bytes(b"first\r\nsecond\r\n")
+
+    assert validator.evidence_fingerprint(tmp_path, rows) == lf_fingerprint
+
+
+def test_evidence_fingerprint_changes_when_only_citation_coordinates_change(
+    tmp_path,
+):
+    validator = load_validator()
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("first\nsecond\n", encoding="utf-8")
+    first_line = {"DOC-001": ("Closed", "`evidence.md:1`")}
+    second_line = {"DOC-001": ("Closed", "`evidence.md:2`")}
+
+    assert validator.evidence_fingerprint(
+        tmp_path, first_line
+    ) != validator.evidence_fingerprint(tmp_path, second_line)
