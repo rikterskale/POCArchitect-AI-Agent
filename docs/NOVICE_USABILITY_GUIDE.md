@@ -6,9 +6,8 @@
 | Guide purpose | Beginner installation, first use, verification, recovery, and common operations |
 | Status | **PARTIALLY VERIFIED** |
 | Reviewed branch | <code>main</code> |
-| Reviewed commit | <code>60d55d47c7ceb621df2f124764f01403a99f346b</code> |
 | Detected project version | <code>0.2.0</code> |
-| Last verified | 2026-08-03 |
+| Last documentation update | 2026-08-15 |
 | Verified platforms | Existing Windows PowerShell virtual environment; Ubuntu CI uses Python 3.10–3.13; Docker CI builds the image and runs <code>--help</code> |
 | Validation limitations | No clean-room installation, live provider request, live Ollama request, or native Docker Desktop run was performed in this review |
 
@@ -36,7 +35,7 @@ Only analyze repositories you are authorized to inspect. A real grounded run clo
 
 You need Python 3.10 or newer, Git, and a terminal: Windows Terminal with PowerShell on Windows or a Bash-compatible terminal on Linux. Check Python with <code>py --version</code> in PowerShell or <code>python3 --version</code> in Bash, and check Git with <code>git --version</code>. A provider credential is required only for a real cloud-provider run.
 
-Ubuntu CI validates Python 3.10–3.13. The safe workflow was reviewed in an existing Windows virtual environment. macOS and a clean Windows or Linux installation were not independently tested.
+Ubuntu CI validates Python 3.10–3.13. The safe workflow was reviewed in an existing Windows virtual environment. macOS and clean Windows/Linux installations were not independently tested. The repository requires Python 3.10+ but does not enforce a processor-architecture restriction.
 
 ## 7. Basic Terms Explained
 
@@ -183,7 +182,22 @@ Also verify the local installation without credentials:
 python -m pocarchitect preflight --offline --format json --no-color
 ~~~
 
-**Success indicator:** the JSON event message is <code>Preflight passed.</code> It includes Python, dependencies, CLI command, prompt file, and writable output-directory checks. This command may create the default <code>reports/</code> folder while testing that it is writable; it creates and removes only a temporary <code>.write_test</code> file.
+**Success indicator:** the JSON event message is <code>Preflight passed.</code>
+It checks Python 3.10+, imports for <code>typer</code>, <code>rich</code>,
+<code>openai</code>, <code>dotenv</code>, and <code>tenacity</code>, a runnable
+Git executable, the CLI command, prompt file, and resolved writable output
+directory. This command may create the default <code>reports/</code> folder; it
+creates and removes only <code>.write_test</code>.
+
+To verify a custom report destination, include it in preflight:
+
+~~~bash
+python -m pocarchitect preflight --offline --output-dir ./my-reports
+~~~
+
+POCArchitect local-provider preflight requests only
+<code>&lt;base-url&gt;/models</code>. It does not test chat completions, model
+suitability, the full prompt, or report generation.
 
 ## 17. If Verification Fails: Diagnose and Fix It
 
@@ -196,7 +210,13 @@ python -m pocarchitect --version
 
 Expected result: <code>POCArchitect v0.2.0</code>.
 
-If offline preflight reports a missing dependency, rerun the same install command and then repeat the offline preflight. If it reports an output-directory permission error, make the repository folder writable and later choose a directory you own with <code>--output-dir</code>. If the safe example attempts a provider call, confirm both <code>--no-ingest</code> and <code>--dry-run</code> are present exactly as shown.
+If offline preflight reports a missing dependency, rerun the same install
+command and then repeat the offline preflight. If it reports an output-directory
+permission error, rerun it with
+<code>--output-dir &lt;WRITABLE_FOLDER&gt;</code>; automatic preflight checks that
+same resolved path on a real command. If the safe example attempts a provider
+call, confirm both <code>--no-ingest</code> and <code>--dry-run</code> are
+present exactly as shown.
 
 ## 18. Common Tasks
 
@@ -208,33 +228,67 @@ In an interactive terminal, replace <code>&lt;AUTHORIZED_GITHUB_URL&gt;</code> w
 python -m pocarchitect --url <AUTHORIZED_GITHUB_URL> --provider xai
 ~~~
 
-POCArchitect performs preflight, displays a redacted transfer preview, and asks for confirmation before sending source to the provider. A successful provider call saves a report.
+POCArchitect performs preflight, displays a redacted transfer preview, and asks
+for confirmation before sending source to the provider. Inspect the preview for
+<code>WARNING: Ingestion failed</code>. A clone failure falls back to URL-only
+warning context and can still proceed after approval; cancel unless that reduced
+context is acceptable. A successful provider call saves a report with the
+actual ingestion outcome.
 
 ### Inspect batch recovery state
 
 ~~~bash
-python -m pocarchitect batch-status --batch-state reports/batch_progress.json
+python -m pocarchitect --format json --no-color batch-status --batch-state reports/batch_progress.json
 ~~~
 
-The command prints total, successful, failed, and unknown items. The default state file is created only after batch processing writes progress.
+The command emits one <code>batch_status</code> object with version, total,
+successful, failed, and unknown counts. Root options such as
+<code>--format</code> must appear before the subcommand.
 
 ### Reset batch recovery state without deleting history
 
 ~~~bash
-python -m pocarchitect batch-reset --batch-state reports/batch_progress.json --yes
+python -m pocarchitect --format json --no-color batch-reset --batch-state reports/batch_progress.json --yes
 ~~~
 
 This moves an existing state file to a timestamped <code>.bak</code> file. Check the printed backup path before starting a new batch.
 
 ## 19. Command and Option Basics
 
-Use either <code>--url</code> or <code>--batch</code>, never both. <code>--provider</code> accepts <code>xai</code>, <code>openai</code>, <code>groq</code>, or <code>local</code>; its default is <code>xai</code>. <code>--model</code> overrides the provider-specific model name, and <code>--temperature</code> defaults to <code>0.2</code>.
+Use either <code>--url</code> or <code>--batch</code>, never both.
+<code>--provider</code> accepts <code>xai</code>, <code>openai</code>,
+<code>groq</code>, or <code>local</code>; its default is <code>xai</code>.
+Default models are <code>grok-3</code>, <code>gpt-4o</code>,
+<code>llama-3.1-70b-versatile</code>, and
+<code>qwen2.5-coder:32b</code>, respectively. Claude/Gemini prompt wording does
+not add CLI providers; another OpenAI-compatible service uses
+<code>--provider local --base-url</code>.
 
-<code>--risk-level</code> and <code>--target-os</code> accept free text and are added to the provider request. <code>--include-mitigations</code> defaults to enabled; the public CLI currently has no switch to set it false. <code>--format json</code> and <code>--no-color</code> apply to main runs and <code>preflight</code>; <code>batch-status</code> and <code>batch-reset</code> currently print text. See the generated [CLI Reference](cli-reference.md) for every option and subcommand.
+<code>--risk-level</code> and <code>--target-os</code> accept free text and are
+added to the provider request. <code>--include-mitigations</code> defaults to
+enabled; the public CLI has no switch to set it false. Root
+<code>--format json</code> and <code>--no-color</code> also apply to
+<code>batch-status</code> and <code>batch-reset</code> when placed before the
+subcommand. See the generated [CLI Reference](cli-reference.md).
 
 ## 20. Where Results, Logs, and Generated Files Are Stored
 
-Successful real runs write <code>POCAnalysis_&lt;url-slug&gt;_&lt;UTC timestamp&gt;.md</code> to <code>reports/</code> in the current directory by default. In Docker, the default is <code>/reports</code>. Use <code>--output-dir &lt;WRITABLE_FOLDER&gt;</code> to choose another location. Batch recovery state defaults to <code>reports/batch_progress.json</code>; reset moves it to a timestamped backup. Dry runs do not create reports.
+Successful real runs write
+<code>POCAnalysis_&lt;url-slug&gt;_&lt;UTC timestamp&gt;.md</code> to
+<code>reports/</code> by default; Docker/<code>IN_DOCKER</code> defaults to
+<code>/reports</code>. Front matter records project, source URL, provider,
+model, prompt asset, generation time, actual ingestion outcome, selected-file
+count, and a SHA-256 of the provider response. Ingestion is one of
+<code>disabled</code>, <code>url-only-non-github</code>,
+<code>url-only-ingestion-failed</code>, or <code>github-shallow-clone</code>.
+Dry runs create no reports.
+
+Batch recovery state defaults to <code>reports/batch_progress.json</code>.
+Version 2 requires a top-level <code>version: 2</code> and object-valued
+<code>items</code>. Current records use <code>status</code>,
+<code>updated_at</code>, and failure <code>error</code>. Unsupported/corrupt
+state is preserved until <code>batch-reset</code> moves it to a backup. See the
+[Command Guide](command-guide.md#version-2-batch-ledger) for the exact sample.
 
 ## 21. How to Stop the Project or Running Services
 
@@ -270,11 +324,19 @@ POCArchitect has no system service or global uninstall step when installed in th
 | Local endpoint unavailable | The local service is stopped or uses another URL | Run local-provider preflight with its endpoint | Start the local service or use its OpenAI-compatible <code>--base-url</code> | Repeat the same preflight |
 | Batch file not found | The <code>--batch</code> path is wrong | List the file from the repository root | Pass the correct relative or absolute path | Batch mode prints the file name |
 | Confirmation required in noninteractive mode | A real run cannot show its prompt | Check for CI, redirected input, or Docker without <code>-it</code> | Use an interactive terminal, or add <code>--yes</code> only after review | The preview is followed by the expected confirmation behavior |
-| Git ingestion fails | URL is not a reachable public GitHub repository or network is unavailable | Repeat the safe preview with <code>--no-ingest --dry-run</code> | Correct the URL or network issue; use no-ingest only when URL-only analysis is acceptable | A grounded run prints clone progress, or the safe preview succeeds |
+| Git ingestion fails or preview contains <code>WARNING: Ingestion failed</code> | URL is not a reachable public GitHub repository, Git is unavailable, or network is unavailable | Run offline preflight and inspect the transfer preview | Cancel the transfer, correct the cause, and retry; approve only if URL-only analysis is acceptable | Metadata says <code>github-shallow-clone</code> only after a completed clone |
+| Batch exits 1 | At least one item failed after processing continued | Inspect <code>batch_complete.failed</code> and <code>batch-status</code> | Correct failed items and rerun the same ledger | Exit is 0 and failed count is 0 |
 
 ## 26. Known Limitations and Unsupported Scenarios
 
-The project has no documented API or library interface. It does not provide private-GitHub authentication, cloning for non-GitHub URLs, report caching, or a public option to disable <code>include_mitigations</code>. Source selection is bounded and may omit files. Cloud responses, live provider credentials, live local endpoints, native Docker Desktop, macOS, and clean-room installation paths were not exercised in this review.
+The project has no documented API or library interface. It does not provide
+private-GitHub authentication, cloning for non-GitHub URLs, report caching, or a
+public option to disable <code>include_mitigations</code>. Source candidates are
+selected by fixed filename keywords/extensions, files over 250,000 bytes are
+skipped, content is truncated at 7,500 characters, and only the first 25
+matches are included. Cloud responses, live credentials/endpoints, native
+Docker Desktop, macOS, and clean-room installation paths remain external or
+unverified.
 
 ## 27. Collect Diagnostic Information and Report a Problem
 
@@ -296,6 +358,8 @@ Include the operating system, Python version, provider name (not its key), comma
 - [Local OpenAI-Compatible Provider Guide](ollama-setup-guide.md) covers Ollama-specific setup.
 - [Windows supplement](guides/WINDOWS_NOVICE_USABILITY_GUIDE.md) and [Linux supplement](guides/LINUX_NOVICE_USABILITY_GUIDE.md) retain platform command ledgers.
 - [Architecture](architecture.md) describes implementation components and boundaries.
+- [Documentation Gap Analysis](DOCUMENTATION_GAP_ANALYSIS.md) records the current-tree audit and remediation closure evidence.
+- [Historical Documentation Review](DOCUMENTATION_REVIEW_REPORT.md) is a point-in-time snapshot for commit <code>60d55...</code>, not current validation evidence.
 
 ## 29. Glossary
 

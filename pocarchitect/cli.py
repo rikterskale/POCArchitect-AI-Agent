@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
@@ -25,8 +26,18 @@ from tenacity import (
 )
 
 # ── Preflight support ─────────────────────────────────────
+from .config import (
+    DEFAULT_LOCAL_BASE_URL,
+    DEFAULT_MODELS,
+    DEFAULT_PROVIDER,
+    DEFAULT_RISK_LEVEL,
+    DEFAULT_TARGET_OS,
+    DEFAULT_TEMPERATURE,
+    PROVIDER_KEY_NAMES,
+    default_output_dir,
+)
 from .output import event_payload
-from .preflight import DEFAULT_LOCAL_BASE_URL, main as run_preflight
+from .preflight import main as run_preflight
 from .state import (
     BatchStateError,
     load_state,
@@ -69,15 +80,6 @@ def emit(event: str, message: str, **details: object) -> None:
         console.print(message)
 
 
-# ── Provider-specific default models (#9) ─────────────────
-DEFAULT_MODELS = {
-    "xai": "grok-3",
-    "openai": "gpt-4o",
-    "groq": "llama-3.1-70b-versatile",
-    "local": "qwen2.5-coder:32b",
-}
-
-
 @app.command("preflight")
 def preflight(
     offline: bool = typer.Option(
@@ -86,10 +88,15 @@ def preflight(
         help="Check installation without requiring an API key or provider access.",
     ),
     provider: Literal["xai", "openai", "groq", "local"] = typer.Option(
-        "xai", "--provider", "-p", help="Provider whose readiness to check."
+        DEFAULT_PROVIDER, "--provider", "-p", help="Provider whose readiness to check."
     ),
     base_url: Optional[str] = typer.Option(
         None, "--base-url", help="OpenAI-compatible local provider endpoint."
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None,
+        "--output-dir",
+        help="Directory whose report-write access should be checked.",
     ),
     output_format: Literal["text", "json"] = typer.Option(
         "text", "--format", help="Output mode: text or JSON Lines."
@@ -104,6 +111,7 @@ def preflight(
         base_url=base_url,
         require_api_key=not offline,
         offline=offline,
+        output_dir=output_dir,
         output_format=output_format,
         no_color=no_color,
     )
@@ -126,9 +134,19 @@ def slugify(text: str) -> str:
 
 
 def get_default_output_dir() -> Path:
-    if Path("/.dockerenv").exists() or os.getenv("IN_DOCKER"):
-        return Path("/reports")
-    return Path.cwd() / "reports"
+    return default_output_dir()
+
+
+@dataclass(frozen=True)
+class GroundingResult:
+    content: str
+    ingestion: Literal[
+        "disabled",
+        "url-only-non-github",
+        "url-only-ingestion-failed",
+        "github-shallow-clone",
+    ]
+    selected_files: int = 0
 
 
 def save_report(
@@ -137,7 +155,7 @@ def save_report(
     output_dir: Path,
     provider: str,
     model: str,
-    no_ingest: bool,
+    grounding: GroundingResult,
 ) -> Path:
     slug = slugify(url.split("/")[-1] or "unknown-poc")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -152,7 +170,8 @@ def save_report(
         "model": model,
         "prompt_asset": "pocarchitect/POC_Architect_Prompt.md",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "ingestion": "disabled" if no_ingest else "github-shallow-clone",
+        "ingestion": grounding.ingestion,
+        "grounding_files_selected": grounding.selected_files,
         "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
     }
     metadata_block = (
@@ -285,9 +304,12 @@ def normalize_github_repo_url(poc_url: str) -> tuple[str, str]:
 
 def build_grounding_context(
     poc_url: str, no_ingest: bool = False, verbose: bool = False
-) -> str:
+) -> GroundingResult:
     if no_ingest:
-        return f"PoC URL: {poc_url}\n[Grounding disabled by --no-ingest]"
+        return GroundingResult(
+            f"PoC URL: {poc_url}\n[Grounding disabled by --no-ingest]",
+            "disabled",
+        )
 
     context = ["=== GROUNDING CONTEXT — USE THIS HEAVILY ==="]
     context.append(f"PoC URL: {poc_url}\n")
@@ -295,7 +317,7 @@ def build_grounding_context(
     parsed = urlparse(poc_url.strip())
     if parsed.netloc.lower() not in {"github.com", "www.github.com"}:
         context.append("Non-GitHub URL — limited analysis.")
-        return "\n".join(context)
+        return GroundingResult("\n".join(context), "url-only-non-github")
 
     try:
         repo_name, clone_url = normalize_github_repo_url(poc_url)
@@ -398,8 +420,12 @@ def build_grounding_context(
                             if len(content) > 7500:
                                 content = content[:7500] + "\n... [truncated]"
                             critical.append((str(file_path), content))
-                        except Exception:
-                            pass
+                        except (OSError, UnicodeError):
+                            if verbose:
+                                emit(
+                                    "grounding_skip",
+                                    f"Could not read selected file: {file_path}",
+                                )
 
             if verbose:
                 emit(
@@ -407,7 +433,8 @@ def build_grounding_context(
                     f"Found {len(critical)} critical files (showing up to 25).",
                 )
 
-            for filepath, content in critical[:25]:
+            selected = critical[:25]
+            for filepath, content in selected:
                 lang = Path(filepath).suffix[1:] if Path(filepath).suffix else "text"
                 context.append(f"\n--- File: {filepath} ---")
                 context.append(f"```{lang}")
@@ -418,11 +445,15 @@ def build_grounding_context(
             context.append(
                 "MANDATORY: Base your entire report on the files above. Quote real code and techniques. Do not hallucinate."
             )
-            return "\n".join(context)
+            return GroundingResult(
+                "\n".join(context),
+                "github-shallow-clone",
+                selected_files=len(selected),
+            )
 
-    except Exception as e:
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
         context.append(f"WARNING: Ingestion failed ({friendly_error_message(e)}).")
-        return "\n".join(context)
+        return GroundingResult("\n".join(context), "url-only-ingestion-failed")
 
 
 @retry(
@@ -444,12 +475,7 @@ def get_llm_response(
 
     # Resolve API key from environment if not provided (#1: guard against None key for env_map)
     if api_key is None:
-        env_map = {
-            "xai": "XAI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "groq": "GROQ_API_KEY",
-        }
-        env_var = env_map.get(p)
+        env_var = PROVIDER_KEY_NAMES.get(p)
         if env_var is not None:
             api_key = os.getenv(env_var)
 
@@ -506,11 +532,10 @@ def process_single_url(
     emit("processing", f"Processing: {url}", url=url)
 
     system_prompt = load_prompt()
-    grounding = (
-        ""
-        if no_ingest
-        else build_grounding_context(url, no_ingest=no_ingest, verbose=verbose)
+    grounding_result = build_grounding_context(
+        url, no_ingest=no_ingest, verbose=verbose
     )
+    grounding = grounding_result.content
     if not no_ingest:
         if dry_run:
             grounding, _, _ = redact_sensitive_input(grounding)
@@ -559,7 +584,7 @@ Operator Preferences (respect these exactly):
         user_message=user_message,
     )
 
-    return save_report(result, url, output_dir, provider, model, no_ingest)
+    return save_report(result, url, output_dir, provider, model, grounding_result)
 
 
 # ── Batch processing (#2) ────────────────────────────────────────────
@@ -657,12 +682,18 @@ def process_batch_file(
                 else:
                     failure_count += 1
                     failed_urls.append(url)
-                break  # dry-run exits after first URL
+                    emit(
+                        "batch_item_failed",
+                        f"Batch dry-run item failed: {url} (exit code {e.exit_code}).",
+                        url=url,
+                    )
+                continue
             failure_count += 1
             failed_urls.append(url)
             state.setdefault("items", {})[url] = {
                 "status": "failed",
                 "error": f"exit code {e.exit_code}",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             persist_state()
             emit(
@@ -677,6 +708,7 @@ def process_batch_file(
             state.setdefault("items", {})[url] = {
                 "status": "failed",
                 "error": friendly_error_message(e),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             persist_state()
             emit(
@@ -699,8 +731,6 @@ def process_batch_file(
         resumed=skipped_completed,
         state_path=str(state_path),
     )
-    if dry_run and processed_count < len(urls):
-        emit("batch_dry_run", "Dry-run mode processed only the first URL by design.")
     if failed_urls:
         emit("batch_failed_urls", "Failed URLs.", urls=failed_urls)
         if output_format == "text":
@@ -711,6 +741,8 @@ def process_batch_file(
             "batch_resumed",
             f"Resumed batch: {skipped_completed} completed URL(s) skipped.",
         )
+    if failed_urls:
+        raise typer.Exit(1)
 
 
 # ── Main CLI entry point ─────────────────────────────────────────────
@@ -792,16 +824,22 @@ def main(
         help="Single PoC URL; public GitHub repositories can be grounded.",
     ),
     batch: Optional[Path] = typer.Option(
-        None, "--batch", "-b", help="Text file containing one PoC URL per line."
+        None,
+        "--batch",
+        "-b",
+        help="Text file; blank lines and full-line # comments are ignored.",
     ),
     provider: Literal["xai", "openai", "groq", "local"] = typer.Option(
-        "xai", "--provider", "-p", help="LLM provider to use."
+        DEFAULT_PROVIDER, "--provider", "-p", help="LLM provider to use."
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model name (default: provider-specific)"
     ),
     temperature: float = typer.Option(
-        0.2, "--temperature", "-t", help="Provider sampling temperature."
+        DEFAULT_TEMPERATURE,
+        "--temperature",
+        "-t",
+        help="Provider sampling temperature.",
     ),
     base_url: Optional[str] = typer.Option(
         None, "--base-url", help="OpenAI-compatible endpoint for --provider local."
@@ -810,10 +848,12 @@ def main(
         None, "--output-dir", help="Directory where successful reports are written."
     ),
     risk_level: str = typer.Option(
-        "High", "--risk-level", help="Free-text risk label sent to the provider."
+        DEFAULT_RISK_LEVEL,
+        "--risk-level",
+        help="Free-text risk label sent to the provider.",
     ),
     target_os: str = typer.Option(
-        "Linux",
+        DEFAULT_TARGET_OS,
         "--target-os",
         help="Free-text target environment sent to the provider.",
     ),
@@ -864,12 +904,16 @@ def main(
         emit("version", f"POCArchitect v{__version__}", version=__version__)
         raise typer.Exit(0)
 
-    # (#10) Skip preflight in dry-run mode (dry-run does not need API keys)
+    if output_dir is None:
+        output_dir = get_default_output_dir()
+
+    # Dry runs bypass automatic preflight; use the explicit preflight command for checks.
     if not dry_run:
         run_preflight(
             provider=provider,
             base_url=base_url,
             require_api_key=True,
+            output_dir=output_dir,
             output_format=output_format,
             no_color=no_color,
         )
@@ -879,9 +923,6 @@ def main(
         model = DEFAULT_MODELS.get(provider.lower(), "grok-3")
         if verbose:
             emit("model_selected", f"Using default model for {provider}: {model}")
-
-    if output_dir is None:
-        output_dir = get_default_output_dir()
 
     if url and batch:
         emit("error", "Provide either --url or --batch, not both")

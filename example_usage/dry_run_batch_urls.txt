@@ -1,0 +1,5 @@
+# Safe fixture only with --no-ingest --dry-run; these URLs are not contacted.
+
+https://github.com/example/first-placeholder
+# Full-line comments and blank lines are ignored.
+https://github.com/example/second-placeholder

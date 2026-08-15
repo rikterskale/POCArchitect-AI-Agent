@@ -1,5 +1,12 @@
 # Documentation Review Report
 
+> [!IMPORTANT]
+> **Historical snapshot — not current behavior or validation evidence.** This
+> report covers commit `60d55d47c7ceb621df2f124764f01403a99f346b` and the
+> point-in-time environment recorded below. For the current-tree audit and
+> verified remediation status, use the
+> [Documentation Gap Analysis](DOCUMENTATION_GAP_ANALYSIS.md).
+
 ## 1. Executive Summary
 
 This review examined POCArchitect at commit 60d55d47c7ceb621df2f124764f01403a99f346b on the main branch. The project is a Python CLI that prepares a provider request from one PoC URL or a URL batch, optionally grounds a public GitHub repository by shallow cloning it, and saves a successful provider response as a Markdown report.

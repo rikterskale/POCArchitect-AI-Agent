@@ -9,7 +9,7 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Shallow GitHub clone and source-file selection for grounding
 - Batch mode (`--batch batch_urls.txt`) — process multiple URLs from a text file
 - Operator controls: `--risk-level`, `--target-os`, `--include-mitigations`, `--no-ingest`
-- Provider-aware preflight checks for real runs; `--dry-run` skips provider readiness checks
+- Provider-aware preflight checks for real runs; `--dry-run` bypasses automatic preflight entirely
 - Cloud providers (`xai`, `openai`, `groq`) and a local OpenAI-compatible endpoint (`local`)
 - Docker image with a writable `/reports` volume
 - Retry logic + timeouts on LLM calls
@@ -34,7 +34,12 @@ python -m pip install -e ".[all]"
 python -m pocarchitect preflight --offline --format json --no-color
 ```
 
-`preflight --offline` verifies Python, installed packages, the package entry point, the prompt asset, and a writable default output directory. A real cloud-provider run additionally requires the matching provider key.
+`preflight --offline` verifies Python, the five declared runtime imports, a
+runnable Git executable, the package entry point, the prompt asset, and the
+resolved writable output directory. Pass `--output-dir` to check the same custom
+path a real run will use. A real cloud-provider run additionally checks the
+matching provider key. Local preflight requests only `<base-url>/models`; it
+does not test chat completions or model suitability.
 
 ## Supported-platform matrix
 
@@ -42,12 +47,33 @@ python -m pocarchitect preflight --offline --format json --no-color
 |---|---|---|
 | Linux Bash | Validated in CI | CI exercises Ubuntu with Python 3.10–3.13. |
 | Windows PowerShell | Partially validated | The safe CLI workflow was reviewed in an existing Windows virtual environment; native Windows CI is not configured. |
+| macOS | Not independently tested | The Bash/Zsh installation path is documented, but no current macOS run is repository evidence. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
 | Docker Desktop/Linux Docker | Validated in CI | CI builds the image and runs its `--help` smoke test; mount a writable host directory to `/reports` for reports. |
 
 ## Batch progress and recovery
 
-Batch runs write a resumable JSON ledger to `reports/batch_progress.json` by default. Pass `--batch-state path\to\state.json` to choose another location. Completed URLs are skipped on the next run; failed URLs remain eligible for retry.
+Batch runs write a version-2 resumable JSON ledger to
+`reports/batch_progress.json` by default. Pass
+`--batch-state path\to\state.json` to choose another location. Completed URLs
+are skipped on the next run; failed URLs remain eligible for retry. The command
+processes every eligible dry-run item and exits 1 after a completed batch if any
+item failed, so automation can use both the exit code and the final
+`batch_complete.failed` field.
+
+## Provider model defaults
+
+| Provider | Default model |
+|---|---|
+| `xai` | `grok-3` |
+| `openai` | `gpt-4o` |
+| `groq` | `llama-3.1-70b-versatile` |
+| `local` | `qwen2.5-coder:32b` |
+
+The CLI exposes exactly `xai`, `openai`, `groq`, and `local`. Claude/Gemini
+wording in the packaged prompt describes prompt portability, not additional CLI
+provider choices. Configure another OpenAI-compatible endpoint through
+`--provider local --base-url <URL>`.
 
 ## Common command options
 
@@ -75,7 +101,10 @@ Full help:
 pocarchitect --help
 ```
 
-The canonical CLI and configuration references are generated from the command metadata with:
+The CLI reference is generated from Typer/Click metadata. The configuration
+reference imports provider maps and defaults from `pocarchitect/config.py`;
+its explanatory policy text remains reviewed source in the generator. Regenerate
+both with:
 
 ```bash
 python scripts/generate_docs.py
@@ -90,7 +119,8 @@ python scripts/generate_docs.py
 - [Docker Guide](docs/docker-guide.md) — image build, safe runs, provider confirmation, and report mounts.
 - [Local OpenAI-Compatible Provider Guide](docs/ollama-setup-guide.md) — Ollama-specific setup notes and limitations.
 - [Architecture](docs/architecture.md) — implementation-oriented component overview.
-- [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — traceability matrix and validation record for this review.
+- [Documentation Gap Analysis](docs/DOCUMENTATION_GAP_ANALYSIS.md) — current-tree evidence, all 28 findings, and verified remediation closure matrix.
+- [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — **historical snapshot** of commit `60d55d47c7ceb621df2f124764f01403a99f346b`; do not use it as current behavior or validation evidence.
 
 ## Safety and authorization
 

@@ -2,6 +2,7 @@
 import importlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from urllib.error import URLError
@@ -14,18 +15,17 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from .config import (
+    DEFAULT_LOCAL_BASE_URL,
+    DEFAULT_PROVIDER,
+    PROVIDER_KEY_NAMES,
+    default_output_dir,
+)
 from .output import event_payload
 
 console = Console()
 
-# ── Supported providers only (synced with cli.py) ─────────────────────
-PROVIDER_KEY_NAMES = {
-    "xai": "XAI_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "groq": "GROQ_API_KEY",
-}
 ENV_KEY_NAMES = list(PROVIDER_KEY_NAMES.values())
-DEFAULT_LOCAL_BASE_URL = "http://localhost:11434/v1"
 
 REQUIRED_DEPS = ["typer", "rich", "openai", "dotenv", "tenacity"]
 
@@ -95,11 +95,28 @@ def check_prompt_file() -> tuple[bool, str]:
     return False, "FAIL: Prompt file missing"
 
 
-def check_output_directory_writable() -> tuple[bool, str]:
+def check_git_command() -> tuple[bool, str]:
+    git = shutil.which("git")
+    if git is None:
+        return False, "FAIL: Git executable not found"
     try:
-        out_dir = (
-            Path("/reports") if Path("/.dockerenv").exists() else Path.cwd() / "reports"
+        result = subprocess.run(
+            [git, "--version"],
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=5,
         )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return False, "FAIL: Git executable is not runnable"
+    return True, f"OK: {result.stdout.strip() or 'Git is runnable'}"
+
+
+def check_output_directory_writable(
+    output_dir: Optional[Path] = None,
+) -> tuple[bool, str]:
+    out_dir = output_dir or default_output_dir()
+    try:
         out_dir.mkdir(parents=True, exist_ok=True)
         test_file = out_dir / ".write_test"
         test_file.touch()
@@ -121,7 +138,7 @@ def check_cli_command() -> tuple[bool, str]:
         try:
             subprocess.run(cmd, capture_output=True, check=True)
             return True, f"OK: Available via: {' '.join(cmd[:3])}".strip()
-        except Exception:
+        except (OSError, subprocess.CalledProcessError):
             continue
     return False, "FAIL: Not found"
 
@@ -129,8 +146,9 @@ def check_cli_command() -> tuple[bool, str]:
 def main(
     require_api_key: bool = True,
     offline: bool = False,
-    provider: str = "xai",
+    provider: str = DEFAULT_PROVIDER,
     base_url: Optional[str] = None,
+    output_dir: Optional[Path] = None,
     output_format: str = "text",
     no_color: bool = False,
 ):
@@ -166,6 +184,11 @@ def main(
             has_failure = True
         add_row(f"Dependency: {dep}", msg)
 
+    ok, msg = check_git_command()
+    if not ok:
+        has_failure = True
+    add_row("Git executable", msg)
+
     # CLI command
     ok, msg = check_cli_command()
     if not ok:
@@ -192,7 +215,7 @@ def main(
         add_row("Provider readiness", "OK: Not required for offline checks")
 
     # Output directory
-    ok, msg = check_output_directory_writable()
+    ok, msg = check_output_directory_writable(output_dir)
     if not ok:
         has_failure = True
     add_row("Output directory", msg)
@@ -224,9 +247,7 @@ def main(
             )
         sys.exit(1)
     elif output_format == "text":
-        console.print(
-            "[bold green]OK: All checks passed! You are ready to run POCArchitect.[/]"
-        )
+        console.print("[bold green]OK: All configured preflight checks passed.[/]")
 
 
 if __name__ == "__main__":

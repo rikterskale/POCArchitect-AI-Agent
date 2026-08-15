@@ -36,8 +36,8 @@ def check_ollama_running() -> tuple[bool, str]:
                 f"✅ Ollama server is running (v{r.json().get('version', 'unknown')})",
             )
         return False, "❌ Ollama responded but not healthy"
-    except requests.exceptions.ConnectionError:
-        return False, "❌ Ollama is NOT running (run `ollama serve`)"
+    except requests.RequestException as e:
+        return False, f"❌ Ollama server check failed: {e}"
 
 
 def check_model_available() -> tuple[bool, str]:
@@ -51,7 +51,7 @@ def check_model_available() -> tuple[bool, str]:
             False,
             f"❌ Model '{TEST_MODEL}' not found (run `ollama pull {TEST_MODEL}`)",
         )
-    except Exception as e:
+    except requests.RequestException as e:
         return False, f"❌ Error checking model: {e}"
 
 
@@ -79,7 +79,7 @@ def check_openai_compatible_endpoint() -> tuple[bool, str]:
                 f"✅ OpenAI-compatible endpoint works!\n   Response: {response_text.strip()}",
             )
         return False, f"❌ OpenAI-compatible endpoint failed (status {r.status_code})"
-    except Exception as e:
+    except (requests.RequestException, ValueError, IndexError) as e:
         return False, f"❌ OpenAI-compatible endpoint error: {e}"
 
 
@@ -87,7 +87,7 @@ def main():
     console.print(
         Panel.fit(
             "[bold green]Ollama Pre-Flight Checker for POCArchitect[/]\n"
-            "[dim]Making sure your local LLM is ready for red-team use[/]",
+            "[dim]Running three bounded Ollama checks[/]",
             border_style="green",
         )
     )
@@ -115,11 +115,14 @@ def main():
     if all_passed:
         console.print(
             Panel.fit(
-                "[bold green]✅ OLLAMA IS PERFECTLY READY![/]\n"
-                "You can now use POCArchitect with --provider local",
+                "[bold green]✅ THE THREE LISTED OLLAMA CHECKS PASSED[/]\n"
+                f"Base URL: {OLLAMA_URL} | Model: {TEST_MODEL}\n"
+                "This did not test POCArchitect's full prompt, report generation, "
+                "response quality, or host resource sufficiency.",
                 border_style="green",
             )
         )
+        return 0
     else:
         console.print(
             Panel.fit(
@@ -127,8 +130,8 @@ def main():
                 border_style="red",
             )
         )
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

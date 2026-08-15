@@ -9,7 +9,7 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 | Option | Type | Default | Purpose |
 |---|---|---|---|
 | `--url`, `-u` | TEXT | None | Single PoC URL; public GitHub repositories can be grounded. |
-| `--batch`, `-b` | PATH | None | Text file containing one PoC URL per line. |
+| `--batch`, `-b` | PATH | None | Text file; blank lines and full-line # comments are ignored. |
 | `--provider`, `-p` | xai \| openai \| groq \| local | xai | LLM provider to use. |
 | `--model`, `-m` | TEXT | None | Model name (default: provider-specific) |
 | `--temperature`, `-t` | FLOAT | 0.2 | Provider sampling temperature. |
@@ -36,6 +36,7 @@ Run environment preflight checks
 | `--offline` | BOOLEAN | False | Check installation without requiring an API key or provider access. |
 | `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
 | `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
+| `--output-dir` | PATH | None | Directory whose report-write access should be checked. |
 | `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 
@@ -69,5 +70,7 @@ Reset a ledger by moving its prior contents to a timestamped backup.
 ```text
 python -m pocarchitect preflight --provider local --offline
 python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color
-python -m pocarchitect batch-status --batch-state reports/batch_progress.json
+python -m pocarchitect --format json --no-color batch-status --batch-state reports/batch_progress.json
 ```
+
+Root options such as `--format` and `--no-color` must appear before a subcommand name. Main-command options such as `--url` remain on the main command.

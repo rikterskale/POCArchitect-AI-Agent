@@ -2,80 +2,143 @@
 
 ## Overview
 
-**POCArchitect** is a Python CLI that turns a supplied PoC URL into a Markdown analysis request for a selected LLM provider. It can shallow-clone public GitHub repositories to include selected source files as grounding; non-GitHub URLs receive limited, URL-only grounding.
+POCArchitect is a Python CLI that turns a supplied PoC URL into a Markdown
+analysis request for a selected LLM provider. It can shallow-clone public GitHub
+repositories and include selected source files as grounding. Non-GitHub URLs and
+failed GitHub clones use explicitly labeled URL-only context.
 
-Grounding is an input aid, not a guarantee of report accuracy. The tool loads a packaged prompt, optionally clones a public GitHub repository, redacts recognized secret patterns, asks for transfer confirmation, sends the request to the configured provider, and saves the provider response as a Markdown report with metadata.
+Grounding is an input aid, not proof of report accuracy. The tool loads a
+packaged prompt, builds grounding context, redacts recognized secret patterns,
+asks for transfer confirmation, sends the request to the configured provider,
+and saves the provider response with provenance metadata.
 
-### Implemented boundaries
-- GitHub grounding uses `git clone --depth 1 --single-branch` with a 90-second timeout; it does not execute cloned source.
-- A non-GitHub URL is accepted but is not cloned for grounding.
-- `--dry-run` prints the provider-facing prompt and skips the provider-readiness preflight.
-- Real source transfer requires interactive confirmation, or `--yes` in a noninteractive job.
-- Batch state is written atomically so completed URLs can be skipped on resume.
+## Authoritative runtime entry points
 
----
+`pyproject.toml` maps the installed `pocarchitect` command to
+`pocarchitect.cli:app`, and `python -m pocarchitect` imports the same app through
+`pocarchitect/__main__.py`. The only CLI and preflight implementations are
+`pocarchitect/cli.py` and `pocarchitect/preflight.py`; the former divergent root
+`cli.py` and `preflight.py` copies were retired. Maintainers should not recreate
+root-level runtime copies.
 
-## High-Level Flow
-User Input (URL or batch file)
-↓
-Provider-aware Preflight (real runs only)
-↓
-Grounding Context (smart clone + file extraction)
-↓
-Prompt Construction (system prompt + operator preferences)
-↓
-LLM Call (up to three attempts; 60-second client timeout)
-↓
-Markdown Report Generation
-↓
-Save to ./reports/ (or /reports in Docker)
+## High-level flow
 
----
+```text
+URL or batch file
+  -> automatic provider-aware preflight (real runs only)
+  -> grounding context and outcome
+  -> redaction and transfer preview
+  -> operator confirmation
+  -> provider request (up to three attempts; 60-second client timeout)
+  -> report plus provenance metadata
+  -> resolved output directory
+```
 
-## Core Components
+`--dry-run` bypasses **all automatic preflight checks**, constructs and prints
+the provider-facing prompt, and exits before a provider call or report write.
+Use `pocarchitect preflight --offline` when installation checks are also needed.
 
-| Component                        | Location                                 | Responsibility |
-|----------------------------------|------------------------------------------|----------------|
-| CLI Entry Point & Orchestration  | `pocarchitect/cli.py`                    | All argument parsing, pipeline control, batch/single mode |
-| Preflight Checks                 | `pocarchitect/preflight.py`              | Environment validation (runs automatically) |
-| System Prompt                    | `pocarchitect/POC_Architect_Prompt.md`   | Defines exact report structure and zero-hallucination rules |
-| Grounding Logic                  | `pocarchitect/cli.py` (`build_grounding_context`) | Shallow GitHub clone plus keyword/extension file selection |
-| LLM Client                       | `pocarchitect/cli.py` (`get_llm_response`) | Provider support, API-key resolution, retries, timeout |
-| Report Saving                    | `cli.py`                                 | Timestamped reports saved to output directory |
+## Core components
 
----
+| Component | Location | Responsibility |
+|---|---|---|
+| CLI entry point and orchestration | `pocarchitect/cli.py` | Argument parsing, output events, single and batch workflows |
+| Shared runtime defaults | `pocarchitect/config.py` | Provider keys/models, local endpoint, labels, and output-path resolution |
+| Preflight checks | `pocarchitect/preflight.py` | Python, imports, Git, CLI, prompt, provider readiness, and resolved output path |
+| Batch state | `pocarchitect/state.py` | Versioned load, atomic writes, summaries, and recoverable reset |
+| System prompt | `pocarchitect/POC_Architect_Prompt.md` | Provider instructions and report structure |
+| Grounding and report saving | `pocarchitect/cli.py` | Clone/selection, ingestion outcomes, metadata, and body hash |
 
-## Key Implementation Details
+## Preflight boundaries
 
-- **CLI orchestration**: `pocarchitect/cli.py` owns parsing and the single/batch workflow; batch-state operations are isolated in `pocarchitect/state.py`.
-- **Batch Mode**: Accepts `.txt` files via `--batch`, processes each URL sequentially, generates one report per URL.
-- **Operator Controls**: `--risk-level`, `--target-os`, and `--include-mitigations` are included in the provider request. The public CLI currently has no flag that sets `include_mitigations` to false.
-- **Resilience**: LLM calls use `tenacity` (3 retries with exponential backoff) + 60-second timeout.
-- **Docker Awareness**: Default output directory becomes `/reports` when `/.dockerenv` exists or `IN_DOCKER` is set.
-- **API Key Handling**: Automatic resolution from `.env` for xAI, OpenAI, and Groq.
-- **Provider-Specific Models**: Default model adjusts per provider (e.g., `grok-3` for xAI, `gpt-4o` for OpenAI).
+Standalone and automatic preflight check:
 
----
+1. Python 3.10 or newer.
+2. Imports for `typer`, `rich`, `openai`, `dotenv`, and `tenacity`.
+3. A runnable Git executable.
+4. `python -m pocarchitect --help` or the installed console command.
+5. The packaged system prompt.
+6. For a real cloud run, the selected provider's non-placeholder key; for a
+   local run, an HTTP request to `<base-url>/models`.
+7. Write access to the same resolved report directory used by the real run.
 
-## Technology Stack
+An explicit `--output-dir` is passed to automatic preflight. The default resolver
+uses `/reports` when `/.dockerenv` exists or `IN_DOCKER` is set; otherwise it
+uses `reports/` under the current directory.
 
-- **Language**: Python 3.10+
-- **CLI Framework**: Typer + Rich
-- **LLM Client**: OpenAI SDK (used for xAI, OpenAI, Groq, and OpenAI-compatible local endpoints)
-- **Grounding**: `git` subprocess (shallow clone)
-- **Retries**: tenacity
-- **Config**: python-dotenv
-- **Packaging**: pyproject.toml + setuptools
+Preflight does not clone a repository, send the full prompt, create a report,
+test local chat completions, or establish model quality/resource sufficiency.
 
----
+## Grounding outcomes and clone-failure fallback
 
-## Limitations (Current)
+`build_grounding_context` returns content plus one ingestion outcome:
 
-- The tool has no API server or library API; the supported interface is the CLI.
-- Source selection is limited to at most 25 matching files, with individual files truncated at 7,500 characters.
-- There is no built-in cache of cloned repositories.
-- Generated reports and provider output require operator review; no sandbox is provided for material copied from a report.
+| Metadata value | Meaning |
+|---|---|
+| `disabled` | `--no-ingest` intentionally disabled grounding |
+| `url-only-non-github` | The URL host is not GitHub and no clone was attempted |
+| `url-only-ingestion-failed` | GitHub clone or later ingestion failed; warning/URL context remains |
+| `github-shallow-clone` | The depth-one GitHub clone completed |
 
----
+A clone failure does not automatically abort a real provider workflow. The
+transfer preview contains `WARNING: Ingestion failed (...)`; the operator must
+decline unless URL-only analysis is acceptable. A report from that fallback is
+not described as source-grounded, and its metadata records
+`url-only-ingestion-failed`.
 
-**Reviewed version:** 0.2.0
+## Grounding file-selection rules
+
+The current implementation walks the temporary clone in filesystem order and
+selects candidates whose filename contains a keyword **or** whose suffix is in
+the extension set. This order is implementation-defined; no completeness claim
+is made.
+
+| Rule | Current value |
+|---|---|
+| Filename keywords | `readme`, `exploit`, `payload`, `shell`, `poc`, `index`, `attack`, `main`, `vuln`, `trigger`, `scan`, `app`, `setup`, `install`, `dockerfile`, `makefile`, `requirements`, `config`, `manifest` |
+| Extensions | `.py`, `.sh`, `.ps1`, `.yml`, `.yaml`, `.json`, `.md`, `.txt`, `.bat`, `.cmd`, `.cpp`, `.c`, `.go`, `.rs` |
+| Per-file size exclusion | Files over 250,000 bytes are skipped |
+| Per-file content limit | 7,500 characters, followed by a truncation marker |
+| Transfer cap | First 25 matching readable files |
+| Excluded directory | `.git` |
+
+## Report provenance
+
+Successful provider responses are written as Markdown with YAML-like front
+matter containing `project`, `source_url`, `provider`, `model`, `prompt_asset`,
+`generated_at`, `ingestion`, `grounding_files_selected`, and
+`content_sha256`. `ingestion` is the outcome above, not an inference from the
+operator's flags. `grounding_files_selected` is zero for disabled/URL-only
+outcomes and the number of files included for a successful clone.
+
+## Batch behavior
+
+Batch input ignores blank lines and full-line comments whose trimmed content
+starts with `#`; inline comments are not removed. Every eligible dry-run URL is
+previewed. Real successes and failures are written atomically to the version-2
+ledger. Processing continues after an item failure, then the command exits 1
+after its summary when any item failed. A zero exit therefore means no processed
+item failed; consumers may also inspect `batch_complete.failed` or the ledger.
+
+## Provider defaults
+
+| Provider | Default model |
+|---|---|
+| `xai` | `grok-3` |
+| `openai` | `gpt-4o` |
+| `groq` | `llama-3.1-70b-versatile` |
+| `local` | `qwen2.5-coder:32b` |
+
+The OpenAI SDK is used for all four choices. Prompt portability references to
+Claude or Gemini do not add CLI provider choices; another OpenAI-compatible
+service must be supplied through `local` and `--base-url`.
+
+## Current limitations
+
+- The supported public interface is the CLI; there is no API server or library API.
+- Private GitHub authentication is not configured by the project.
+- No clone cache or source-completeness guarantee exists.
+- Provider output and copied commands require operator review.
+- The tool does not execute cloned source and supplies no sandbox for report content.
+
+**Documented version:** 0.2.0

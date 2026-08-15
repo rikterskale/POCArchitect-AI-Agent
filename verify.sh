@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================
-# POCArchitect Verification Script (Dry-Run))
+# POCArchitect Verification Script (Dry-Run)
 # Validates the tool without making real LLM calls
 # ================================================
 
@@ -27,7 +27,7 @@ echo
 
 # 3. Preflight
 echo "3. ✅ Running preflight checks..."
-pocarchitect preflight
+pocarchitect preflight --offline
 echo
 
 # 4. Single URL dry-run test
@@ -50,12 +50,13 @@ pocarchitect --url https://github.com/rikterskale/POCArchitect-AI-Agent \
 echo "✅ Operator flags + verbose dry-run passed"
 echo
 
-# 6. Batch mode dry-run test
-echo "6. 📋 Batch mode test (dry-run)..."
-pocarchitect --batch example_usage/batch_urls.txt \
+# 6. Every eligible batch item dry-run test
+echo "6. 📋 Every eligible batch item test (dry-run)..."
+pocarchitect --batch example_usage/dry_run_batch_urls.txt \
   --provider openai \
+  --no-ingest \
   --dry-run
-echo "✅ Batch mode dry-run passed"
+echo "✅ Every eligible batch item was previewed without provider access"
 echo
 
 # 7. Final status
@@ -64,8 +65,8 @@ echo "🎉 ALL VERIFICATION STEPS COMPLETE!"
 echo "=================================================="
 echo "✅ --dry-run now works correctly (no API calls)"
 echo "✅ --verbose flag is functional"
-echo "✅ --batch flag works for batch mode"
-echo "✅ Project is clean and production-ready!"
+echo "✅ --batch previews every eligible item in dry-run mode"
+echo "✅ Selected no-network verification steps passed"
 echo "=================================================="
 
 echo "Latest reports (if any were generated):"

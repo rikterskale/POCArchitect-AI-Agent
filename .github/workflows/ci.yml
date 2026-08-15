@@ -57,6 +57,15 @@ jobs:
       - name: Documentation link validation
         run: python scripts/validate_documentation_links.py
 
+      - name: Selected documentation command validation
+        run: python scripts/validate_documentation_commands.py
+
+      - name: Documentation report validation
+        run: python scripts/validate_documentation_reports.py
+
+      - name: CI workflow invariant validation
+        run: python scripts/validate_ci_workflow.py
+
   test:
     needs: quality
     runs-on: ubuntu-latest
@@ -155,6 +164,9 @@ jobs:
 
       - name: Build package
         run: python -m build
+
+      - name: Validate packaged documentation links
+        run: python scripts/validate_distribution.py dist
 
       - name: List built artifacts
         run: ls -la dist/

@@ -1,6 +1,6 @@
 # POCArchitect Prompt
 
-> **Target:** SuperGrok (xAI) – also compatible with GPT‑5.x, Claude, Gemini, and any OpenAI‑compatible API that supports web browsing or receives pasted source.
+> **Prompt portability:** This text can be adapted for GPT, Claude, Gemini, or other capable models. The packaged POCArchitect CLI itself exposes only `xai`, `openai`, `groq`, and `local`; other OpenAI-compatible endpoints are configured through `local`.
 > **Version:** v2.1 – 2026-04-01 (streamlined for clarity, consistency, and multi‑model use)
 > **Usage:** Feed a single URL or a file of URLs (one per line) as user messages.
 

@@ -1,128 +1,18 @@
-POCArchitect AI Agent - Beginner Friendly Installation, Setup & Usage Guide
+POCArchitect Quickstart Redirect
 
-POCArchitect-AI-Agent is a Python CLI tool that takes any Proof-of-Concept (PoC) URL, usually a GitHub repo, and turns it into a clean, reproducible, "weaponized" Markdown blueprint/report.
+This former quickstart duplicated command and option details that are now
+generated or maintained in canonical documentation. Use:
 
-It uses AI (LLMs) with real code grounding to generate structured documentation with your chosen risk level, target OS, mitigations, etc.
+  docs/NOVICE_USABILITY_GUIDE.md
 
-Perfect for red teamers and offensive security operators.
+The canonical guide contains supported Windows PowerShell and Bash installation
+paths, provider setup, batch recovery, exact success indicators, and
+troubleshooting.
 
-Prerequisites
+Safe no-clone, no-provider-call preview from the repository root:
 
-Git – For cloning PoCs and grounding
-Download: https://git-scm.com/downloads
-Python 3.10 or higher
-Download: https://www.python.org/downloads/
+  python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --format json --no-color
 
-Make sure "Add to PATH" is checked on Windows
-An LLM API key (choose one):
-xAI / Grok (recommended): https://console.grok.x.ai/
-OpenAI: https://platform.openai.com/api-keys
-Groq: https://console.groq.com/keys
-Ollama (completely local & free): See Ollama Setup Guide
-Optional but recommended: Docker Desktop
+For the current option surface, use docs/cli-reference.md or run:
 
-Option 1: Local Python Installation (Recommended)
-
-Step 1: Clone the repo
-
-git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
-
-cd POCArchitect-AI-Agent
-
-Step 2: Create a virtual environment (strongly recommended)
-
-Windows:
-python -m venv venv
-venv\Scripts\activate
-
-macOS / Linux:
-python -m venv venv
-source venv/bin/activate
-
-Step 3: Install the tool
-
-pip install -e .[all]
-
-Step 4: Set up your API key
-
-cp .env.example .env
-
-Edit .env and add your key, for example:
-XAI_API_KEY=...
-
-Step 5: Test your setup
-
-pocarchitect preflight
-
-If all checks pass, you're ready.
-
-Option 2: Docker (No Python setup needed)
-
-Build the image:
-
-docker build -t pocarchitect .
-
-Run it:
-
-docker run --rm
--v "$(pwd)/reports:/reports"
--e XAI_API_KEY=your_actual_key_here
-pocarchitect --url https://github.com/example/poc-repo
- --provider xai
-
-Basic Usage
-
-Single PoC (most common)
-
-pocarchitect --url https://github.com/someuser/some-poc
- --provider xai
-
-With common options
-
-pocarchitect --url https://github.com/someuser/some-poc
-
---provider xai
---risk-level Critical
---target-os Windows
---include-mitigations
---verbose
-
-Dry-Run Mode (highly recommended before real runs)
-
-pocarchitect --url https://github.com/someuser/some-poc
- --dry-run
-
-This shows the full prompt that will be sent to the LLM without making any API call.
-
-Batch Mode
-
-Create a .txt file with one URL per line, then run using --batch:
-
-pocarchitect --batch example_usage/batch_urls.txt --provider xai
-
-Useful Flags
-
---provider xai|openai|groq|local
---model (model name, defaults per provider)
---risk-level Critical|High|Medium|Low
---target-os Windows|Linux|macOS|cross-platform
---include-mitigations / --no-include-mitigations
---no-ingest (skip grounding for very large repos)
---dry-run (show prompt only)
---verbose / -v (extra grounding details)
-
-Run pocarchitect --help for the full list.
-
-Where Reports Are Saved
-
-Default location: ./reports/ folder (created automatically)
-Each report is a nicely formatted Markdown file.
-
-Troubleshooting
-
-Command not found → Activate your virtual environment first.
-API key error → Check your .env file and make sure the key matches the --provider you chose.
-Git not found → Install Git and restart your terminal.
-Still stuck? → Run pocarchitect preflight and follow the error messages.
-
-Happy hunting!
+  python -m pocarchitect --help

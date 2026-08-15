@@ -44,15 +44,19 @@ Run the included preflight checker:
 python docs/ollama_preflight_check.py
 ```
 
-This helper validates the server, the `qwen2.5-coder:32b` model name, and the OpenAI-compatible endpoint (`/v1/chat/completions`) that POCArchitect uses. It sends a short local test request and therefore may use local compute.
+This helper performs exactly three checks against `http://localhost:11434`: Ollama `/api/version`, availability of the configured model through `/api/show`, and one short `/v1/chat/completions` request. It reports the tested base URL and model. It does not run POCArchitect's full prompt, create a report, judge response quality, or establish that host resources are sufficient.
 
 > **Prerequisite:** The checker requires the `requests` library. Install it with `pip install requests` if not already available.
 
-Before a real run, check the same endpoint through POCArchitect:
+Before a real run, check the endpoint through POCArchitect:
 
 ```bash
 python -m pocarchitect preflight --provider local --base-url http://localhost:11434/v1
 ```
+
+POCArchitect preflight performs only an HTTP readiness request to
+`http://localhost:11434/v1/models`; it does not repeat the helper's model-specific
+chat-completion test.
 
 ## 5. Run POCArchitect with Local Ollama
 

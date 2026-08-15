@@ -7,7 +7,7 @@ This is a short orientation page. The complete, generated option list is the [CL
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--url` / `-u` | Single PoC GitHub URL | Required (or use `--batch`) |
-| `--batch` / `-b` | Path to `.txt` file with multiple URLs (one per line) | None |
+| `--batch` / `-b` | Text input: blank lines and full-line `#` comments ignored | None |
 | `--provider` / `-p` | LLM provider: `xai`, `openai`, `groq`, `local` | `xai` |
 | `--model` / `-m` | Model name | Provider-specific (e.g., `grok-3` for xai, `gpt-4o` for openai) |
 | `--temperature` / `-t` | Provider temperature | `0.2` |
@@ -20,7 +20,7 @@ This is a short orientation page. The complete, generated option list is the [CL
 | `--dry-run` | Show full prompt without calling LLM | `false` |
 | `--batch-state` | Custom JSON batch recovery ledger | `reports/batch_progress.json` during batch runs |
 | `--yes` | Approve source transfer for noninteractive jobs | `false` |
-| `--format` | Text or JSON Lines output for main runs and `preflight` | `text` |
+| `--format` | Text or JSON Lines output; place before subcommands | `text` |
 | `--no-color` | Disable terminal styling | `false` |
 | `--version` / `-V` | Show version and exit | — |
 
@@ -32,13 +32,18 @@ python -m pocarchitect --url https://github.com/example/poc-repo --no-ingest --d
 
 ## Batch Mode
 
-Pass a text file of URLs (one per line) using `--batch`. A real batch runs provider calls and asks for confirmation for each source transfer in an interactive terminal; use `--yes` only after reviewing an authorized batch.
+Pass a text file using `--batch`. Every nonblank line whose trimmed content does
+not begin with `#` is an item; inline comments are not removed. A real batch
+runs provider calls and asks for confirmation for each source transfer in an
+interactive terminal; use `--yes` only after reviewing an authorized batch.
 
 ```bash
 python -m pocarchitect --batch example_usage/batch_urls.txt --provider xai
 ```
 
-The tool will process every URL in the file and generate one report per URL.
+The tool attempts every eligible URL. Dry run previews every non-resumed item.
+Real item failures are persisted while later items continue; the command exits
+1 after the summary if any item failed.
 
 ## Examples
 
@@ -55,12 +60,14 @@ python -m pocarchitect --url https://github.com/example/poc \
 Batch processing:
 
 ```bash
-python -m pocarchitect batch-status --batch-state reports/batch_progress.json
+python -m pocarchitect --format json --no-color batch-status --batch-state reports/batch_progress.json
 ```
 
 ## Dry-Run Mode
 
-Use `--dry-run` to inspect the exact prompt that will be sent to the LLM without making any API call. This is very useful for:
+Use `--dry-run` to inspect the exact prompt without making an LLM call. It
+bypasses automatic preflight entirely, so use `preflight --offline` separately
+when you also need installation/output checks. This is useful for:
 
 - Debugging prompt quality
 - Tuning operator flags

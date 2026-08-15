@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail CI when the canonical novice journeys lose key guidance."""
+"""Validate canonical-guide structure and platform-delta command ledgers."""
 
 from __future__ import annotations
 
@@ -30,26 +30,46 @@ REQUIRED_COMMANDS = (
     "batch-status",
     "batch-reset",
 )
+PLATFORM_REQUIREMENTS = {
+    "Windows": {
+        "prefix": "WIN",
+        "needles": (
+            "PowerShell",
+            r".\.venv\Scripts\Activate.ps1",
+            r".\reports\batch_progress.json",
+            "preflight --provider openai",
+            "preflight --provider local --base-url",
+        ),
+    },
+    "Linux": {
+        "prefix": "LINUX",
+        "needles": (
+            "Bash",
+            ". .venv/bin/activate",
+            "./reports/batch_progress.json",
+            "preflight --provider openai",
+            "preflight --provider local --base-url",
+        ),
+    },
+}
 
 
 def validate_guide(platform: str, path: Path) -> list[str]:
     if not path.exists():
         return [f"{platform}: guide is missing: {path}"]
     text = path.read_text(encoding="utf-8")
-    headings = re.findall(r"^##\s+.+$", text, flags=re.MULTILINE)
     errors = []
-    if len(headings) < 30:
-        errors.append(
-            f"{platform}: expected at least 30 second-level journey headings; found {len(headings)}"
-        )
     if "Status: **PARTIALLY VERIFIED**" not in text:
         errors.append(f"{platform}: must state its current validation status")
+    if "[Novice Usability Guide](../NOVICE_USABILITY_GUIDE.md)" not in text:
+        errors.append(f"{platform}: canonical-guide link is missing")
     if "## Command ledger" not in text:
         errors.append(f"{platform}: command ledger heading is missing")
-    for command in REQUIRED_COMMANDS:
-        if command not in text:
-            errors.append(f"{platform}: required command missing from guide: {command}")
-    prefix = "WIN" if platform == "Windows" else "LINUX"
+    requirements = PLATFORM_REQUIREMENTS[platform]
+    for needle in requirements["needles"]:
+        if needle not in text:
+            errors.append(f"{platform}: required platform delta missing: {needle}")
+    prefix = requirements["prefix"]
     ledger_rows = re.findall(rf"\| {prefix}-\d{{2}} \|", text)
     if len(ledger_rows) < 5:
         errors.append(
@@ -87,7 +107,10 @@ def main() -> int:
         print("Novice guide validation failed:")
         print("\n".join(f"- {error}" for error in errors))
         return 1
-    print("Novice guides are complete and command-ledger validated.")
+    print(
+        "Novice guide structure and platform-delta command ledgers are present. "
+        "This structural check does not prove command behavior."
+    )
     return 0
 
 

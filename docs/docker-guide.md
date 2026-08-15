@@ -76,7 +76,12 @@ docker run --rm -it \
   --batch /batch_urls.txt
 ```
 
-The batch file must contain one URL per line. The container asks for a source-transfer confirmation for each item. Add `--yes` only to a noninteractive job whose URLs and transfer are already authorized and reviewed.
+Each nonblank, noncomment line is treated as one input. Full-line `#` comments
+and blank lines are ignored; inline comments are not removed. The container asks
+for a source-transfer confirmation for each item. Add `--yes` only to a
+noninteractive job whose URLs and transfer are already authorized and reviewed.
+If any item fails, processing continues and the container exits 1 after the
+batch summary.
 
 ### Full Example with Custom Options
 
@@ -110,13 +115,21 @@ docker run --rm -it \
 
 - Mount `-v "$(pwd)/reports:/reports"` whenever you want reports or batch state retained on the host. The container default output is `/reports`.
 - Use `--rm` to auto-clean the container after it finishes.
-- Create a shell alias for daily use:
+- Create an **interactive real-run** alias:
 
 ```bash
-alias pocarch='docker run --rm --env-file .env -v "$(pwd)/reports:/reports" pocarchitect'
+alias pocarch='docker run --rm -it --env-file .env -v "$(pwd)/reports:/reports" pocarchitect:latest'
 ```
 
-Then just run: `pocarch --url <url>`
+Then run: `pocarch --url <AUTHORIZED_GITHUB_URL> --provider <provider>`. The
+`-it` flag is required for the default confirmation path.
+
+For a no-interaction, no-provider-call preview alias:
+
+```bash
+alias pocarch-preview='docker run --rm -v "$(pwd)/reports:/reports" pocarchitect:latest'
+pocarch-preview --url https://github.com/example/poc --no-ingest --dry-run --no-color
+```
 
 - GitHub grounding uses an unauthenticated shallow Git clone. It is intended for public GitHub repositories; do not assume private repository access is configured in this image.
 
@@ -126,7 +139,7 @@ Then just run: `pocarch --url <url>`
 
 - **"Permission denied" on reports** → The container runs as non-root `pocuser`. Create a host `reports` folder you can write to, mount it at `/reports`, then repeat the safe dry run before a real run.
 - **Git clone fails** → Confirm the URL is a public GitHub repository and that the container has network access. To validate the CLI without cloning, repeat the command with `--no-ingest --dry-run`.
-- **API key not found** → Check that `.env` is in the directory where you run Docker and contains the key matching `--provider`; then rerun `docker run --rm --env-file .env pocarchitect:latest preflight --provider xai`.
+- **API key not found** → Check that `.env` is in the directory where you run Docker and contains the key matching `--provider`; then rerun preflight with that same provider, for example `docker run --rm --env-file .env pocarchitect:latest preflight --provider openai`.
 - **Rebuild after changes** → `docker build --no-cache -t pocarchitect:latest .`
 
 ---

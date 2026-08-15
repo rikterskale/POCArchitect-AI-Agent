@@ -8,22 +8,15 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-DOC_SOURCES = (
-    ROOT / "README.md",
-    ROOT / "POCArchitect_Quickstart.txt",
-    ROOT / "docs",
-    ROOT / "example_usage",
-)
+DOC_DIRECTORIES = (ROOT / "docs", ROOT / "example_usage", ROOT / "pocarchitect")
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 
 
 def markdown_files() -> list[Path]:
-    files: list[Path] = []
-    for source in DOC_SOURCES:
-        if source.is_file() and source.suffix.lower() == ".md":
-            files.append(source)
-        elif source.is_dir():
-            files.extend(source.rglob("*.md"))
+    files = set(ROOT.glob("*.md"))
+    for directory in DOC_DIRECTORIES:
+        if directory.exists():
+            files.update(directory.rglob("*.md"))
     return sorted(files)
 
 
@@ -68,7 +61,10 @@ def main() -> int:
         print("Documentation link validation failed:")
         print("\n".join(f"- {error}" for error in errors))
         return 1
-    print(f"Validated local Markdown links in {len(markdown_files())} files.")
+    print(
+        f"Validated local Markdown targets and anchors in {len(markdown_files())} files. "
+        "External reachability and behavioral accuracy are outside this check."
+    )
     return 0
 
 

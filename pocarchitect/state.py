@@ -31,9 +31,14 @@ def load_state(path: Path) -> dict[str, Any]:
             f"State file is not valid JSON: {path}. Run `batch-reset --batch-state {path} --yes` "
             "to preserve it as a backup and start over."
         ) from error
-    if not isinstance(state, dict) or not isinstance(state.get("items"), dict):
+    if (
+        not isinstance(state, dict)
+        or state.get("version") != STATE_VERSION
+        or not isinstance(state.get("items"), dict)
+    ):
         raise BatchStateError(
-            f"State file has an unsupported structure: {path}. Use batch-reset to create a backup."
+            f"State file must use version {STATE_VERSION} with an object-valued `items` field: "
+            f"{path}. Use batch-reset to create a backup."
         )
     return state
 

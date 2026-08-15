@@ -73,10 +73,13 @@ def test_check_api_key_accepts_real_env_file_value(tmp_path, monkeypatch):
 
 def test_offline_preflight_does_not_require_api_key(monkeypatch):
     monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_git_command", lambda: (True, "ok"))
     monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
     monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
     monkeypatch.setattr(
-        preflight, "check_output_directory_writable", lambda: (True, "ok")
+        preflight,
+        "check_output_directory_writable",
+        lambda output_dir=None: (True, "ok"),
     )
     monkeypatch.setattr(
         preflight,
@@ -91,10 +94,13 @@ def test_offline_preflight_does_not_require_api_key(monkeypatch):
 
 def test_local_preflight_checks_endpoint_without_cloud_key(monkeypatch):
     monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_git_command", lambda: (True, "ok"))
     monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
     monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
     monkeypatch.setattr(
-        preflight, "check_output_directory_writable", lambda: (True, "ok")
+        preflight,
+        "check_output_directory_writable",
+        lambda output_dir=None: (True, "ok"),
     )
     monkeypatch.setattr(
         preflight,
@@ -117,10 +123,13 @@ def test_local_preflight_checks_endpoint_without_cloud_key(monkeypatch):
 
 def test_preflight_json_is_one_machine_readable_event(monkeypatch, capsys):
     monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_git_command", lambda: (True, "ok"))
     monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
     monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
     monkeypatch.setattr(
-        preflight, "check_output_directory_writable", lambda: (True, "ok")
+        preflight,
+        "check_output_directory_writable",
+        lambda output_dir=None: (True, "ok"),
     )
 
     preflight.main(
@@ -131,3 +140,37 @@ def test_preflight_json_is_one_machine_readable_event(monkeypatch, capsys):
     assert payload["event"] == "preflight"
     assert payload["offline"] is True
     assert "\x1b" not in json.dumps(payload)
+
+
+def test_output_directory_check_uses_explicit_path(tmp_path):
+    output_dir = tmp_path / "chosen" / "reports"
+
+    ok, message = preflight.check_output_directory_writable(output_dir)
+
+    assert ok is True
+    assert str(output_dir) in message
+    assert output_dir.is_dir()
+    assert not (output_dir / ".write_test").exists()
+
+
+def test_preflight_passes_output_directory_to_check(tmp_path, monkeypatch):
+    checked = []
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_git_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        preflight,
+        "check_output_directory_writable",
+        lambda output_dir=None: (checked.append(output_dir) or True, "ok"),
+    )
+
+    preflight.main(
+        require_api_key=False,
+        offline=True,
+        output_dir=tmp_path,
+        output_format="json",
+        no_color=True,
+    )
+
+    assert checked == [tmp_path]
