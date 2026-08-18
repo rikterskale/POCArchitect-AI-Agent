@@ -176,8 +176,7 @@ def run_console(
     args: list[str], cwd: Path, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     """Invoke the generated console executable exactly as an installed user does."""
-    name = "pocarchitect.exe" if os.name == "nt" else "pocarchitect"
-    executable = Path(sys.executable).resolve().parent / name
+    executable = console_executable_path(sys.executable)
     if not executable.is_file():
         return subprocess.CompletedProcess(
             [str(executable), *args],
@@ -197,6 +196,19 @@ def run_console(
         timeout=120,
         check=False,
     )
+
+
+def console_executable_path(python_executable: str | Path) -> Path:
+    """Locate the console script beside the Python executable that was invoked."""
+    name = "pocarchitect.exe" if os.name == "nt" else "pocarchitect"
+    return Path(python_executable).parent / name
+
+
+def run_completion_probe(cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Emit a completion script without relying on the runner's parent shell."""
+    env = _clean_env()
+    env["_TYPER_COMPLETE_TEST_DISABLE_SHELL_DETECTION"] = "1"
+    return run_cli(["--show-completion=bash"], cwd, env)
 
 
 # ── Hermetic mock provider ───────────────────────────────────────────────────
@@ -369,7 +381,7 @@ def pillar_installation(work: Path, require_console_script: bool = False) -> Pil
         p.record("`pocarchitect` console script registered", has_script)
 
     # Shell completion ships and is emitted without touching the user's profile.
-    completion = run_cli(["--show-completion"], work)
+    completion = run_completion_probe(work)
     p.record(
         "`--show-completion` emits a completion script",
         completion.returncode == 0 and bool(completion.stdout.strip()),

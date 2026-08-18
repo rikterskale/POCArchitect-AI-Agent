@@ -12,7 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts.release_readiness import COVERED_OPTIONS, all_long_options
+from scripts.release_readiness import (
+    COVERED_OPTIONS,
+    all_long_options,
+    console_executable_path,
+    run_completion_probe,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "scripts" / "release_readiness.py"
@@ -27,6 +32,30 @@ def test_option_inventory_is_scoped_by_command():
     assert ("preflight", "--output-dir") in COVERED_OPTIONS
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX virtualenv Python executables are symlinks",
+)
+def test_console_executable_stays_in_symlinked_virtualenv(tmp_path):
+    base_python = tmp_path / "base" / "bin" / "python"
+    base_python.parent.mkdir(parents=True)
+    base_python.touch()
+    venv_python = tmp_path / "venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(base_python)
+
+    assert console_executable_path(venv_python) == venv_python.parent / "pocarchitect"
+
+
+def test_completion_probe_does_not_require_parent_shell(tmp_path, monkeypatch):
+    monkeypatch.delenv("SHELL", raising=False)
+
+    result = run_completion_probe(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert "_completion" in result.stdout
+
+
 @pytest.fixture(scope="module")
 def gate_report():
     """Run the gate once and share its JSON report across the readiness tests."""
@@ -37,6 +66,7 @@ def gate_report():
         encoding="utf-8",
         errors="replace",
         timeout=300,
+        check=False,
     )
     return result.returncode, json.loads(result.stdout)
 
