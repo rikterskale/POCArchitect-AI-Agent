@@ -4,7 +4,7 @@ import json
 import os
 import re
 import stat
-import subprocess
+import subprocess  # nosec B404 - controlled Git/viewer subprocesses are required by the CLI
 import sys
 import tempfile
 import threading
@@ -232,10 +232,12 @@ def open_in_default_viewer(path: Path) -> bool:
     """Best-effort open of a file in the OS default application."""
     try:
         if sys.platform.startswith("win"):
-            os.startfile(str(path))  # type: ignore[attr-defined]
+            os.startfile(str(path))  # type: ignore[attr-defined]  # nosec B606 - OS default viewer for an operator-selected report
         elif sys.platform == "darwin":
+            # nosec B603, B607 - fixed viewer executable and selected report path
             subprocess.run(["open", str(path)], check=False)
         else:
+            # nosec B603, B607 - fixed viewer executable and selected report path
             subprocess.run(["xdg-open", str(path)], check=False)
         return True
     except Exception:
@@ -734,6 +736,7 @@ def build_grounding_context(
                 f"Cloning {repo_name} (shallow)...",
                 repository=repo_name,
             )
+            # nosec B603, B607 - fixed git executable and bounded public clone arguments
             subprocess.run(
                 [
                     "git",

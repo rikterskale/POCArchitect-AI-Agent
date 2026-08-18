@@ -3,10 +3,11 @@ import importlib
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - controlled diagnostic subprocesses are required by preflight
 import sys
 from pathlib import Path
 from urllib.error import URLError
+from urllib.parse import urlparse
 from urllib.request import urlopen
 
 from dotenv import dotenv_values
@@ -81,8 +82,13 @@ def check_api_key(provider: str | None = None) -> tuple[bool, str]:
 def check_local_endpoint(base_url: str | None = None) -> tuple[bool, str]:
     """Verify that the selected OpenAI-compatible local endpoint can list models."""
     endpoint = (base_url or DEFAULT_LOCAL_BASE_URL).rstrip("/")
+    parsed = urlparse(endpoint)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False, f"FAIL: Local endpoint must use an http(s) URL: {endpoint}"
     try:
-        with urlopen(f"{endpoint}/models", timeout=3) as response:
+        with urlopen(  # nosec B310 - scheme and network location are validated above
+            f"{endpoint}/models", timeout=3
+        ) as response:
             if 200 <= response.status < 300:
                 return True, f"OK: Local endpoint ready at {endpoint}"
     except (OSError, URLError) as error:
@@ -109,6 +115,7 @@ def check_git_command() -> tuple[bool, str]:
     if git is None:
         return False, "FAIL: Git executable not found"
     try:
+        # nosec B603 - executable comes from shutil.which("git")
         result = subprocess.run(
             [git, "--version"],
             capture_output=True,
@@ -145,6 +152,7 @@ def check_cli_command() -> tuple[bool, str]:
     ]
     for cmd in candidates:
         try:
+            # nosec B603, B607 - fixed module/CLI diagnostic commands
             subprocess.run(cmd, capture_output=True, check=True)
             return True, f"OK: Available via: {' '.join(cmd[:3])}".strip()
         except (OSError, subprocess.CalledProcessError):
