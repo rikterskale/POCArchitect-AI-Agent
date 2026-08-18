@@ -58,6 +58,7 @@ REQUIRED_COMMANDS = {
     "batch-status",
     "batch-reset",
     "quickstart",
+    "models",
 }
 SAFE_EXAMPLE_URL = "https://github.com/example/poc"
 
@@ -122,6 +123,10 @@ COVERED_OPTIONS: dict[tuple[str, str], str] = {
     ("root", "--format"): "Root JSON output is asserted throughout.",
     ("preflight", "--format"): "Preflight JSON output is asserted in Pillars 1 and 3.",
     ("root", "--no-color"): "Root color-free output is used throughout.",
+    (
+        "root",
+        "--max-estimated-cost",
+    ): "Cost-limit enforcement is asserted by the provider-boundary checks.",
     ("preflight", "--no-color"): "Color-free preflight output is asserted in Pillar 1.",
 }
 WAIVED_OPTIONS: dict[tuple[str, str], str] = {

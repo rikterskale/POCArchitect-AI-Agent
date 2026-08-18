@@ -15,7 +15,9 @@ DEFAULT_MODELS = {
     "xai": "grok-3",
     "openai": "gpt-4o",
     "groq": "llama-3.1-70b-versatile",
-    "local": "qwen2.5-coder:32b",
+    # Keep the default practical for a developer laptop. Larger models remain
+    # available through an explicit --model selection.
+    "local": "qwen2.5-coder:14b",
 }
 
 DEFAULT_PROVIDER = "xai"

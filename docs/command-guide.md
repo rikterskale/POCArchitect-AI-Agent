@@ -47,19 +47,10 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[all]'
 ```
 
-Use `python -m pip install .` for a non-editable local install. The current
-project release is distributed through repository artifacts rather than a
-guaranteed PyPI package. Runtime dependencies are pinned in `pyproject.toml`
-and `requirements.txt` for reproducible clean installs.
-
-The repository includes a release workflow for PyPI trusted publishing. Once a
-release is published, the shortest supported path is:
-
-```bash
-python -m pip install pocarchitect
-pocarchitect doctor --offline
-pocarchitect demo
-```
+Use `python -m pip install .` for a non-editable local install. PyPI is not a
+supported installation path. Use a source checkout or a project release
+artifact. Runtime dependencies are pinned in `pyproject.toml` and
+`requirements.txt` for reproducible clean installs.
 
 Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. Python
 3.14 is best-effort until it is added to the matrix. The
@@ -94,6 +85,8 @@ directory without printing the value, runs provider-aware preflight, and offers
 a safe dry run. For `local`, it asks for an OpenAI-compatible endpoint and does
 not request a cloud key. In automation, configure the environment directly and
 use `preflight`; `setup` exits 2 when no interactive terminal is available.
+Use `pocarchitect models` to see built-in defaults and known alternatives;
+provider model availability can change independently.
 
 Inspect effective settings without exposing full keys:
 
@@ -114,8 +107,8 @@ python -m pocarchitect preflight --offline --format json --no-color
 ```
 
 It checks Python 3.10+, imports for `typer`, `rich`, `openai`, `dotenv`, and
-`tenacity`, a runnable Git executable, the package command, the prompt asset,
-and the resolved writable output path. It creates and removes only
+`tenacity`, the package command, the prompt asset, and the resolved writable
+output path. Grounded runs additionally require a runnable Git executable. It creates and removes only
 `.write_test` inside that path.
 
 Choose the exact path checked:
@@ -201,9 +194,9 @@ python -m pocarchitect --url <AUTHORIZED_GITHUB_URL> --provider openai
 
 The tool previews redacted transfer content and asks for confirmation. Inspect
 the preview for `WARNING: Ingestion failed`. A failed GitHub clone falls back to
-warning/URL-only context and can still reach the provider after approval; cancel
-unless URL-only analysis is acceptable. Successful report metadata records
-`url-only-ingestion-failed`, not a successful clone.
+warning/URL-only context. The provider call is blocked until ingestion succeeds;
+fix the URL/Git/network problem and retry. Successful report metadata records
+`github-shallow-clone` only after a completed clone.
 
 ### Credential-free end-to-end demo
 
@@ -239,7 +232,7 @@ is best-effort and does not change report generation success.
 | `xai` | `XAI_API_KEY` | `grok-3` |
 | `openai` | `OPENAI_API_KEY` | `gpt-4o` |
 | `groq` | `GROQ_API_KEY` | `llama-3.1-70b-versatile` |
-| `local` | None | `qwen2.5-coder:32b` |
+| `local` | None | `qwen2.5-coder:14b` |
 
 The current provider choices are exactly those four. Claude/Gemini wording in
 the packaged prompt describes portability of the prompt text, not named CLI

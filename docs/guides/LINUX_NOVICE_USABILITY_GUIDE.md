@@ -62,7 +62,7 @@ chat-completion behavior.
 | ID | Command | Safe expected result |
 |---|---|---|
 | LINUX-01 | `python -m pocarchitect --version` | Version is printed |
-| LINUX-02 | `python -m pocarchitect preflight --offline --output-dir ./reports` | Installation, Git, and selected output path checks run without provider access |
+| LINUX-02 | `python -m pocarchitect preflight --offline --output-dir ./reports` | Installation and selected output path checks run without provider access; Git is checked only for grounded runs |
 | LINUX-03 | `python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color` | No clone, automatic preflight, or provider call occurs |
 | LINUX-04 | `python -m pocarchitect --format json --no-color batch-status --batch-state ./reports/batch_progress.json` | One JSON status event is emitted |
 | LINUX-05 | `python -m pocarchitect --format json --no-color batch-reset --batch-state ./reports/batch_progress.json --yes` | Existing state is moved to a timestamped backup |

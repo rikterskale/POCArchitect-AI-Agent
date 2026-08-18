@@ -1,8 +1,10 @@
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 import typer
@@ -194,6 +196,57 @@ def test_demo_creates_report_without_credentials_or_network(tmp_path, monkeypatc
     assert "credential-free report" in reports[0].read_text(encoding="utf-8")
 
 
+def test_demo_does_not_require_git(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    calls = []
+    original_preflight = cli.run_preflight
+
+    def capture_preflight(**kwargs):
+        calls.append(kwargs)
+        return original_preflight(**kwargs)
+
+    monkeypatch.setattr(cli, "run_preflight", capture_preflight)
+
+    result = RUNNER.invoke(cli.app, ["--format", "json", "--no-color", "demo"])
+
+    assert result.exit_code == 0, result.stdout
+    assert calls and calls[0]["require_git"] is False
+
+
+def test_cost_limit_aborts_before_provider_call(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "load_prompt", lambda: "system prompt")
+    called = []
+    monkeypatch.setattr(cli, "get_llm_response", lambda **kwargs: called.append(kwargs))
+
+    with pytest.raises(typer.Exit) as error:
+        cli.process_single_url(
+            url="https://example.com/poc",
+            provider="openai",
+            api_key=None,
+            model="gpt-4o",
+            temperature=0.2,
+            base_url=None,
+            output_dir=tmp_path,
+            risk_level="High",
+            target_os="Linux",
+            include_mitigations=True,
+            no_ingest=True,
+            max_estimated_cost=0.0,
+        )
+
+    assert error.value.exit_code == 2
+    assert called == []
+
+
+def test_models_command_reports_defaults():
+    result = RUNNER.invoke(cli.app, ["--format", "json", "models"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["event"] == "models"
+    assert any(row["provider"] == "local" for row in payload["models"])
+
+
 def test_process_batch_file_continues_after_non_dry_typer_exit(tmp_path, monkeypatch):
     batch_file = tmp_path / "batch.txt"
     batch_file.write_text(
@@ -258,6 +311,25 @@ def test_build_grounding_context_uses_non_interactive_timed_git_clone(monkeypatc
     assert kwargs["text"] is True
     assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
     assert kwargs["env"]["PATH"] == os.environ["PATH"]
+
+
+def test_grounding_fixture_exercises_selection_and_content(monkeypatch):
+    fixture = Path(__file__).parent / "fixtures" / "grounding-repo"
+
+    def fake_run(cmd, **kwargs):
+        destination = Path(cmd[-1])
+        shutil.copytree(
+            fixture, destination, ignore=shutil.ignore_patterns("__pycache__")
+        )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+
+    result = cli.build_grounding_context("https://github.com/example/fixture")
+
+    assert result.ingestion == "github-shallow-clone"
+    assert result.selected_files == 2
+    assert "POCARCHITECT_GROUNDING_FIXTURE" in result.content
 
 
 def test_save_report_contains_safe_metadata(tmp_path, monkeypatch):

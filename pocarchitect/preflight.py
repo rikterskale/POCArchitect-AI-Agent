@@ -168,6 +168,7 @@ def main(
     output_dir: Path | None = None,
     output_format: str = "text",
     no_color: bool = False,
+    require_git: bool = True,
 ):
     global console
     console = Console(no_color=no_color)
@@ -222,15 +223,18 @@ def main(
             has_failure = True
         add_row(f"Dependency: {dep}", msg, ok=ok, fix=f"Run: {install_hint}")
 
-    ok, msg = check_git_command()
-    if not ok:
-        has_failure = True
-    add_row(
-        "Git executable",
-        msg,
-        ok=ok,
-        fix="Install Git, reopen the terminal, and rerun preflight.",
-    )
+    if require_git:
+        ok, msg = check_git_command()
+        if not ok:
+            has_failure = True
+        add_row(
+            "Git executable",
+            msg,
+            ok=ok,
+            fix="Install Git, reopen the terminal, and rerun preflight.",
+        )
+    else:
+        add_row("Git executable", "OK: Not required for this command", ok=True)
 
     # CLI command
     ok, msg = check_cli_command()

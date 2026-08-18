@@ -49,17 +49,8 @@ This runs the offline installation diagnosis and creates a local demo report.
 
 ## Install
 
-For a published release, install from PyPI:
-
-```bash
-python -m pip install pocarchitect
-pocarchitect doctor --offline
-pocarchitect demo
-```
-
-The repository includes a PyPI trusted-publishing workflow. Configure trusted
-publishing for the repository before publishing a release. Until then, use the
-source-checkout or release-artifact paths below.
+PyPI is not a supported installation path for this project. Use a source
+checkout or a project release artifact; both paths are validated by CI.
 
 For a source checkout:
 
@@ -73,11 +64,14 @@ python -m pocarchitect doctor --offline
 python -m pocarchitect demo
 ```
 
-Once the package is published, `uvx pocarchitect demo` is also supported.
+For a release artifact, download the matching wheel or source distribution from
+the project's release assets and install it in a fresh virtual environment:
 
-The supported release path is the PyPI package only after the publish workflow
-has completed for the matching `v<version>` release tag. Before that point,
-install from a repository checkout or a release artifact.
+```bash
+python -m pip install dist/pocarchitect-0.2.0-py3-none-any.whl
+python -m pocarchitect doctor --offline
+python -m pocarchitect demo
+```
 
 After installing, the quickest guided path is the interactive wizard, which stores a provider key in a local `.env` and checks readiness:
 
@@ -101,16 +95,15 @@ python -m pocarchitect preflight --offline --format json --no-color
 ```
 
 For a non-editable local install, use `python -m pip install .`. Release CI
-builds a wheel and source distribution. This repository does not currently
-promise a PyPI publication; use a project release artifact or source checkout
-until a registry install command is published.
+builds a wheel and source distribution, but does not publish them to PyPI.
 
-`preflight --offline` verifies Python, the five declared runtime imports, a
-runnable Git executable, the package entry point, the prompt asset, and the
-resolved writable output directory. Pass `--output-dir` to check the same custom
-path a real run will use. A real cloud-provider run additionally checks the
-matching provider key. Local preflight requests only `<base-url>/models`; it
-does not test chat completions or model suitability.
+`preflight --offline` verifies Python, the five declared runtime imports, the
+package entry point, the prompt asset, and the resolved writable output
+directory. Grounded runs additionally require a runnable Git executable; use
+`doctor` without `--offline` when you want to check that capability explicitly. A real
+cloud-provider run additionally checks the matching provider key. Local
+preflight requests only `<base-url>/models`; it does not test chat completions
+or model suitability.
 
 On Windows, help is rendered as plain text so diagnostic capture remains safe:
 
@@ -153,7 +146,7 @@ item failed, so automation can use both the exit code and the final
 | `xai` | `grok-3` |
 | `openai` | `gpt-4o` |
 | `groq` | `llama-3.1-70b-versatile` |
-| `local` | `qwen2.5-coder:32b` |
+| `local` | `qwen2.5-coder:14b` |
 
 The CLI exposes exactly `xai`, `openai`, `groq`, and `local`. Claude/Gemini
 wording in the packaged prompt describes prompt portability, not additional CLI
@@ -178,6 +171,7 @@ provider choices. Configure another OpenAI-compatible endpoint through
 | `--open` | Open each finished report in the OS default viewer | `false` |
 | `--verbose`, `-v` | Extra grounding details | `false` |
 | `--batch-state` | Custom resumable batch-ledger path | `reports/batch_progress.json` for batch runs |
+| `--max-estimated-cost` | Abort before a cloud call above this estimated USD input-cost limit | None |
 | `--format` | Text or JSON Lines output for main runs and `preflight` | `text` |
 | `--no-color` | Disable terminal styling | `false` |
 | `--version`, `-V` | Show version and exit | — |
@@ -193,6 +187,7 @@ Useful no-cost diagnostics:
 ```bash
 python -m pocarchitect --format json --no-color doctor --offline
 python -m pocarchitect --format json --no-color demo
+python -m pocarchitect models
 ```
 
 `doctor` checks the installation and selected provider readiness. `demo` starts
@@ -221,6 +216,7 @@ python scripts/generate_docs.py
 - [Finding-driven workflow quickstart](docs/finding-workflow.md#first-cli-workflow) — complete durable workflow example from initialization to archival.
 - [Documentation Gap Analysis](docs/DOCUMENTATION_GAP_ANALYSIS.md) — current-tree evidence, all 28 findings, and verified remediation closure matrix.
 - [Release Readiness Standard](docs/RELEASE_READINESS.md) — the six-pillar new-user readiness gate enforced in CI.
+- [Validation Claims and Evidence Policy](docs/VALIDATION_CLAIMS.md) — distinguishes current repository claims, hosted CI results, manual external checks, and historical snapshots.
 - [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — **historical snapshot** of commit `60d55d47c7ceb621df2f124764f01403a99f346b`; do not use it as current behavior or validation evidence.
 
 ## Safety and authorization

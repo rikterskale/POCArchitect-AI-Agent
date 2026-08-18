@@ -92,6 +92,24 @@ def test_offline_preflight_does_not_require_api_key(monkeypatch):
     preflight.main(require_api_key=False, offline=True)
 
 
+def test_offline_preflight_does_not_require_git(monkeypatch):
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(
+        preflight,
+        "check_git_command",
+        lambda: (_ for _ in ()).throw(AssertionError("Git should be optional")),
+    )
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        preflight,
+        "check_output_directory_writable",
+        lambda output_dir=None: (True, "ok"),
+    )
+
+    preflight.main(require_api_key=False, offline=True, require_git=False)
+
+
 def test_local_preflight_checks_endpoint_without_cloud_key(monkeypatch):
     monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
     monkeypatch.setattr(preflight, "check_git_command", lambda: (True, "ok"))

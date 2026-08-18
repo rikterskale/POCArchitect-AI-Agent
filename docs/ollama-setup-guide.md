@@ -28,14 +28,14 @@ ollama serve
 ## 3. Choose a model
 
 ```bash
-# The POCArchitect default model name for --provider local.
-ollama pull qwen2.5-coder:32b
-
-# Alternative model names must be passed with --model.
+# Practical first-run model for a developer laptop.
 ollama pull qwen2.5-coder:14b
+
+# Larger alternative; pass it explicitly with --model.
+ollama pull qwen2.5-coder:32b
 ```
 
-> **Note:** The included preflight checker (`docs/ollama_preflight_check.py`) tests for `qwen2.5-coder:32b` by default. If you use a different model, update the `TEST_MODEL` variable in that script to match.
+> **Note:** The included preflight checker (`docs/ollama_preflight_check.py`) tests for `qwen2.5-coder:14b` by default. If you use a different model, update the `TEST_MODEL` variable in that script to match.
 
 ## 4. Test Ollama
 Run the included preflight checker:
@@ -65,7 +65,7 @@ chat-completion test.
 python -m pocarchitect --url https://github.com/example/poc-repo \
   --provider local \
   --base-url http://localhost:11434/v1 \
-  --model qwen2.5-coder:32b
+  --model qwen2.5-coder:14b
 ```
 
 Run this in an interactive terminal. POCArchitect shows a redacted source-transfer preview before it sends any selected GitHub source to the local endpoint. Use `--no-ingest --dry-run` first if you only want to inspect the prompt.
@@ -83,9 +83,9 @@ You can combine with any other flags:
 | Out of memory | Choose and pull a smaller model in Ollama, then pass its exact name with `--model` |
 | Slow generation | Choose a model appropriate for the local hardware; POCArchitect has no performance-control flag for Ollama |
 
-**Resource note:** The default `qwen2.5-coder:32b` model can require substantial
-RAM/VRAM and may be slow or unavailable on modest hardware. For a first local
-smoke test, pull a smaller model and pass its exact name with `--model`.
+**Resource note:** Larger models such as `qwen2.5-coder:32b` can require
+substantial RAM/VRAM. Start with the 14B model and pass a larger model explicitly
+only when the host has sufficient resources.
 
 **Validation status:** The POCArchitect local-endpoint preflight behavior and
 the helper's standard-library transport are covered by tests. Ollama

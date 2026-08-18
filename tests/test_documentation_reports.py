@@ -19,6 +19,19 @@ def test_current_documentation_reports_pass_structural_currentness_controls():
     assert load_validator().validate(ROOT) == []
 
 
+def test_validation_policy_distinguishes_current_manual_and_historical_evidence():
+    policy = (ROOT / "docs" / "VALIDATION_CLAIMS.md").read_text(encoding="utf-8")
+
+    for heading in (
+        "## Evidence classes",
+        "## Current claims",
+        "## External or manual claims",
+        "## Historical material",
+    ):
+        assert heading in policy
+    assert "PyPI is not supported" in policy
+
+
 def test_report_validator_rejects_out_of_range_closure_citation(tmp_path):
     validator = load_validator()
     evidence = tmp_path / "evidence.md"

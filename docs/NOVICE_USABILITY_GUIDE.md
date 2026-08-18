@@ -33,7 +33,7 @@ Only analyze repositories you are authorized to inspect. A real grounded run clo
 
 ## 6. Before You Begin
 
-You need Python 3.10 or newer, Git, and a terminal: Windows Terminal with PowerShell on Windows or a Bash-compatible terminal on Linux. Check Python with <code>py --version</code> in PowerShell or <code>python3 --version</code> in Bash, and check Git with <code>git --version</code>. A provider credential is required only for a real cloud-provider run.
+You need Python 3.10 or newer and a terminal: Windows Terminal with PowerShell on Windows or a Bash-compatible terminal on Linux. Git is required for public GitHub grounding, but not for the offline checks, demo, or <code>--no-ingest</code> paths. Check Python with <code>py --version</code> in PowerShell or <code>python3 --version</code> in Bash; check Git with <code>git --version</code> before grounded runs. A provider credential is required only for a real cloud-provider run.
 
 CI runs unit tests on Ubuntu with Python 3.10–3.13. It also installs release artifacts into disposable environments and runs the offline first-day readiness gate on Windows and macOS with Python 3.12, on Linux wheels with Python 3.10 and 3.13, and on a Linux source distribution with Python 3.12. The repository requires Python 3.10+ but does not enforce a processor-architecture restriction.
 
@@ -205,9 +205,9 @@ python -m pocarchitect preflight --offline --format json --no-color
 
 **Success indicator:** the JSON event message is <code>Preflight passed.</code>
 It checks Python 3.10+, imports for <code>typer</code>, <code>rich</code>,
-<code>openai</code>, <code>dotenv</code>, and <code>tenacity</code>, a runnable
-Git executable, the CLI command, prompt file, and resolved writable output
-directory. This command may create the default <code>reports/</code> folder; it
+<code>openai</code>, <code>dotenv</code>, and <code>tenacity</code>, the CLI
+command, prompt file, and resolved writable output directory. It does not
+check Git unless a real grounded run is requested. This command may create the default <code>reports/</code> folder; it
 creates and removes only <code>.write_test</code>.
 
 To verify a custom report destination, include it in preflight:
@@ -314,7 +314,7 @@ Use either <code>--url</code> or <code>--batch</code>, never both.
 <code>groq</code>, or <code>local</code>; its default is <code>xai</code>.
 Default models are <code>grok-3</code>, <code>gpt-4o</code>,
 <code>llama-3.1-70b-versatile</code>, and
-<code>qwen2.5-coder:32b</code>, respectively. Claude/Gemini prompt wording does
+<code>qwen2.5-coder:14b</code>, respectively. Claude/Gemini prompt wording does
 not add CLI providers; another OpenAI-compatible service uses
 <code>--provider local --base-url</code>.
 
@@ -384,7 +384,7 @@ POCArchitect has no system service or global uninstall step when installed in th
 | Local endpoint unavailable | The local service is stopped or uses another URL | Run local-provider preflight with its endpoint | Start the local service or use its OpenAI-compatible <code>--base-url</code> | Repeat the same preflight |
 | Batch file not found | The <code>--batch</code> path is wrong | List the file from the repository root | Pass the correct relative or absolute path | Batch mode prints the file name |
 | Confirmation required in noninteractive mode | A real run cannot show its prompt | Check for CI, redirected input, or Docker without <code>-it</code> | Use an interactive terminal, or add <code>--yes</code> only after review | The preview is followed by the expected confirmation behavior |
-| Git ingestion fails or preview contains <code>WARNING: Ingestion failed</code> | URL is not a reachable public GitHub repository, Git is unavailable, or network is unavailable | Run offline preflight and inspect the transfer preview | Cancel the transfer, correct the cause, and retry; approve only if URL-only analysis is acceptable | Metadata says <code>github-shallow-clone</code> only after a completed clone |
+| Git ingestion fails or preview contains <code>WARNING: Ingestion failed</code> | URL is not a reachable public GitHub repository, Git is unavailable, or network is unavailable | Run grounded diagnostics and inspect the transfer preview | Cancel the transfer, correct the cause, and retry; the provider call is blocked until ingestion succeeds | Report is created only after a completed clone |
 | Batch exits 1 | At least one item failed after processing continued | Inspect <code>batch_complete.failed</code> and <code>batch-status</code> | Correct failed items and rerun the same ledger | Exit is 0 and failed count is 0 |
 
 ## 26. Known Limitations and Unsupported Scenarios

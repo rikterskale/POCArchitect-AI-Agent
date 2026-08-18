@@ -15,9 +15,7 @@ from rich.table import Table
 console = Console()
 
 OLLAMA_URL = "http://localhost:11434"
-TEST_MODEL = (
-    "qwen2.5-coder:32b"  # (#13) Aligned with ollama-setup-guide.md recommendation
-)
+TEST_MODEL = "qwen2.5-coder:14b"  # Practical default for a developer laptop
 
 
 def check_ollama_running() -> tuple[bool, str]:

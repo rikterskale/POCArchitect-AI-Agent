@@ -140,7 +140,12 @@ KNOWN_MODELS = {
     "xai": ["grok-3", "grok-3-mini", "grok-2"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
     "groq": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
-    "local": ["qwen2.5-coder:32b", "llama3.1:8b", "(any locally pulled model)"],
+    "local": [
+        "qwen2.5-coder:14b",
+        "qwen2.5-coder:32b",
+        "llama3.1:8b",
+        "(any locally pulled model)",
+    ],
 }
 
 # Rough input-token prices (USD per 1M input tokens) for a friendly cost hint.
@@ -200,6 +205,11 @@ def estimate_cost_usd(model: str, input_tokens: int) -> float | None:
     if price is None:
         return None
     return (input_tokens / 1_000_000) * price
+
+
+def estimate_input_tokens(text: str) -> int:
+    """Return a conservative, provider-neutral input-token estimate."""
+    return max(1, (len(text) + 3) // 4)
 
 
 def expand_url_shorthand(value: str) -> str:
@@ -383,6 +393,7 @@ def doctor(
         output_dir=output_dir,
         output_format=output_format,
         no_color=no_color_state,
+        require_git=not offline,
     )
     if output_format == "text":
         console.print(
@@ -402,6 +413,7 @@ def demo() -> None:
             output_dir=output_dir,
             output_format=output_format,
             no_color=no_color_state,
+            require_git=False,
         )
         process_single_url(
             url="https://github.com/example/poc",
@@ -433,6 +445,7 @@ def quickstart() -> None:
         output_dir=Path.cwd() / "reports",
         output_format=output_format,
         no_color=no_color_state,
+        require_git=False,
     )
     demo()
 
@@ -991,6 +1004,7 @@ def process_single_url(
     open_report: bool = False,
     dry_run_full: bool = False,
     show_spinner: bool = False,
+    max_estimated_cost: float | None = None,
 ):
     emit("processing", f"Processing: {url}", url=url)
 
@@ -1030,6 +1044,30 @@ Operator Preferences (respect these exactly):
             character_count=len(system_prompt) + len(user_message),
         )
         raise typer.Exit(2)
+
+    if max_estimated_cost is not None:
+        estimated = estimate_cost_usd(
+            model, estimate_input_tokens(system_prompt + user_message)
+        )
+        if estimated is not None:
+            emit(
+                "cost_estimate",
+                f"Estimated input cost: ${estimated:.4f} (limit ${max_estimated_cost:.4f})",
+                estimated_usd=estimated,
+                limit_usd=max_estimated_cost,
+                model=model,
+                provider=provider,
+            )
+            if estimated > max_estimated_cost:
+                emit(
+                    "error",
+                    f"Estimated input cost ${estimated:.4f} exceeds the configured limit "
+                    f"${max_estimated_cost:.4f}. Use --max-estimated-cost to raise the limit "
+                    "or reduce the grounding input.",
+                    estimated_usd=estimated,
+                    limit_usd=max_estimated_cost,
+                )
+                raise typer.Exit(2)
 
     if dry_run:
         full_prompt = f"--- SYSTEM PROMPT ---\n{system_prompt}\n\n--- USER MESSAGE ---\n{user_message}"
@@ -1128,6 +1166,7 @@ def process_batch_file(
     confirmed: bool = True,
     open_report: bool = False,
     dry_run_full: bool = False,
+    max_estimated_cost: float | None = None,
 ):
     """Read URLs from a text file and process each one sequentially."""
     if not batch_path.exists():
@@ -1223,6 +1262,7 @@ def process_batch_file(
                     open_report=open_report,
                     dry_run_full=dry_run_full,
                     show_spinner=False,
+                    max_estimated_cost=max_estimated_cost,
                 )
                 success_count += 1
                 state.setdefault("items", {})[url] = {
@@ -1636,6 +1676,32 @@ def config_command() -> None:
     )
 
 
+@app.command("models")
+def models_command() -> None:
+    """Show provider defaults and practical model alternatives."""
+    rows = [
+        {
+            "provider": provider,
+            "default": DEFAULT_MODELS[provider],
+            "known_alternatives": ", ".join(KNOWN_MODELS.get(provider, [])),
+        }
+        for provider in DEFAULT_MODELS
+    ]
+    if output_format == "json":
+        emit("models", "Provider model defaults.", models=rows)
+        return
+    table = Table(title="Provider Models")
+    table.add_column("Provider", style="cyan")
+    table.add_column("Default", style="green")
+    table.add_column("Known alternatives", style="yellow")
+    for row in rows:
+        table.add_row(row["provider"], row["default"], row["known_alternatives"])
+    console.print(table)
+    console.print(
+        "Model availability is provider/service dependent; pass --model to select another model."
+    )
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -1716,6 +1782,12 @@ def main(
         "--yes",
         help="Confirm source transfer without an interactive prompt.",
     ),
+    max_estimated_cost: float | None = typer.Option(
+        None,
+        "--max-estimated-cost",
+        min=0.0,
+        help="Abort before a cloud call when estimated input cost exceeds this USD limit.",
+    ),
     output_format: Literal["text", "json"] = typer.Option(
         "text", "--format", help="Output mode: text or JSON Lines."
     ),
@@ -1748,6 +1820,7 @@ def main(
             output_dir=output_dir,
             output_format=output_format,
             no_color=no_color,
+            require_git=not no_ingest,
         )
 
     # (#9) Resolve provider-specific default model if not explicitly set
@@ -1788,6 +1861,7 @@ def main(
             open_report=open_report,
             dry_run_full=full,
             show_spinner=show_spinner,
+            max_estimated_cost=max_estimated_cost,
         )
     elif batch:
         process_batch_file(
@@ -1808,6 +1882,7 @@ def main(
             confirmed=yes,
             open_report=open_report,
             dry_run_full=full,
+            max_estimated_cost=max_estimated_cost,
         )
     else:
         emit("error", "Provide --url or --batch")

@@ -147,7 +147,7 @@ also inspect `batch_complete.failed` or the ledger.
 | `xai` | `grok-3` |
 | `openai` | `gpt-4o` |
 | `groq` | `llama-3.1-70b-versatile` |
-| `local` | `qwen2.5-coder:32b` |
+| `local` | `qwen2.5-coder:14b` |
 
 The OpenAI SDK is used for all four choices. Prompt portability references to
 Claude or Gemini do not add CLI provider choices; another OpenAI-compatible

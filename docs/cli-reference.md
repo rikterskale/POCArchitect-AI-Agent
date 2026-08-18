@@ -25,6 +25,7 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 | `--verbose`, `-v` | BOOLEAN | False | Enable verbose output (extra details during grounding) |
 | `--batch-state` | PATH | None | JSON progress file used to resume completed batch URLs. |
 | `--yes` | BOOLEAN | False | Confirm source transfer without an interactive prompt. |
+| `--max-estimated-cost` | FLOAT RANGE | None | Abort before a cloud call when estimated input cost exceeds this USD limit. |
 | `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 | `--version`, `-V` | BOOLEAN | False | Show version and exit |
@@ -130,6 +131,14 @@ Show effective settings and where each value comes from (keys masked).
 |---|---|---|---|
 | — | — | — | No options |
 
+## Command: `models`
+
+Show provider defaults and practical model alternatives.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| — | — | — | No options |
+
 ## Commands
 
 | Command | Purpose |
@@ -145,6 +154,7 @@ Show effective settings and where each value comes from (keys masked).
 | `workflow-apply` | Apply one auditable workflow command and persist the resulting state. |
 | `setup` | Interactive first-run wizard: choose a provider, store a key, verify readiness. |
 | `config` | Show effective settings and where each value comes from (keys masked). |
+| `models` | Show provider defaults and practical model alternatives. |
 
 ## Safe examples
 

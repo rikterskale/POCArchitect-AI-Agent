@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GAP_REPORT = ROOT / "docs" / "DOCUMENTATION_GAP_ANALYSIS.md"
 HISTORICAL_REPORT = ROOT / "docs" / "DOCUMENTATION_REVIEW_REPORT.md"
+VALIDATION_POLICY = ROOT / "docs" / "VALIDATION_CLAIMS.md"
 README = ROOT / "README.md"
 QUICKSTART = ROOT / "POCArchitect_Quickstart.txt"
 EXPECTED_IDS = {f"DOC-{number:03d}" for number in range(1, 29)}
@@ -99,7 +100,7 @@ def validate_citations(
 
 def validate(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
-    required = (GAP_REPORT, HISTORICAL_REPORT, README, QUICKSTART)
+    required = (GAP_REPORT, HISTORICAL_REPORT, VALIDATION_POLICY, README, QUICKSTART)
     for default_path in required:
         path = root / default_path.relative_to(ROOT)
         if not path.is_file():
@@ -111,6 +112,7 @@ def validate(root: Path = ROOT) -> list[str]:
     historical = (root / HISTORICAL_REPORT.relative_to(ROOT)).read_text(
         encoding="utf-8"
     )
+    policy = (root / VALIDATION_POLICY.relative_to(ROOT)).read_text(encoding="utf-8")
     readme = (root / README.relative_to(ROOT)).read_text(encoding="utf-8")
     quickstart = (root / QUICKSTART.relative_to(ROOT)).read_text(encoding="utf-8")
 
@@ -157,6 +159,20 @@ def validate(root: Path = ROOT) -> list[str]:
             errors.append(f"README navigation is missing {target}")
     if "**historical snapshot**" not in readme:
         errors.append("README does not label the prior review as historical")
+
+    required_policy_phrases = (
+        "## Evidence classes",
+        "## Current claims",
+        "## External or manual claims",
+        "## Historical material",
+        "PyPI is not supported",
+        "current workflow run",
+    )
+    for phrase in required_policy_phrases:
+        if phrase.lower() not in policy.lower():
+            errors.append(f"Validation claims policy is missing: {phrase}")
+    if "docs/VALIDATION_CLAIMS.md" not in readme:
+        errors.append("README navigation is missing docs/VALIDATION_CLAIMS.md")
 
     if "docs/NOVICE_USABILITY_GUIDE.md" not in quickstart:
         errors.append("Root quickstart does not redirect to the canonical guide")

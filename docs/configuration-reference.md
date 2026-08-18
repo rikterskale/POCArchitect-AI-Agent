@@ -31,7 +31,7 @@ and `preflight --offline` do not require a provider key.
 | `xai` | `grok-3` |
 | `openai` | `gpt-4o` |
 | `groq` | `llama-3.1-70b-versatile` |
-| `local` | `qwen2.5-coder:32b` |
+| `local` | `qwen2.5-coder:14b` |
 
 The current CLI provider choices are `xai`, `openai`, `groq`, `local`. Claude and Gemini
 wording in the packaged prompt describes prompt portability, not additional

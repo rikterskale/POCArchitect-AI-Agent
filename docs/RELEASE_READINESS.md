@@ -23,6 +23,9 @@ in CI (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):
 - The **test suite** runs the same gate (`tests/test_release_readiness.py`) so
   regressions are caught on every push, and `build` depends on both.
 
+PyPI is intentionally **not** a supported installation channel. Release
+artifacts are distributed through project release assets and source checkouts.
+
 The gate is offline and deterministic: it makes no network calls, needs no
 provider credentials, and scrubs provider keys from the environment so results
 do not depend on the runner's secrets.
@@ -31,8 +34,9 @@ do not depend on the runner's secrets.
 
 ## Pillar 1 — Proven installation
 
-**Standard:** A user who installs the published artifact can run the tool
-immediately, with no source checkout and no credentials.
+**Standard:** A user who installs a project release artifact can run the tool
+immediately, with no source checkout and no credentials. PyPI is not a supported
+installation channel.
 
 Enforced checks:
 
@@ -232,3 +236,23 @@ python scripts/validate_fresh_install.py dist --artifact sdist
 
 Exit code `0` means release-ready; `1` means at least one pillar failed, and the
 report names the exact check.
+
+## Manual release checklist for external providers
+
+The hermetic gate proves the provider protocol without network access. Before a
+release is announced, maintainers should also perform one low-cost smoke run for
+each provider intended to be supported by that release:
+
+1. Configure a disposable provider key with a spending limit.
+2. Run `pocarchitect models` and record the selected model.
+3. Run `pocarchitect doctor --provider <provider>`.
+4. Run an authorized `--no-ingest` request with `--yes` and
+   `--max-estimated-cost <small-limit>`.
+5. Confirm that a Markdown report is written and its metadata records the
+   expected provider, model, and `ingestion: "disabled"` outcome.
+6. Record provider, model, date, operating system, and result in the release
+   checklist. Never commit credentials or report contents.
+
+This manual step covers live authentication, current model availability,
+provider-side billing permissions, and network behavior that deterministic CI
+cannot safely guarantee.
