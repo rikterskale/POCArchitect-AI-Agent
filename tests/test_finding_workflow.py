@@ -232,3 +232,31 @@ def test_integrity_check_detects_corrupt_references_without_mutation():
     errors = engine.validate_integrity()
     assert "unknown related finding: missing" in errors
     assert finding.related_finding_ids == ["missing"]
+
+
+def test_historical_override_does_not_rewind_guided_route():
+    engine = WorkflowEngine()
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+
+    assert engine.state.current_step_id == "discover"
+    engine.complete_step(
+        "scope", override=True, rationale="Backfilled owner confirmation"
+    )
+    assert engine.state.current_step_id == "discover"
+
+
+def test_snapshot_contains_durable_guidance_context_without_shared_mutables():
+    engine = WorkflowEngine()
+    finding = engine.inject_finding(
+        title="Contextual observation", severity=7, recommended_actions=["triage"]
+    )
+    snapshot = engine.snapshot()
+
+    assert snapshot["findings"][finding.id]["status"] == "open"
+    assert snapshot["findings"][finding.id]["recommended_actions"] == ["triage"]
+    assert snapshot["actions"][f"validate:{finding.id}"]["status"] == "pending"
+    snapshot["findings"][finding.id]["recommended_actions"].append("mutated")
+    assert finding.recommended_actions == ["triage"]

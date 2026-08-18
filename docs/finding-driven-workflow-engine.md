@@ -9,7 +9,7 @@ The engine has four deliberately separate concerns:
 1. **Durable domain state** — `WorkflowState` stores the current phase and step, completed and skipped steps, findings, actions, decisions, audit events, scores, mode, and terminal state.
 2. **Finding lifecycle** — `Finding` stores the observation, evidence, confidence, severity, relationships, recommended actions, metadata, and status history. The normal lifecycle is `open → validated → exploited → mitigated → closed`; invalid jumps fail safely.
 3. **Policy and orchestration** — `WorkflowEngine` recalculates risk, priority, derived actions, blockers, branch skips, and progress after every mutation.
-4. **Read model and persistence** — `snapshot()` is the stable UI/agent read model; `save()`/`load()` use atomic JSON replacement so an interrupted write does not corrupt resumability.
+4. **Read model and persistence** — `snapshot()` is the stable UI/agent read model, including finding/action detail, decisions, audit history, scores, and guidance; `save()`/`load()` use atomic JSON replacement so an interrupted write does not corrupt resumability.
 
 ## Finding and state contracts
 
@@ -37,7 +37,7 @@ being silently ignored.
 
 The default route is scope → authorization → discovery → validation → impact → remediation planning → remediation verification → reporting → closure → archive. Authorization and scope decisions are explicit boolean decisions and are recorded with rationale and audit events.
 
-An empty discovery result safely skips finding-specific work but still visits reporting, closure, and archive. A finding automatically creates validation, impact, treatment, and verification actions as its status advances. A user or agent may inject a finding at any point; the next recalculation immediately adds its actions and updates guidance. Out-of-order completion is supported only with an explicit, audited override rationale.
+An empty discovery result safely skips finding-specific work but still visits reporting, closure, and archive. A finding automatically creates validation, impact, treatment, and verification actions as its status advances. A user or agent may inject a finding at any point; the next recalculation immediately adds its actions and updates guidance. Out-of-order completion is supported only with an explicit, audited override rationale. Historical overrides never rewind the active guided position.
 
 ## Transparent policy rules
 
@@ -64,6 +64,9 @@ These rules are intentionally small and inspectable. A future product can replac
 - Custom routes are allowed to omit optional finding phases without causing a
   late finding to point at a nonexistent step; the default route retains the
   full validation and treatment path.
+- Snapshot collections are defensive copies, so UI or agent code cannot mutate
+  the live workflow by modifying returned findings, actions, decisions, or
+  audit records.
 
 ## Product integration
 

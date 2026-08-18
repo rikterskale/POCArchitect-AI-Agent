@@ -12,6 +12,7 @@ import os
 import tempfile
 import uuid
 from collections.abc import Iterable
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -235,6 +236,13 @@ class WorkflowEngine:
             raise WorkflowError("Workflow must end with the archive step")
         if self.steps[-1].phase != WorkflowPhase.ARCHIVED:
             raise WorkflowError("Archive step must use the archived phase")
+        current = self._step(self.state.current_step_id)
+        if self.state.current_phase != current.phase:
+            raise WorkflowError(
+                "Workflow current_phase must match the current step phase"
+            )
+        if self.state.terminal and self.state.current_step_id != "archive":
+            raise WorkflowError("A terminal workflow must be positioned at archive")
 
     def _has_step(self, step_id: str) -> bool:
         return any(step.id == step_id for step in self.steps)
@@ -511,6 +519,18 @@ class WorkflowEngine:
                     "step.skipped", step_id=next_id, reason="finding-driven branch"
                 )
             next_id = self._next_step(next_id)
+        # An override can complete historical work without rewinding the
+        # user's current guided position. If it completes a future step, the
+        # route may advance; if it completes a prior step, retain the current
+        # position and continue from there.
+        current_index = next(
+            i for i, item in enumerate(self.steps) if item.id == self.state.current_step_id
+        )
+        completed_index = next(
+            i for i, item in enumerate(self.steps) if item.id == step_id
+        )
+        if override and completed_index < current_index:
+            next_id = self.state.current_step_id
         self.state.current_step_id = next_id
         self.state.current_phase = self._step(next_id).phase
         self.state.terminal = step_id == "archive"
@@ -720,9 +740,17 @@ class WorkflowEngine:
                     "required": True,
                 }
             )
-        for action in self.state.pending_actions.values():
-            if action.status == "pending":
-                result.append({"kind": action.kind, **asdict(action)})
+        actions = sorted(
+            (action for action in self.state.pending_actions.values() if action.status == "pending"),
+            key=lambda action: (
+                0 if action.required else 1,
+                -self.state.findings[action.finding_id].severity
+                if action.finding_id in self.state.findings
+                else 0,
+            ),
+        )
+        for action in actions:
+            result.append({"kind": action.kind, **asdict(action)})
         if self.state.findings:
             for finding in sorted(
                 self.state.findings.values(),
@@ -737,6 +765,7 @@ class WorkflowEngine:
                             "status": finding.status.value,
                             "severity": finding.severity,
                             "confidence": finding.confidence,
+                            "recommended_actions": list(finding.recommended_actions),
                             "next": self._finding_next_action(finding),
                         }
                     )
@@ -773,6 +802,18 @@ class WorkflowEngine:
             "skipped_steps": list(self.state.skipped_steps),
             "open_findings": self.state.open_findings,
             "pending_actions": self.state.open_actions,
+            "findings": {
+                finding_id: deepcopy(asdict(finding))
+                | {"status": finding.status.value}
+                for finding_id, finding in self.state.findings.items()
+            },
+            "actions": {
+                action_id: deepcopy(asdict(action))
+                for action_id, action in self.state.pending_actions.items()
+            },
+            "decisions": deepcopy(self.state.decisions),
+            "audit_log": deepcopy(self.state.audit_log),
+            "mode": self.state.mode,
             "progress_percent": self.state.progress_percent,
             "risk_score": self.state.risk_score,
             "priority_score": self.state.priority_score,
