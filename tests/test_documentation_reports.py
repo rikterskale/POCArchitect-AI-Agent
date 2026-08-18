@@ -19,6 +19,37 @@ def test_current_documentation_reports_pass_structural_currentness_controls():
     assert load_validator().validate(ROOT) == []
 
 
+def test_current_documentation_reports_match_high_impact_behavioral_contracts():
+    assert load_validator().validate_behavioral_contracts(ROOT) == []
+
+
+def test_behavioral_contract_validator_rejects_stale_clone_fallback_claim(tmp_path):
+    validator = load_validator()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "pocarchitect").mkdir()
+    (tmp_path / "docs" / "architecture.md").write_text(
+        "A clone failure does not automatically abort a real provider workflow.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "README.md").write_text(
+        "| Linux Docker | Validated in CI |\n| Docker Desktop | Not separately validated |\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "DOCUMENTATION_GAP_ANALYSIS.md").write_text(
+        "| DOC-006 | Closed | `docs/architecture.md:1` | old fallback |\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pocarchitect" / "cli.py").write_text(
+        "url-only-ingestion-failed\nno provider call was made\n",
+        encoding="utf-8",
+    )
+
+    errors = validator.validate_behavioral_contracts(tmp_path)
+
+    assert any("obsolete clone-failure" in error for error in errors)
+    assert any("DOC-006 closure" in error for error in errors)
+
+
 def test_validation_policy_distinguishes_current_manual_and_historical_evidence():
     policy = (ROOT / "docs" / "VALIDATION_CLAIMS.md").read_text(encoding="utf-8")
 

@@ -98,6 +98,62 @@ def validate_citations(
     return errors, paths
 
 
+def validate_behavioral_contracts(root: Path = ROOT) -> list[str]:
+    """Check high-impact documentation claims against current source contracts."""
+    errors: list[str] = []
+    architecture = (
+        (root / "docs" / "architecture.md").read_text(encoding="utf-8").lower()
+    )
+    cli = (root / "pocarchitect" / "cli.py").read_text(encoding="utf-8").lower()
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    gap_report = (root / "docs" / "DOCUMENTATION_GAP_ANALYSIS.md").read_text(
+        encoding="utf-8"
+    )
+
+    if "exits before any provider call" not in architecture:
+        errors.append(
+            "Architecture must document that real ingestion failure exits before provider access"
+        )
+    if "does not automatically abort a real provider workflow" in architecture:
+        errors.append("Architecture retains obsolete clone-failure fallback wording")
+    if "url-only-ingestion-failed" not in cli or "no provider call was made" not in cli:
+        errors.append(
+            "CLI ingestion-failure abort contract is missing from the current source"
+        )
+
+    if "there is no api server or library api" in architecture:
+        errors.append(
+            "Architecture must distinguish no HTTP/API server from the WorkflowEngine Python API"
+        )
+    if (
+        "workflowengine" not in architecture
+        or "python integration api" not in architecture
+    ):
+        errors.append(
+            "Architecture must identify WorkflowEngine as a Python integration API"
+        )
+
+    if "| Docker Desktop/Linux Docker |" in readme:
+        errors.append(
+            "README must not combine Linux Docker CI evidence with Docker Desktop"
+        )
+    if (
+        "| Linux Docker | Validated in CI |" not in readme
+        or "| Docker Desktop | Not separately validated |" not in readme
+    ):
+        errors.append(
+            "README must separate Linux Docker CI status from Docker Desktop status"
+        )
+
+    closure = closure_rows(gap_report)
+    doc006 = closure.get("DOC-006")
+    if doc006 is None or "exits before any provider call" not in doc006[1].lower():
+        errors.append(
+            "DOC-006 closure row must describe the current real-run ingestion-failure behavior"
+        )
+    return errors
+
+
 def validate(root: Path = ROOT) -> list[str]:
     errors: list[str] = []
     required = (GAP_REPORT, HISTORICAL_REPORT, VALIDATION_POLICY, README, QUICKSTART)
@@ -129,6 +185,7 @@ def validate(root: Path = ROOT) -> list[str]:
 
     citation_errors, _ = validate_citations(root, rows)
     errors.extend(citation_errors)
+    errors.extend(validate_behavioral_contracts(root))
     fingerprint_match = FINGERPRINT_PATTERN.search(gap)
     if fingerprint_match is None:
         errors.append("Gap report is missing closure evidence fingerprint")

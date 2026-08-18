@@ -99,11 +99,11 @@ test local chat completions, or establish model quality/resource sufficiency.
 | `url-only-ingestion-failed` | GitHub clone or later ingestion failed; warning/URL context remains |
 | `github-shallow-clone` | The depth-one GitHub clone completed |
 
-A clone failure does not automatically abort a real provider workflow. The
-transfer preview contains `WARNING: Ingestion failed (...)`; the operator must
-decline unless URL-only analysis is acceptable. A report from that fallback is
-not described as source-grounded, and its metadata records
-`url-only-ingestion-failed`.
+On a real run, a clone failure emits `WARNING: Ingestion failed (...)` and the
+CLI exits before any provider call. The operator must fix ingestion and retry,
+or explicitly rerun with `--no-ingest` when URL-only analysis is acceptable.
+The `url-only-ingestion-failed` outcome is therefore available for diagnostics
+and dry runs; it is not a provider-backed fallback path for real runs.
 
 ## Grounding file-selection rules
 
@@ -155,7 +155,9 @@ service must be supplied through `local` and `--base-url`.
 
 ## Current limitations
 
-- The supported public interface is the CLI; there is no API server or library API.
+- The supported command interface is the CLI; there is no HTTP/API server. The
+  `WorkflowEngine` module is also a supported Python integration API for
+  workflow clients, as documented in the finding-driven workflow guide.
 - Private GitHub authentication is not configured by the project.
 - No clone cache or source-completeness guarantee exists.
 - Provider output and copied commands require operator review.

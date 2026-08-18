@@ -496,7 +496,7 @@ cell uses recalculated current `path:line` citations. Its fingerprint binds each
 finding to its citation coordinates and normalized cited-file content so line-
 ending conversion does not create drift while evidence or coordinate changes do.
 
-<!-- closure-evidence-sha256: 25948ca8c655b6e33d6ba5a72cb3d402bedf5082e12da9de7e09cff66ea03578 -->
+<!-- closure-evidence-sha256: eec57dd7c955bc4bfab0fe82b62a600f2e0a8b847bca67486385d5ff7ae2353f -->
 
 | Finding | Status | Current evidence | Verified resolution |
 |---|---|---|---|
@@ -505,7 +505,7 @@ ending conversion does not create drift while evidence or coordinate changes do.
 | DOC-003 | Closed | `docs/cli-reference.md:88-98`; `tests/test_cli.py:305-358` | Generated guidance places root format options before subcommands, and status/reset tests verify JSON events. |
 | DOC-004 | Closed | `pocarchitect/cli.py:1408-1420`; `pocarchitect/preflight.py:115-128`; `tests/test_cli.py:379-397` | Main resolves the report path before preflight, passes it through, and the standalone preflight accepts the same explicit output option. |
 | DOC-005 | Closed | `docs/architecture.md:37-41`; `tests/test_cli.py:400-419` | Current guidance says dry run bypasses all automatic preflight, and the CLI test proves the preflight callback is not invoked. |
-| DOC-006 | Closed | `docs/architecture.md:93-106`; `pocarchitect/cli.py:649-657`; `tests/test_cli.py:251-263` | Ingestion failures retain a visible warning, return an explicit URL-only outcome, and are documented as requiring operator rejection unless reduced context is acceptable. |
+| DOC-006 | Closed | `docs/architecture.md:93-106`; `pocarchitect/cli.py:1015-1022`; `tests/test_cli.py:380-399`; the CLI exits before any provider call | Ingestion failures retain a visible warning; operators may explicitly rerun with `--no-ingest` for URL-only analysis. |
 | DOC-007 | Closed | `docs/architecture.md:108-122`; `pocarchitect/cli.py:558-646` | The architecture lists every keyword, extension, byte threshold, character limit, file cap, and ordering/completeness boundary. |
 | DOC-008 | Closed | `pocarchitect/cli.py:1017-1041`; `docs/command-guide.md:246-256`; `tests/test_cli.py:53-94` | Batch processing still attempts later items but raises exit 1 after the summary when failures exist; docs and tests define the contract. |
 | DOC-009 | Closed | `pocarchitect/cli.py:972-985`; `tests/test_cli.py:97-133`; `verify.sh:53-59` | Dry run continues through every eligible item, the two-item behavior is tested, and the verifier uses a safe multi-item fixture. |

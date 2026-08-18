@@ -120,7 +120,8 @@ python -m pocarchitect --help | Select-Object -First 20
 | Windows PowerShell | CI-gated | The first-run matrix installs the wheel on Windows/Python 3.12 and runs the offline readiness gate. |
 | macOS | CI-gated | The first-run matrix installs the wheel on macOS/Python 3.12 and runs the offline readiness gate. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
-| Docker Desktop/Linux Docker | Validated in CI | CI builds the image and runs its `--help` smoke test; mount a writable host directory to `/reports` for reports. |
+| Linux Docker | Validated in CI | CI builds the image, runs its `--help` smoke test, and checks report persistence; mount a writable host directory to `/reports` for reports. |
+| Docker Desktop | Not separately validated | Native bind mounts, path conversion, TTY behavior, and provider-backed runs remain manual/best-effort. |
 | ARM64/Apple Silicon/Windows ARM | Not separately validated | The package is pure Python, but provider, Git, Docker, and local-model compatibility depends on the host; use `doctor` and `demo` after installation. |
 
 Python 3.10–3.13 are CI-supported. Python 3.14 is best-effort until it is
