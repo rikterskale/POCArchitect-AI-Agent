@@ -1,11 +1,22 @@
 import shutil
 import subprocess
+import os
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-BASH = shutil.which("bash")
+
+
+def _usable_bash() -> str | None:
+    """Ignore the Windows WSL launcher when no Bash runtime is installed."""
+    bash = shutil.which("bash")
+    if bash and os.name == "nt" and Path(bash).parent.name.lower() == "system32":
+        return None
+    return bash
+
+
+BASH = _usable_bash()
 
 
 def test_no_network_verifier_uses_offline_preflight_and_safe_batch_fixture():
