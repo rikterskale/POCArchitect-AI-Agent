@@ -27,6 +27,10 @@ class WorkflowError(ValueError):
     """Invalid command, transition, or persisted workflow state."""
 
 
+class WorkflowCommandError(WorkflowError):
+    """A command envelope is malformed or names an unsupported operation."""
+
+
 class FindingStatus(str, Enum):
     OPEN = "open"
     VALIDATED = "validated"
@@ -231,6 +235,9 @@ class WorkflowEngine:
             raise WorkflowError("Workflow must end with the archive step")
         if self.steps[-1].phase != WorkflowPhase.ARCHIVED:
             raise WorkflowError("Archive step must use the archived phase")
+
+    def _has_step(self, step_id: str) -> bool:
+        return any(step.id == step_id for step in self.steps)
 
     def _audit(self, event: str, **data: Any) -> None:
         self.state.audit_log.append({"at": _now(), "event": event, **data})
@@ -523,7 +530,11 @@ class WorkflowEngine:
         """
         if self.state.terminal:
             return
-        if self.state.current_step_id in {"report", "close"}:
+        # Custom products may omit a validation step, so never strand them by
+        # assigning an ID that is not present in their route.
+        if self.state.current_step_id in {"report", "close"} and self._has_step(
+            "validate"
+        ):
             previous = self.state.current_step_id
             self.state.current_step_id = "validate"
             self.state.current_phase = self._step("validate").phase
@@ -548,6 +559,87 @@ class WorkflowEngine:
             "plan-remediation",
             "verify-remediation",
         }
+
+    def can_complete(self, step_id: str | None = None) -> dict[str, Any]:
+        """Return the explainable gate result used by buttons and agents.
+
+        This is deliberately a read-only counterpart to ``complete_step``.
+        A client can render consequences before asking the user to commit.
+        """
+        target = step_id or self.state.current_step_id
+        self._step(target)
+        blockers = self.blockers(target)
+        if target != self.state.current_step_id:
+            blockers = [
+                f"Current step is {self.state.current_step_id}; use an override."
+            ] + blockers
+        return {"step_id": target, "allowed": not blockers, "blockers": blockers}
+
+    def next_recommendation(self) -> dict[str, Any]:
+        """Return the highest-value actionable recommendation.
+
+        The list returned by ``recommendations`` is useful for dashboards;
+        this helper is the stable contract for a single guided prompt.
+        """
+        recommendations = self.recommendations()
+        for item in recommendations:
+            if item.get("kind") not in {"progress", "finding"}:
+                return item
+        return recommendations[-1]
+
+    def apply(self, command: str, **payload: Any) -> Any:
+        """Apply a UI/agent command through one stable, auditable boundary.
+
+        Keeping this adapter in the domain layer prevents each front end from
+        re-implementing lifecycle and branching rules. Payload keys are
+        explicit and unexpected keys fail rather than being silently ignored.
+        """
+        handlers = {
+            "add_finding": self.add_finding,
+            "inject_finding": self.inject_finding,
+            "enrich_finding": self.enrich_finding,
+            "update_finding_status": self.update_finding_status,
+            "correlate": self.correlate,
+            "decide": self.decide,
+            "resolve_action": self.resolve_action,
+            "complete_step": self.complete_step,
+        }
+        handler = handlers.get(command)
+        if handler is None:
+            raise WorkflowCommandError(f"Unsupported workflow command: {command}")
+        try:
+            return handler(**payload)
+        except TypeError as exc:
+            raise WorkflowCommandError(
+                f"Invalid payload for workflow command {command}: {exc}"
+            ) from exc
+
+    def validate_integrity(self) -> list[str]:
+        """Return invariant violations without mutating state.
+
+        Persistence adapters and health checks can call this before accepting
+        a snapshot. The engine still raises on malformed commands; this method
+        is intended for diagnostics and migration tooling.
+        """
+        errors: list[str] = []
+        known_steps = {step.id for step in self.steps}
+        for step_id in set(self.state.completed_steps + self.state.skipped_steps):
+            if step_id not in known_steps:
+                errors.append(f"unknown recorded step: {step_id}")
+        if self.state.current_step_id not in known_steps:
+            errors.append(f"unknown current step: {self.state.current_step_id}")
+        for finding_id, finding in self.state.findings.items():
+            if finding.id != finding_id:
+                errors.append(f"finding key/id mismatch: {finding_id}")
+            for related_id in finding.related_finding_ids:
+                if related_id not in self.state.findings:
+                    errors.append(f"unknown related finding: {related_id}")
+        for action_id, action in self.state.pending_actions.items():
+            if action.id != action_id:
+                errors.append(f"action key/id mismatch: {action_id}")
+            if action.finding_id and action.finding_id not in self.state.findings:
+                errors.append(f"action references unknown finding: {action_id}")
+        return errors
 
     def blockers(self, step_id: str | None = None) -> list[str]:
         step_id = step_id or self.state.current_step_id

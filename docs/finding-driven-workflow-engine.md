@@ -24,6 +24,15 @@ engine.update_finding_status(finding.id, FindingStatus.VALIDATED, reason="Reprod
 
 `WorkflowState.open_findings` and `WorkflowState.open_actions` are derived query helpers. `snapshot()` includes those lists, current guidance, scores, and progress so a client never needs to reconstruct workflow rules locally.
 
+For product integration, `apply(command, **payload)` is the single command
+boundary. Supported commands are `add_finding`, `inject_finding`,
+`enrich_finding`, `update_finding_status`, `correlate`, `decide`,
+`resolve_action`, and `complete_step`. A UI or agent can call
+`can_complete(step_id)` to render blockers before committing and
+`next_recommendation()` to obtain the highest-value guided prompt. Unknown
+commands and malformed payloads fail with `WorkflowCommandError` instead of
+being silently ignored.
+
 ## Guided flow and branching
 
 The default route is scope → authorization → discovery → validation → impact → remediation planning → remediation verification → reporting → closure → archive. Authorization and scope decisions are explicit boolean decisions and are recorded with rationale and audit events.
@@ -50,6 +59,11 @@ These rules are intentionally small and inspectable. A future product can replac
 - Derived actions are reconciled, marked done rather than deleted, and retained in the audit-friendly state.
 - Repeated completion of archive is idempotent; once archived, further step mutations are rejected.
 - Every mutation is auditable, and JSON save/load preserves decisions, findings, histories, actions, skipped branches, and scores.
+- `validate_integrity()` gives persistence/migration jobs a non-mutating health
+  check for unknown steps, mismatched IDs, and dangling finding/action links.
+- Custom routes are allowed to omit optional finding phases without causing a
+  late finding to point at a nonexistent step; the default route retains the
+  full validation and treatment path.
 
 ## Product integration
 

@@ -8,6 +8,7 @@ from pocarchitect.finding_workflow import (
     FindingStatus,
     WorkflowEngine,
     WorkflowError,
+    WorkflowCommandError,
     WorkflowPhase,
 )
 
@@ -208,3 +209,26 @@ def test_query_rejects_invalid_filters():
         engine.query_findings(status="invalid")
     with pytest.raises(WorkflowError, match="Minimum"):
         engine.query_findings(min_severity=11)
+
+
+def test_command_boundary_and_preflight_gate_are_ui_agent_safe():
+    engine = WorkflowEngine()
+    gate = engine.can_complete("authorize")
+    assert gate["allowed"] is False
+    assert "Current step" in gate["blockers"][0]
+
+    engine.apply("decide", key="scope_defined", value=True)
+    engine.apply("complete_step", step_id="scope")
+    engine.apply("decide", key="authorized", value=True)
+    assert engine.next_recommendation()["step_id"] == "authorize"
+    with pytest.raises(WorkflowCommandError, match="Unsupported"):
+        engine.apply("not-a-command")
+
+
+def test_integrity_check_detects_corrupt_references_without_mutation():
+    engine = WorkflowEngine()
+    finding = engine.add_finding(title="Observation")
+    finding.related_finding_ids.append("missing")
+    errors = engine.validate_integrity()
+    assert "unknown related finding: missing" in errors
+    assert finding.related_finding_ids == ["missing"]
