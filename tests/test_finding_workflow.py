@@ -157,3 +157,54 @@ def test_invalid_status_is_reported_as_workflow_error():
 
     with pytest.raises(WorkflowError, match="Unknown finding status"):
         engine.update_finding_status(finding.id, "not-a-status")
+
+
+def test_initial_read_model_is_consistent_and_scope_can_be_confirmed_later():
+    engine = WorkflowEngine()
+    assert engine.state.current_phase == WorkflowPhase.SCOPE
+    assert engine.state.current_step_id == "scope"
+    engine.complete_step("scope")
+    with pytest.raises(WorkflowError, match="authorized"):
+        engine.complete_step("authorize")
+
+
+def test_enrichment_updates_scores_and_rejects_invalid_payload_without_partial_update():
+    engine = WorkflowEngine()
+    finding = engine.add_finding(title="Observation", severity=2, confidence=50)
+    with pytest.raises(WorkflowError, match="severity"):
+        engine.enrich_finding(finding.id, evidence=["evidence-a"], severity=11)
+    assert finding.evidence == []
+    engine.enrich_finding(
+        finding.id,
+        evidence=["evidence-a"],
+        severity=8,
+        confidence=100,
+        recommended_actions=["rotate credential"],
+        metadata={"asset": "api"},
+    )
+    assert engine.state.risk_score == 8.0
+    assert finding.recommended_actions == ["rotate credential"]
+    assert finding.metadata["asset"] == "api"
+
+
+def test_late_finding_reopens_report_route_and_requires_closure_approval():
+    engine = WorkflowEngine()
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+    engine.complete_step("discover")
+    engine.complete_step("report")
+    assert engine.state.current_step_id == "close"
+    finding = engine.inject_finding(title="Late observation", severity=5)
+    assert finding.id in engine.state.open_findings
+    assert engine.state.current_step_id == "validate"
+    assert any("closure_approved" in item for item in engine.blockers("close"))
+
+
+def test_query_rejects_invalid_filters():
+    engine = WorkflowEngine()
+    with pytest.raises(WorkflowError, match="Unknown finding status"):
+        engine.query_findings(status="invalid")
+    with pytest.raises(WorkflowError, match="Minimum"):
+        engine.query_findings(min_severity=11)

@@ -96,7 +96,9 @@ class WorkflowState:
 
     id: str = field(default_factory=lambda: f"workflow-{uuid.uuid4().hex[:12]}")
     version: int = 1
-    current_phase: WorkflowPhase = WorkflowPhase.INTAKE
+    # ``scope`` is the first actionable step.  Keeping the phase aligned with
+    # it avoids an impossible initial read-model (intake + scope).
+    current_phase: WorkflowPhase = WorkflowPhase.SCOPE
     current_step_id: str = "scope"
     completed_steps: list[str] = field(default_factory=list)
     skipped_steps: list[str] = field(default_factory=list)
@@ -218,7 +220,17 @@ class WorkflowEngine:
             raise WorkflowError(
                 f"Unknown current workflow step: {self.state.current_step_id}"
             )
+        self._validate_steps()
         self._recalculate()
+
+    def _validate_steps(self) -> None:
+        """Reject malformed custom routes before a user can get stranded."""
+        if any(not step.title.strip() or not step.explanation.strip() for step in self.steps):
+            raise WorkflowError("Every workflow step needs a title and explanation")
+        if self.steps[-1].id != "archive":
+            raise WorkflowError("Workflow must end with the archive step")
+        if self.steps[-1].phase != WorkflowPhase.ARCHIVED:
+            raise WorkflowError("Archive step must use the archived phase")
 
     def _audit(self, event: str, **data: Any) -> None:
         self.state.audit_log.append({"at": _now(), "event": event, **data})
@@ -325,6 +337,8 @@ class WorkflowEngine:
             raise WorkflowError(f"Unknown workflow step: {step_id}") from exc
 
     def add_finding(self, finding: Finding | None = None, **values: Any) -> Finding:
+        if self.state.terminal:
+            raise WorkflowError("Workflow is archived and cannot accept findings")
         finding = finding or Finding(**values)
         if finding.id in self.state.findings:
             raise WorkflowError(f"Finding already exists: {finding.id}")
@@ -335,6 +349,7 @@ class WorkflowEngine:
             title=finding.title,
             source=finding.source,
         )
+        self._reopen_for_new_finding()
         self._recalculate()
         return finding
 
@@ -345,12 +360,31 @@ class WorkflowEngine:
         evidence: Iterable[str] = (),
         tags: Iterable[str] = (),
         description: str | None = None,
+        severity: int | None = None,
+        confidence: int | None = None,
+        recommended_actions: Iterable[str] = (),
+        metadata: dict[str, Any] | None = None,
     ) -> Finding:
         finding = self._finding(finding_id)
+        if severity is not None and not 0 <= severity <= 10:
+            raise WorkflowError("Finding severity must be 0-10")
+        if confidence is not None and not 0 <= confidence <= 100:
+            raise WorkflowError("Finding confidence must be 0-100")
+        # Validate all scalar updates before changing any collection so a bad
+        # connector payload cannot leave a half-enriched finding behind.
         finding.evidence.extend(x for x in evidence if x not in finding.evidence)
         finding.tags.extend(x for x in tags if x not in finding.tags)
         if description is not None:
             finding.description = description
+        if severity is not None:
+            finding.severity = severity
+        if confidence is not None:
+            finding.confidence = confidence
+        finding.recommended_actions.extend(
+            x for x in recommended_actions if x not in finding.recommended_actions
+        )
+        if metadata:
+            finding.metadata.update(metadata)
         finding.updated_at = _now()
         finding.history.append({"at": finding.updated_at, "event": "enriched"})
         self._audit("finding.enriched", finding_id=finding_id)
@@ -479,6 +513,27 @@ class WorkflowEngine:
         self._recalculate()
         return next_id
 
+    def _reopen_for_new_finding(self) -> None:
+        """Re-enter finding work when a late observation changes the route.
+
+        This is deliberately conservative: an archived record is immutable,
+        while a non-terminal report/closure route can be reopened and audited.
+        The previously completed report remains historical; the route will
+        return to it after the new finding is treated.
+        """
+        if self.state.terminal:
+            return
+        if self.state.current_step_id in {"report", "close"}:
+            previous = self.state.current_step_id
+            self.state.current_step_id = "validate"
+            self.state.current_phase = self._step("validate").phase
+            self._audit(
+                "workflow.reopened",
+                reason="new finding requires treatment",
+                from_step=previous,
+                to_step="validate",
+            )
+
     def _next_step(self, step_id: str) -> str:
         index = next(i for i, step in enumerate(self.steps) if step.id == step_id)
         return self.steps[min(index + 1, len(self.steps) - 1)].id
@@ -500,6 +555,10 @@ class WorkflowEngine:
             return ["Record an authorized=true decision."]
         if step_id == "discover" and not self._decision("scope_defined"):
             return ["Record a scope_defined=true decision."]
+        if step_id == "validate" and any(
+            f.status == FindingStatus.OPEN for f in self.state.findings.values()
+        ):
+            return ["Validate or explicitly reject every open finding."]
         if step_id in {
             "assess-impact",
             "plan-remediation",
@@ -524,6 +583,11 @@ class WorkflowEngine:
             if incomplete:
                 return ["Resolve required finding actions: " + ", ".join(incomplete)]
         if step_id == "close":
+            # A no-finding assessment has no residual risk to approve.  A
+            # finding-bearing workflow always requires an explicit closure
+            # decision, including the rationale captured in its history.
+            if self.state.findings and not self._decision("closure_approved"):
+                return ["Record a closure_approved=true decision."]
             if any(
                 a.required and a.status != "done"
                 for a in self.state.pending_actions.values()
@@ -536,7 +600,12 @@ class WorkflowEngine:
         return []
 
     def _decision(self, key: str) -> bool:
-        return any(d["key"] == key and d["value"] is True for d in self.state.decisions)
+        # Decisions are historical, but the latest one is authoritative.  This
+        # allows a user to correct a prior choice without corrupting the audit.
+        for decision in reversed(self.state.decisions):
+            if decision.get("key") == key:
+                return decision.get("value") is True
+        return False
 
     def _finding(self, finding_id: str) -> Finding:
         if finding_id not in self.state.findings:
@@ -626,10 +695,16 @@ class WorkflowEngine:
         min_severity: int = 0,
         tag: str | None = None,
     ) -> list[Finding]:
+        try:
+            normalized_status = None if status is None else FindingStatus(status)
+        except ValueError as exc:
+            raise WorkflowError(f"Unknown finding status: {status}") from exc
+        if not 0 <= min_severity <= 10:
+            raise WorkflowError("Minimum finding severity must be 0-10")
         return [
             f
             for f in self.state.findings.values()
-            if (status is None or f.status == FindingStatus(status))
+            if (normalized_status is None or f.status == normalized_status)
             and f.severity >= min_severity
             and (tag is None or tag in f.tags)
         ]
