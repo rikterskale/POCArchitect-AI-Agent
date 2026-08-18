@@ -105,7 +105,7 @@ Enforced checks:
   saved report with faithful metadata, and `--open` drives the viewer path.
 
 Because the gate reads the command surface from the CLI's own metadata, a new
-command that ships without validation and documentation trips Pillars 3 and 5.
+command that ships without validation and documentation trips Pillars 3 and 6.
 
 ### Option coverage, enforced
 
@@ -138,7 +138,35 @@ Enforced checks:
 
 ---
 
-## Pillar 5 — Documentation
+## Pillar 5 — Guided workflow
+
+**Standard:** A user can start from an empty workflow, follow the guided
+recommendations, inject observations, branch on findings, recover from a
+failed command, resume persisted work, and reach definitive archive without a
+dead end.
+
+Enforced checks:
+
+- Empty state exposes scope as the next actionable step and authorization
+  decisions unlock discovery.
+- Finding injection updates open findings, risk, priority, derived actions,
+  and the next recommendation.
+- Invalid commands roll back atomically without losing user work.
+- The finding lifecycle reaches validated, exploited, mitigated, and closed;
+  required impact/remediation/verification actions are enforced.
+- Empty discovery safely skips finding-specific phases and reaches reporting.
+- Late findings reopen treatment while preserving completed history.
+- Saved state reloads with findings, audit history, and guidance intact, then
+  reaches closure and archive with 100% progress.
+- False positives and accepted exceptions use the rationale-required waiver
+  path and do not strand closure.
+
+This pillar is deterministic and provider-free. It exercises the public
+`WorkflowEngine.apply()`, `snapshot()`, `recommendations()`, `save()`, and
+`load()` contracts, so the same checks apply to source and clean artifact
+installs.
+
+## Pillar 6 — Documentation
 
 **Standard:** The documentation a new user relies on is present, current, and
 consistent with the actual command surface.

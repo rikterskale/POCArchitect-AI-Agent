@@ -1,7 +1,7 @@
 """Run the new-user release readiness gate as part of the test suite.
 
 The gate script (`scripts/release_readiness.py`) is the single source of truth
-for the five-pillar standard. This test drives it end to end so the standard is
+for the six-pillar standard. This test drives it end to end so the standard is
 enforced locally and in CI, not just in the dedicated wheel-install CI job.
 """
 
@@ -87,7 +87,7 @@ def test_release_readiness_gate_passes(gate_report):
 
 
 @pytest.mark.readiness
-def test_release_readiness_reports_all_five_pillars(gate_report):
+def test_release_readiness_reports_all_six_pillars(gate_report):
     _, report = gate_report
     keys = {pillar["key"] for pillar in report["pillars"]}
     assert keys == {
@@ -96,4 +96,5 @@ def test_release_readiness_reports_all_five_pillars(gate_report):
         "features",
         "recovery",
         "documentation",
+        "guided-workflow",
     }

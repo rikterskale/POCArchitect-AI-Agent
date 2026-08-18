@@ -9,7 +9,9 @@ is unmet:
   2. Guided troubleshooting   — every failure carries an actionable fix.
   3. Full feature validation  — each command/journey behaves as documented.
   4. Tested recovery paths     — batch resume, corruption, and reset work.
-  5. Documentation             — generated docs, links, guides, and command
+  5. Guided workflow            — finding-driven lifecycle, branching,
+                                 recommendations, persistence, and closure.
+  6. Documentation             — generated docs, links, guides, and command
                                  coverage are current and complete.
 
 Run it against an *installed* package (ideally from a built wheel in a clean
@@ -846,7 +848,7 @@ def pillar_recovery(work: Path) -> Pillar:
     return p
 
 
-# ── Pillar 5: Documentation ──────────────────────────────────────────────────
+# ── Pillar 6: Documentation ──────────────────────────────────────────────────
 def _run_script(rel: str, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(ROOT / rel), *args],
@@ -858,6 +860,188 @@ def _run_script(rel: str, *args: str) -> subprocess.CompletedProcess[str]:
         timeout=120,
         check=False,
     )
+
+
+def pillar_guided_workflow(work: Path) -> Pillar:
+    """Exercise the public finding-workflow journey from scope to archive."""
+    p = Pillar("guided-workflow", "Guided workflow")
+
+    from pocarchitect.finding_workflow import (
+        FindingStatus,
+        WorkflowEngine,
+        WorkflowError,
+    )
+
+    engine = WorkflowEngine()
+    initial = engine.snapshot()
+    p.record(
+        "Workflow starts with an actionable empty state",
+        initial["phase"] == "scope"
+        and initial["step_id"] == "scope"
+        and initial["progress_percent"] == 0.0
+        and initial["recommendations"]
+        and initial["recommendations"][0]["kind"] == "step",
+    )
+
+    engine.apply("decide", key="scope_defined", value=True)
+    engine.apply("complete_step", step_id="scope")
+    engine.apply("decide", key="authorized", value=True)
+    engine.apply("complete_step", step_id="authorize")
+    p.record(
+        "Scope and authorization decisions unlock discovery",
+        engine.state.current_step_id == "discover"
+        and engine.can_complete("discover")["allowed"],
+    )
+
+    finding = engine.apply(
+        "inject_finding",
+        title="Guided workflow test finding",
+        description="Deterministic readiness finding",
+        severity=8,
+        confidence=90,
+        tags=["readiness"],
+        evidence=["synthetic-evidence"],
+        recommended_actions=["rotate-test-secret"],
+    )
+    finding_id = finding.id
+    injected = engine.snapshot()
+    p.record(
+        "Finding injection updates state, risk, actions, and guidance",
+        finding_id in injected["open_findings"]
+        and injected["risk_score"] == 7.2
+        and f"validate:{finding_id}" in injected["pending_actions"]
+        and any(
+            item.get("finding_id") == finding_id
+            and item.get("next") == "validate"
+            for item in injected["recommendations"]
+        ),
+    )
+
+    before = engine.snapshot()
+    try:
+        engine.apply(
+            "enrich_finding",
+            finding_id=finding_id,
+            evidence=["must-rollback"],
+            severity=11,
+        )
+        rollback_ok = False
+    except WorkflowError:
+        rollback_ok = engine.snapshot() == before
+    p.record(
+        "Invalid guided commands fail atomically without losing user work",
+        rollback_ok,
+    )
+
+    engine.apply("complete_step", step_id="discover")
+    engine.apply(
+        "update_finding_status",
+        finding_id=finding_id,
+        status=FindingStatus.VALIDATED,
+    )
+    engine.apply("resolve_action", action_id=f"impact:{finding_id}")
+    engine.apply(
+        "update_finding_status",
+        finding_id=finding_id,
+        status=FindingStatus.EXPLOITED,
+    )
+    p.record(
+        "Finding lifecycle changes drive exploitability and priority",
+        engine.state.findings[finding_id].status == FindingStatus.EXPLOITED
+        and engine.state.priority_score == 9.0
+        and engine.next_recommendation().get("kind") in {"remediate", "step"},
+    )
+
+    engine.apply("complete_step", step_id="validate")
+    engine.apply("complete_step", step_id="assess-impact")
+    engine.apply("complete_step", step_id="plan-remediation")
+    engine.apply("resolve_action", action_id=f"remediate:{finding_id}")
+    engine.apply(
+        "update_finding_status",
+        finding_id=finding_id,
+        status=FindingStatus.MITIGATED,
+    )
+    engine.apply("resolve_action", action_id=f"verify:{finding_id}")
+    engine.apply(
+        "update_finding_status",
+        finding_id=finding_id,
+        status=FindingStatus.CLOSED,
+    )
+    engine.apply("complete_step", step_id="verify-remediation")
+    p.record(
+        "Mitigation verification and closure clear required finding work",
+        not engine.state.open_findings
+        and not engine.state.open_actions
+        and engine.state.priority_score == 0.0,
+    )
+
+    save_path = work / "guided-workflow.json"
+    engine.apply("complete_step", step_id="report")
+    engine.save(save_path)
+    resumed = WorkflowEngine.load(save_path)
+    resume_ok = (
+        resumed.state.current_step_id == "close"
+        and resumed.snapshot()["findings"][finding_id]["status"] == "closed"
+        and resumed.snapshot()["audit_log"]
+    )
+    resumed.apply("decide", key="closure_approved", value=True)
+    resumed.apply("complete_step", step_id="close")
+    resumed.apply("complete_step", step_id="archive")
+    p.record(
+        "Persisted state resumes to definitive closure and archival",
+        resume_ok
+        and resumed.state.terminal
+        and resumed.state.progress_percent == 100.0,
+    )
+
+    empty = WorkflowEngine()
+    empty.apply("decide", key="scope_defined", value=True)
+    empty.apply("complete_step", step_id="scope")
+    empty.apply("decide", key="authorized", value=True)
+    empty.apply("complete_step", step_id="authorize")
+    empty.apply("complete_step", step_id="discover")
+    skipped = set(empty.state.skipped_steps)
+    p.record(
+        "Empty discovery safely branches to reporting",
+        empty.state.current_step_id == "report"
+        and {"validate", "assess-impact", "plan-remediation", "verify-remediation"}
+        <= skipped,
+    )
+
+    late = WorkflowEngine()
+    late.apply("decide", key="scope_defined", value=True)
+    late.apply("complete_step", step_id="scope")
+    late.apply("decide", key="authorized", value=True)
+    late.apply("complete_step", step_id="authorize")
+    late.apply("complete_step", step_id="discover")
+    late.apply("complete_step", step_id="report")
+    late_finding = late.apply("inject_finding", title="Late observation", severity=4)
+    p.record(
+        "Late findings reopen treatment without rewinding history",
+        late.state.current_step_id == "validate"
+        and "report" in late.state.completed_steps
+        and late_finding.id in late.state.open_findings,
+    )
+
+    waived = WorkflowEngine()
+    waived_finding = waived.apply(
+        "inject_finding", title="Accepted test exception", severity=6
+    )
+    waived.apply(
+        "waive_finding",
+        finding_id=waived_finding.id,
+        rationale="Synthetic test asset is explicitly out of scope.",
+    )
+    p.record(
+        "False positives and accepted exceptions have a guided waiver path",
+        waived_finding.status == FindingStatus.WAIVED
+        and waived_finding.id not in waived.state.open_findings
+        and any(
+            event.get("event") == "finding.waived"
+            for event in waived.state.audit_log
+        ),
+    )
+    return p
 
 
 def pillar_documentation() -> Pillar:
@@ -899,6 +1083,7 @@ def collect(work: Path, require_console_script: bool = False) -> list[Pillar]:
         pillar_troubleshooting(work),
         pillar_features(work),
         pillar_recovery(work),
+        pillar_guided_workflow(work),
         pillar_documentation(),
     ]
 
