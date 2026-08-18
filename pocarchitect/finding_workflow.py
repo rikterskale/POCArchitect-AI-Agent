@@ -69,11 +69,14 @@ class Finding:
     history: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        if not self.title.strip():
+        if not isinstance(self.title, str) or not self.title.strip():
             raise WorkflowError("Finding title is required")
         if not 0 <= self.severity <= 10 or not 0 <= self.confidence <= 100:
             raise WorkflowError("Finding severity must be 0-10 and confidence 0-100")
-        self.status = FindingStatus(self.status)
+        try:
+            self.status = FindingStatus(self.status)
+        except ValueError as exc:
+            raise WorkflowError(f"Unknown finding status: {self.status}") from exc
 
 
 @dataclass
@@ -107,6 +110,24 @@ class WorkflowState:
     mode: str = "interactive"
     terminal: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def open_findings(self) -> list[str]:
+        """IDs of findings that still require a decision or treatment."""
+        return [
+            finding_id
+            for finding_id, finding in self.findings.items()
+            if finding.status != FindingStatus.CLOSED
+        ]
+
+    @property
+    def open_actions(self) -> list[str]:
+        """IDs of required actions that have not been resolved."""
+        return [
+            action_id
+            for action_id, action in self.pending_actions.items()
+            if action.required and action.status == "pending"
+        ]
 
 
 @dataclass(frozen=True)
@@ -189,6 +210,10 @@ class WorkflowEngine:
     ):
         self.state = state or WorkflowState()
         self.steps = tuple(steps)
+        if not self.steps or len({step.id for step in self.steps}) != len(self.steps):
+            raise WorkflowError("Workflow must define one or more uniquely identified steps")
+        if self.state.current_step_id not in {step.id for step in self.steps}:
+            raise WorkflowError(f"Unknown current workflow step: {self.state.current_step_id}")
         self._recalculate()
 
     def _audit(self, event: str, **data: Any) -> None:
@@ -218,6 +243,8 @@ class WorkflowEngine:
             / len(self.steps),
             1,
         )
+        if self.state.terminal:
+            self.state.progress_percent = 100.0
         # Keep derived required actions coherent after every command.
         for finding in findings:
             if finding.status == FindingStatus.OPEN:
@@ -335,7 +362,10 @@ class WorkflowEngine:
         self, finding_id: str, status: FindingStatus, *, reason: str = ""
     ) -> Finding:
         finding = self._finding(finding_id)
-        status = FindingStatus(status)
+        try:
+            status = FindingStatus(status)
+        except ValueError as exc:
+            raise WorkflowError(f"Unknown finding status: {status}") from exc
         previous = finding.status
         allowed = {
             FindingStatus.OPEN: {FindingStatus.VALIDATED},
@@ -375,6 +405,7 @@ class WorkflowEngine:
             {"key": key, "value": value, "rationale": rationale, "at": _now()}
         )
         self._audit("decision.recorded", key=key, value=value, rationale=rationale)
+        self._recalculate()
 
     def correlate(self, finding_id: str, related_finding_ids: Iterable[str]) -> Finding:
         finding = self._finding(finding_id)
@@ -388,12 +419,15 @@ class WorkflowEngine:
             finding_id=finding_id,
             related_finding_ids=finding.related_finding_ids,
         )
+        self._recalculate()
         return finding
 
     def resolve_action(self, action_id: str, *, note: str = "") -> None:
         action = self.state.pending_actions.get(action_id)
         if action is None:
             raise WorkflowError(f"Unknown action: {action_id}")
+        if action.status == "done":
+            return
         action.status = "done"
         self._audit("action.completed", action_id=action_id, note=note)
         self._recalculate()
@@ -403,8 +437,14 @@ class WorkflowEngine:
     ) -> str:
         step_id = step_id or self.state.current_step_id
         self._step(step_id)
+        if self.state.terminal and step_id != "archive":
+            raise WorkflowError("Workflow is archived and cannot accept more steps")
         if step_id in self.state.completed_steps:
-            return self._next_step(step_id)
+            if step_id == "archive":
+                self.state.terminal = True
+                self.state.current_phase = WorkflowPhase.ARCHIVED
+                self._recalculate()
+            return self.state.current_step_id
         if step_id != self.state.current_step_id and not override:
             raise WorkflowError(
                 f"Current step is {self.state.current_step_id}; use override for out-of-order completion"
@@ -428,7 +468,10 @@ class WorkflowEngine:
             next_id = self._next_step(next_id)
         self.state.current_step_id = next_id
         self.state.current_phase = self._step(next_id).phase
-        self.state.terminal = next_id == "archive" and step_id == "archive"
+        self.state.terminal = step_id == "archive"
+        if self.state.terminal:
+            self.state.current_step_id = "archive"
+            self.state.current_phase = WorkflowPhase.ARCHIVED
         self._recalculate()
         return next_id
 
@@ -515,6 +558,23 @@ class WorkflowEngine:
         for action in self.state.pending_actions.values():
             if action.status == "pending":
                 result.append({"kind": action.kind, **asdict(action)})
+        if self.state.findings:
+            for finding in sorted(
+                self.state.findings.values(),
+                key=lambda item: (item.status == FindingStatus.CLOSED, -item.severity),
+            ):
+                if finding.status != FindingStatus.CLOSED:
+                    result.append(
+                        {
+                            "kind": "finding",
+                            "finding_id": finding.id,
+                            "title": finding.title,
+                            "status": finding.status.value,
+                            "severity": finding.severity,
+                            "confidence": finding.confidence,
+                            "next": self._finding_next_action(finding),
+                        }
+                    )
         result.append(
             {
                 "kind": "progress",
@@ -528,6 +588,32 @@ class WorkflowEngine:
         if not result:
             result.append({"kind": "complete", "title": "No action is pending."})
         return result
+
+    def _finding_next_action(self, finding: Finding) -> str:
+        return {
+            FindingStatus.OPEN: "validate",
+            FindingStatus.VALIDATED: "assess-impact",
+            FindingStatus.EXPLOITED: "plan-remediation",
+            FindingStatus.MITIGATED: "verify-remediation",
+            FindingStatus.CLOSED: "none",
+        }[finding.status]
+
+    def snapshot(self) -> dict[str, Any]:
+        """Return a UI/agent-safe read model without exposing mutable objects."""
+        return {
+            "workflow_id": self.state.id,
+            "phase": self.state.current_phase.value,
+            "step_id": self.state.current_step_id,
+            "completed_steps": list(self.state.completed_steps),
+            "skipped_steps": list(self.state.skipped_steps),
+            "open_findings": self.state.open_findings,
+            "pending_actions": self.state.open_actions,
+            "progress_percent": self.state.progress_percent,
+            "risk_score": self.state.risk_score,
+            "priority_score": self.state.priority_score,
+            "terminal": self.state.terminal,
+            "recommendations": self.recommendations(),
+        }
 
     def query_findings(
         self,

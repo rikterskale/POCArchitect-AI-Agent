@@ -120,3 +120,38 @@ def test_override_requires_explanation_and_progress_is_recommendable():
     with pytest.raises(WorkflowError, match="rationale"):
         engine.complete_step("scope", override=True)
     assert any(item["kind"] == "progress" for item in engine.recommendations())
+
+
+def test_snapshot_is_a_complete_guidance_read_model():
+    engine = WorkflowEngine()
+    finding = engine.inject_finding(title="User observation", severity=6, confidence=100)
+
+    snapshot = engine.snapshot()
+
+    assert snapshot["workflow_id"] == engine.state.id
+    assert finding.id in snapshot["open_findings"]
+    assert f"validate:{finding.id}" in snapshot["pending_actions"]
+    assert snapshot["recommendations"]
+    assert snapshot["terminal"] is False
+
+
+def test_archive_is_idempotently_terminal_and_rejects_future_mutation():
+    engine = WorkflowEngine()
+    engine.state.completed_steps = [step.id for step in engine.steps[:-1]]
+    engine.state.current_step_id = "archive"
+    engine.state.current_phase = WorkflowPhase.ARCHIVED
+
+    engine.complete_step("archive")
+    assert engine.state.terminal is True
+    assert engine.state.progress_percent == 100.0
+    engine.complete_step("archive")
+    with pytest.raises(WorkflowError, match="archived"):
+        engine.complete_step("report", override=True, rationale="late edit")
+
+
+def test_invalid_status_is_reported_as_workflow_error():
+    engine = WorkflowEngine()
+    finding = engine.add_finding(title="Malformed input")
+
+    with pytest.raises(WorkflowError, match="Unknown finding status"):
+        engine.update_finding_status(finding.id, "not-a-status")
