@@ -247,9 +247,7 @@ class WorkflowEngine:
                         finding.id,
                         "Material finding requires treatment.",
                     )
-            elif (
-                finding.status == FindingStatus.MITIGATED
-            ):
+            elif finding.status == FindingStatus.MITIGATED:
                 self._ensure_action(
                     f"verify:{finding.id}",
                     "Verify remediation",
@@ -263,15 +261,18 @@ class WorkflowEngine:
             if action.finding_id and action.finding_id in self.state.findings:
                 status = self.state.findings[action.finding_id].status
                 obsolete = (
-                    action.kind == "validate" and status != FindingStatus.OPEN
-                ) or (
-                    action.kind == "impact"
-                    and status
-                    not in (FindingStatus.VALIDATED, FindingStatus.EXPLOITED)
-                ) or (
-                    action.kind == "remediate"
-                    and status in (FindingStatus.MITIGATED, FindingStatus.CLOSED)
-                ) or (action.kind == "verify" and status == FindingStatus.CLOSED)
+                    (action.kind == "validate" and status != FindingStatus.OPEN)
+                    or (
+                        action.kind == "impact"
+                        and status
+                        not in (FindingStatus.VALIDATED, FindingStatus.EXPLOITED)
+                    )
+                    or (
+                        action.kind == "remediate"
+                        and status in (FindingStatus.MITIGATED, FindingStatus.CLOSED)
+                    )
+                    or (action.kind == "verify" and status == FindingStatus.CLOSED)
+                )
                 if obsolete:
                     action.status = "done"
         for action_id, action in list(self.state.pending_actions.items()):
@@ -421,7 +422,9 @@ class WorkflowEngine:
         while next_id != step_id and self._should_skip(next_id):
             if next_id not in self.state.skipped_steps:
                 self.state.skipped_steps.append(next_id)
-                self._audit("step.skipped", step_id=next_id, reason="finding-driven branch")
+                self._audit(
+                    "step.skipped", step_id=next_id, reason="finding-driven branch"
+                )
             next_id = self._next_step(next_id)
         self.state.current_step_id = next_id
         self.state.current_phase = self._step(next_id).phase

@@ -80,9 +80,12 @@ def test_empty_scope_takes_a_safe_branch_to_report_and_archive():
     engine.decide("authorized", True)
     engine.complete_step("authorize")
     assert engine.complete_step("discover") == "report"
-    assert {"validate", "assess-impact", "plan-remediation", "verify-remediation"}.issubset(
-        set(engine.state.skipped_steps)
-    )
+    assert {
+        "validate",
+        "assess-impact",
+        "plan-remediation",
+        "verify-remediation",
+    }.issubset(set(engine.state.skipped_steps))
     engine.complete_step("report")
     engine.complete_step("close")
     engine.complete_step("archive")
