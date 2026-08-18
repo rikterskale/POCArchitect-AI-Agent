@@ -391,7 +391,7 @@ def doctor(
 @app.command("demo")
 def demo() -> None:
     """Generate a local demo report without credentials, network, or provider cost."""
-    output_dir = Path.cwd() / "reports" / "demo"
+    output_dir = default_output_dir() / "demo"
     with demo_provider() as base_url:
         run_preflight(
             provider="local",

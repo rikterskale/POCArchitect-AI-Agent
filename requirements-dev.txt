@@ -1,9 +1,9 @@
 # requirements-dev.txt – dev dependencies
 -r requirements.txt
-pytest==8.4.1
+pytest==9.0.3
 pytest-cov==6.2.1
 ruff==0.15.9
-black==25.1.0
+black==26.3.1
 mypy==1.15.0
 pip-audit==2.7.3
 bandit==1.8.3
