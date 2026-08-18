@@ -11,14 +11,14 @@ keywords = ["red-team", "pentesting", "poc", "exploit-development", "ai-agent", 
 dependencies = [
     "typer==0.23.1",      # [all] brings shell completion support
     "click==8.3.3",
-    "rich>=13.7.0",
-    "openai>=1.35.0",
-    "python-dotenv>=1.0.0",
-    "tenacity>=9.0.0",
+    "rich==15.0.0",
+    "openai==3.1.0",
+    "python-dotenv==1.2.2",
+    "tenacity==9.1.4",
 ]
 
 [project.optional-dependencies]
-all = []   # kept for future extras / compatibility with Dockerfile/docs
+all = []   # compatibility extra; core runtime features are included by default
 
 [project.scripts]
 pocarchitect = "pocarchitect.cli:app"

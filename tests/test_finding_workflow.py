@@ -309,7 +309,12 @@ def test_command_boundary_rolls_back_failed_mutation():
     before = engine.snapshot()
 
     with pytest.raises(WorkflowError, match="severity"):
-        engine.apply("enrich_finding", finding_id=finding.id, evidence=["must-rollback"], severity=11)
+        engine.apply(
+            "enrich_finding",
+            finding_id=finding.id,
+            evidence=["must-rollback"],
+            severity=11,
+        )
 
     assert engine.snapshot() == before
 

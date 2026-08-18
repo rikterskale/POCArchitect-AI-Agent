@@ -29,6 +29,12 @@ The Dockerfile uses a multi-stage build and runs the final container as the non-
 docker run --rm pocarchitect:latest --help
 ```
 
+PowerShell uses the same help command:
+
+```powershell
+docker run --rm pocarchitect:latest --help
+```
+
 ### Safe first run
 
 Run this from the repository root after building the image:
@@ -40,6 +46,14 @@ docker run --rm pocarchitect:latest \
 ```
 
 This does not clone the URL, call a provider, require a key, or write a report. A successful run prints `DRY RUN MODE` and the prompt.
+
+PowerShell:
+
+```powershell
+docker run --rm pocarchitect:latest `
+  --url https://github.com/example/poc `
+  --no-ingest --dry-run --no-color
+```
 
 ### Interactive cloud-provider run
 
@@ -54,6 +68,16 @@ docker run --rm -it \
 ```
 
 The command creates a report in the mounted host `reports/` folder only after the provider call succeeds. Do not put a provider key directly on a command line; `--env-file .env` keeps it out of shell history.
+
+On PowerShell, use `${PWD}` for the current directory:
+
+```powershell
+docker run --rm -it `
+  -v "${PWD}\reports:/reports" `
+  --env-file .env `
+  pocarchitect:latest `
+  --url <AUTHORIZED_GITHUB_URL> --provider xai
+```
 
 ### Using a `.env` File (Cleanest)
 

@@ -12,6 +12,8 @@ credentials on a command line or commit `.env`.
 | Inspect effective masked configuration | `pocarchitect config` |
 | Show CLI help | `python -m pocarchitect --help` |
 | Verify installation without provider access | `python -m pocarchitect preflight --offline` |
+| Diagnose installation and provider readiness | `python -m pocarchitect --format json --no-color doctor --offline` |
+| Generate a no-cost end-to-end demo report | `python -m pocarchitect --format json --no-color demo` |
 | Verify a custom report path | `python -m pocarchitect preflight --offline --output-dir <PATH>` |
 | Safely inspect a prompt | `python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run` |
 | Analyze one authorized URL | `python -m pocarchitect --url <AUTHORIZED_URL> --provider <PROVIDER>` |
@@ -43,6 +45,11 @@ python3 -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -e '.[all]'
 ```
+
+Use `python -m pip install .` for a non-editable local install. The current
+project release is distributed through repository artifacts rather than a
+guaranteed PyPI package. Runtime dependencies are pinned in `pyproject.toml`
+and `requirements.txt` for reproducible clean installs.
 
 Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. The
 first-run matrix installs release artifacts and runs the offline readiness gate
@@ -114,6 +121,16 @@ checks that same directory. Without an override, `/reports` is selected when
 dependencies, Git, credentials, the prompt, or output writes are ready. Run the
 standalone offline command above when those checks are needed.
 
+For a single consolidated diagnostic, use:
+
+```bash
+python -m pocarchitect --format json --no-color doctor --offline
+python -m pocarchitect --format json --no-color doctor --provider local --base-url http://localhost:11434/v1
+```
+
+The first command is credential-free. The second also checks the selected local
+endpoint's `/models` path.
+
 Cloud-provider preflight checks the key for the selected provider:
 
 ```bash
@@ -165,6 +182,16 @@ the preview for `WARNING: Ingestion failed`. A failed GitHub clone falls back to
 warning/URL-only context and can still reach the provider after approval; cancel
 unless URL-only analysis is acceptable. Successful report metadata records
 `url-only-ingestion-failed`, not a successful clone.
+
+### Credential-free end-to-end demo
+
+```bash
+python -m pocarchitect --format json --no-color demo
+```
+
+This exercises preflight, local-provider routing, report generation, and report
+writing through a temporary in-process mock. It creates a demonstration report
+under `reports/demo/` and makes no network or billable provider request.
 
 `--url owner/repository` expands to the corresponding GitHub URL. Malformed
 GitHub repository shapes fail early. Interactive text runs show a spinner while

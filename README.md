@@ -14,6 +14,7 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Batch mode (`--batch batch_urls.txt`) with a live progress bar and ETA
 - Operator controls: `--risk-level`, `--target-os`, `--include-mitigations/--no-mitigations`, `--no-ingest`
 - Provider-aware preflight checks with actionable fix hints; `--dry-run` bypasses automatic preflight entirely
+- `doctor` installation/provider diagnosis and a credential-free `demo` report
 - Ingestion preview with a rough cost estimate before any provider call
 - Cloud providers (`xai`, `openai`, `groq`) and a local OpenAI-compatible endpoint (`local`)
 - Docker image with a writable `/reports` volume
@@ -21,6 +22,17 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Reports print their absolute path with an optional `--open`, plus a short preview
 - Finding-driven workflow kernel with resumable guided state, lifecycle gates, and audited recommendations
 - Shell completion (`--install-completion`), `--dry-run` (summary, or `--full`), and `--verbose`
+
+## Feature status
+
+| Capability | Status | Extra setup |
+|---|---|---|
+| Safe dry run, preflight, doctor, demo | Stable | None |
+| Cloud providers (`xai`, `openai`, `groq`) | Stable | Provider key and network access |
+| Local OpenAI-compatible provider | Stable integration boundary | Running endpoint and compatible model |
+| GitHub grounding and batch recovery | Stable | Public authorized repositories; Git |
+| Finding-driven workflow kernel | Stable library capability | Integrate through the documented workflow API |
+| ARM64/Apple Silicon/Windows ARM | Experimental/untested | Validate Git, Docker, and local-provider compatibility on the host |
 
 ## Start here
 
@@ -35,10 +47,10 @@ pocarchitect setup
 From the repository root, a safe first run is:
 
 ```bash
-python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --format json --no-color
+python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color
 ```
 
-This command does not clone the example repository, contact an LLM provider, create a report, or require a credential. It prints JSON Lines events ending with `"event": "dry_run"`.
+This command does not clone the example repository, contact an LLM provider, create a report, or require a credential. It prints a compact summary. Add `--format json` for machine-readable events or `--full` to inspect the complete prompt.
 
 For installation and an offline readiness check, follow the guide or run:
 
@@ -46,6 +58,11 @@ For installation and an offline readiness check, follow the guide or run:
 python -m pip install -e ".[all]"
 python -m pocarchitect preflight --offline --format json --no-color
 ```
+
+For a non-editable local install, use `python -m pip install .`. Release CI
+builds a wheel and source distribution. This repository does not currently
+promise a PyPI publication; use a project release artifact or source checkout
+until a registry install command is published.
 
 `preflight --offline` verifies Python, the five declared runtime imports, a
 runnable Git executable, the package entry point, the prompt asset, and the
@@ -63,6 +80,7 @@ does not test chat completions or model suitability.
 | macOS | CI-gated | The first-run matrix installs the wheel on macOS/Python 3.12 and runs the offline readiness gate. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
 | Docker Desktop/Linux Docker | Validated in CI | CI builds the image and runs its `--help` smoke test; mount a writable host directory to `/reports` for reports. |
+| ARM64/Apple Silicon/Windows ARM | Not separately validated | The package is pure Python, but provider, Git, Docker, and local-model compatibility depends on the host; use `doctor` and `demo` after installation. |
 
 ## Batch progress and recovery
 
@@ -116,6 +134,17 @@ Full help:
 ```bash
 pocarchitect --help
 ```
+
+Useful no-cost diagnostics:
+
+```bash
+python -m pocarchitect --format json --no-color doctor --offline
+python -m pocarchitect --format json --no-color demo
+```
+
+`doctor` checks the installation and selected provider readiness. `demo` starts
+a temporary local OpenAI-compatible endpoint and writes a real Markdown report
+under `reports/demo/`; it requires no credentials, network, or provider spend.
 
 The CLI reference is generated from Typer/Click metadata. The configuration
 reference imports provider maps and defaults from `pocarchitect/config.py`;

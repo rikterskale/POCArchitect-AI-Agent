@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 def _now() -> str:
@@ -231,7 +231,10 @@ class WorkflowEngine:
 
     def _validate_steps(self) -> None:
         """Reject malformed custom routes before a user can get stranded."""
-        if any(not step.title.strip() or not step.explanation.strip() for step in self.steps):
+        if any(
+            not step.title.strip() or not step.explanation.strip()
+            for step in self.steps
+        ):
             raise WorkflowError("Every workflow step needs a title and explanation")
         if self.steps[-1].id != "archive":
             raise WorkflowError("Workflow must end with the archive step")
@@ -546,7 +549,9 @@ class WorkflowEngine:
         # route may advance; if it completes a prior step, retain the current
         # position and continue from there.
         current_index = next(
-            i for i, item in enumerate(self.steps) if item.id == self.state.current_step_id
+            i
+            for i, item in enumerate(self.steps)
+            if item.id == self.state.current_step_id
         )
         completed_index = next(
             i for i, item in enumerate(self.steps) if item.id == step_id
@@ -636,7 +641,7 @@ class WorkflowEngine:
         re-implementing lifecycle and branching rules. Payload keys are
         explicit and unexpected keys fail rather than being silently ignored.
         """
-        handlers = {
+        handlers: dict[str, Callable[..., Any]] = {
             "add_finding": self.add_finding,
             "inject_finding": self.inject_finding,
             "enrich_finding": self.enrich_finding,
@@ -704,13 +709,18 @@ class WorkflowEngine:
             f.status == FindingStatus.OPEN for f in self.state.findings.values()
         ):
             return ["Validate or explicitly reject every open finding."]
-        if step_id in {
-            "assess-impact",
-            "plan-remediation",
-            "verify-remediation",
-            "report",
-        } and has_validation_step and any(
-            f.status == FindingStatus.OPEN for f in self.state.findings.values()
+        if (
+            step_id
+            in {
+                "assess-impact",
+                "plan-remediation",
+                "verify-remediation",
+                "report",
+            }
+            and has_validation_step
+            and any(
+                f.status == FindingStatus.OPEN for f in self.state.findings.values()
+            )
         ):
             return ["Validate all open findings before continuing."]
         if step_id == "plan-remediation":
@@ -777,12 +787,18 @@ class WorkflowEngine:
                 }
             )
         actions = sorted(
-            (action for action in self.state.pending_actions.values() if action.status == "pending"),
+            (
+                action
+                for action in self.state.pending_actions.values()
+                if action.status == "pending"
+            ),
             key=lambda action: (
                 0 if action.required else 1,
-                -self.state.findings[action.finding_id].severity
-                if action.finding_id in self.state.findings
-                else 0,
+                (
+                    -self.state.findings[action.finding_id].severity
+                    if action.finding_id in self.state.findings
+                    else 0
+                ),
             ),
         )
         for action in actions:
@@ -840,8 +856,7 @@ class WorkflowEngine:
             "open_findings": self.state.open_findings,
             "pending_actions": self.state.open_actions,
             "findings": {
-                finding_id: deepcopy(asdict(finding))
-                | {"status": finding.status.value}
+                finding_id: deepcopy(asdict(finding)) | {"status": finding.status.value}
                 for finding_id, finding in self.state.findings.items()
             },
             "actions": {
@@ -885,8 +900,7 @@ class WorkflowEngine:
         integrity_errors = self.validate_integrity()
         if integrity_errors:
             raise WorkflowError(
-                "Cannot persist invalid workflow state: "
-                + "; ".join(integrity_errors)
+                "Cannot persist invalid workflow state: " + "; ".join(integrity_errors)
             )
         payload["current_phase"] = self.state.current_phase.value
         payload["findings"] = {

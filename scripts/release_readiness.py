@@ -50,6 +50,8 @@ CLI = [sys.executable, "-m", "pocarchitect"]
 
 # Commands that must exist and be validated somewhere in this gate.
 REQUIRED_COMMANDS = {
+    "demo",
+    "doctor",
     "preflight",
     "setup",
     "config",
@@ -90,6 +92,16 @@ COVERED_OPTIONS: dict[tuple[str, str], str] = {
     ("root", "--temperature"): "Temperature reaches the provider call in Pillar 3.",
     ("root", "--base-url"): "Local endpoint routing is proven in Pillar 3.",
     ("preflight", "--base-url"): "Preflight reaches the local mock in Pillar 3.",
+    (
+        "doctor",
+        "--provider",
+    ): "Doctor's provider-aware diagnostic path is asserted in Pillar 3.",
+    ("doctor", "--base-url"): "Doctor accepts the local endpoint used for diagnostics.",
+    ("doctor", "--output-dir"): "Doctor checks a selected writable output directory.",
+    (
+        "doctor",
+        "--offline",
+    ): "Doctor's credential-free installation diagnosis is asserted in Pillar 3.",
     ("root", "--output-dir"): "Report output location is asserted in Pillar 3.",
     (
         "preflight",
@@ -488,6 +500,35 @@ def pillar_features(work: Path) -> Pillar:
         f"missing: {sorted(missing)}" if missing else "ok",
     )
 
+    doctor = run_cli(
+        [
+            "--format",
+            "json",
+            "--no-color",
+            "doctor",
+            "--offline",
+            "--output-dir",
+            str(work / "doctor-out"),
+        ],
+        work,
+    )
+    doctor_events = json_events(doctor.stdout)
+    p.record(
+        "`doctor --offline` runs a credential-free installation diagnosis",
+        doctor.returncode == 0
+        and any(event.get("event") == "preflight" for event in doctor_events)
+        and any(event.get("message") == "Preflight passed." for event in doctor_events),
+    )
+
+    demo = run_cli(["--format", "json", "--no-color", "demo"], work)
+    demo_events = json_events(demo.stdout)
+    p.record(
+        "`demo` creates a report through a hermetic local provider",
+        demo.returncode == 0
+        and any(event.get("event") == "report_saved" for event in demo_events)
+        and any(event.get("event") == "report_digest" for event in demo_events),
+    )
+
     # "No exceptions" made enforceable: every long option the CLI exposes must be
     # functionally covered by this gate or explicitly waived. A newly shipped
     # option that is neither trips this check until it is validated.
@@ -645,6 +686,31 @@ def pillar_features(work: Path) -> Pillar:
     out_dir = work / "mock-out"
     open_supported = sys.platform != "win32"  # avoid launching a GUI app locally
     with mock_provider() as (base_url, captured):
+        doctor_local = run_cli(
+            [
+                "--format",
+                "json",
+                "--no-color",
+                "doctor",
+                "--provider",
+                "local",
+                "--base-url",
+                base_url,
+                "--output-dir",
+                str(work / "doctor-local-out"),
+            ],
+            work,
+        )
+        doctor_local_events = json_events(doctor_local.stdout)
+        p.record(
+            "`doctor` validates a selected local provider endpoint",
+            doctor_local.returncode == 0
+            and any(
+                event.get("message") == "Preflight passed."
+                for event in doctor_local_events
+            ),
+        )
+
         pre = run_cli(
             [
                 "preflight",
@@ -911,8 +977,7 @@ def pillar_guided_workflow(work: Path) -> Pillar:
         and injected["risk_score"] == 7.2
         and f"validate:{finding_id}" in injected["pending_actions"]
         and any(
-            item.get("finding_id") == finding_id
-            and item.get("next") == "validate"
+            item.get("finding_id") == finding_id and item.get("next") == "validate"
             for item in injected["recommendations"]
         ),
     )
@@ -1037,8 +1102,7 @@ def pillar_guided_workflow(work: Path) -> Pillar:
         waived_finding.status == FindingStatus.WAIVED
         and waived_finding.id not in waived.state.open_findings
         and any(
-            event.get("event") == "finding.waived"
-            for event in waived.state.audit_log
+            event.get("event") == "finding.waived" for event in waived.state.audit_log
         ),
     )
     return p

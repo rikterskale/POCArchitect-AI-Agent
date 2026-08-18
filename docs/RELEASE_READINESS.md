@@ -84,14 +84,16 @@ documented — validated by running it, not by inferring from line coverage.
 
 Enforced checks:
 
-- All required commands exist: `preflight`, `setup`, `config`, `batch-status`,
-  `batch-reset`.
+- All required commands exist: `preflight`, `doctor`, `demo`, `setup`, `config`,
+  `batch-status`, and `batch-reset`.
 - **Option coverage is enforced** (see below): every `--long` option the CLI
   exposes is functionally exercised here or explicitly waived.
 - `config` reports effective settings as machine-readable data **and never
   prints a secret in full** (keys are masked to a short prefix).
 - `--dry-run` prints a compact summary and accepts `owner/repo` shorthand;
   `--dry-run --full` prints the entire prompt.
+- `doctor --offline` diagnoses installation readiness without credentials, and
+  `demo` exercises local-provider routing and report writing without network or cost.
 - The JSON dry-run is a stable two-event stream (`processing`, `dry_run`) and
   shorthand is expanded to a full GitHub URL in the emitted events.
 - `--risk-level`, `--target-os`, and `--include-mitigations`/`--no-mitigations`

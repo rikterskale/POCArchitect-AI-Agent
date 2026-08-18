@@ -44,6 +44,25 @@ Run environment preflight checks
 | `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
 
+## Command: `doctor`
+
+Diagnose installation, Git, output, and selected-provider readiness.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
+| `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
+| `--output-dir` | PATH | None | Directory whose report-write access should be checked. |
+| `--offline` | BOOLEAN | False | Skip credentials and endpoint checks; diagnose the local installation only. |
+
+## Command: `demo`
+
+Generate a local demo report without credentials, network, or provider cost.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| — | — | — | No options |
+
 ## Command: `batch-status`
 
 Show a concise, machine-readable summary of batch recovery state.
@@ -82,6 +101,8 @@ Show effective settings and where each value comes from (keys masked).
 | Command | Purpose |
 |---|---|
 | `preflight` | Run environment preflight checks |
+| `doctor` | Diagnose installation, Git, output, and selected-provider readiness. |
+| `demo` | Generate a local demo report without credentials, network, or provider cost. |
 | `batch-status` | Show a concise, machine-readable summary of batch recovery state. |
 | `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. |
 | `setup` | Interactive first-run wizard: choose a provider, store a key, verify readiness. |

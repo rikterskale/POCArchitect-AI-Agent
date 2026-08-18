@@ -6,9 +6,12 @@ import re
 import subprocess
 import sys
 import tempfile
-from contextlib import AbstractContextManager, nullcontext
+import threading
+from contextlib import AbstractContextManager, contextmanager, nullcontext
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from importlib.resources import files
 from pathlib import Path
 from typing import Literal, Optional
@@ -215,6 +218,67 @@ def report_digest(content: str, max_lines: int = 8) -> str:
     return "\n".join(lines)
 
 
+class _DemoProviderHandler(BaseHTTPRequestHandler):
+    """Minimal OpenAI-compatible endpoint used by the credential-free demo."""
+
+    def log_message(self, *_args: object) -> None:
+        pass
+
+    def _send(self, status: int, payload: dict[str, object]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802 — stdlib handler API
+        if self.path.endswith("/models"):
+            self._send(200, {"object": "list", "data": [{"id": "demo-model"}]})
+        else:
+            self._send(404, {"error": "not found"})
+
+    def do_POST(self) -> None:  # noqa: N802 — stdlib handler API
+        length = int(self.headers.get("Content-Length", "0"))
+        self.rfile.read(length)
+        self._send(
+            200,
+            {
+                "id": "chatcmpl-demo",
+                "object": "chat.completion",
+                "model": "demo-model",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": (
+                                "# POCArchitect Demo Report\n\n"
+                                "This credential-free report proves the installed "
+                                "provider and report-writing path.\n"
+                            ),
+                        },
+                    }
+                ],
+            },
+        )
+
+
+@contextmanager
+def demo_provider() -> Iterator[str]:
+    """Serve a deterministic local response for ``pocarchitect demo``."""
+    server = HTTPServer(("127.0.0.1", 0), _DemoProviderHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/v1"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 @app.command("preflight")
 def preflight(
     offline: bool = typer.Option(
@@ -250,6 +314,74 @@ def preflight(
         output_format=output_format,
         no_color=no_color,
     )
+
+
+@app.command("doctor")
+def doctor(
+    provider: Literal["xai", "openai", "groq", "local"] = typer.Option(
+        DEFAULT_PROVIDER, "--provider", "-p", help="Provider whose readiness to check."
+    ),
+    base_url: Optional[str] = typer.Option(
+        None, "--base-url", help="OpenAI-compatible local provider endpoint."
+    ),
+    output_dir: Optional[Path] = typer.Option(
+        None,
+        "--output-dir",
+        help="Directory whose report-write access should be checked.",
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Skip credentials and endpoint checks; diagnose the local installation only.",
+    ),
+):
+    """Diagnose installation, Git, output, and selected-provider readiness."""
+    run_preflight(
+        provider=provider,
+        base_url=base_url,
+        require_api_key=not offline,
+        offline=offline,
+        output_dir=output_dir,
+        output_format=output_format,
+        no_color=no_color_state,
+    )
+    if output_format == "text":
+        console.print(
+            "[bold green]Doctor complete.[/] If all rows passed, retry your original command."
+        )
+
+
+@app.command("demo")
+def demo() -> None:
+    """Generate a local demo report without credentials, network, or provider cost."""
+    output_dir = Path.cwd() / "reports" / "demo"
+    with demo_provider() as base_url:
+        run_preflight(
+            provider="local",
+            base_url=base_url,
+            require_api_key=True,
+            output_dir=output_dir,
+            output_format=output_format,
+            no_color=no_color_state,
+        )
+        process_single_url(
+            url="https://github.com/example/poc",
+            provider="local",
+            api_key=None,
+            model="demo-model",
+            temperature=0.0,
+            base_url=base_url,
+            output_dir=output_dir,
+            risk_level=DEFAULT_RISK_LEVEL,
+            target_os=DEFAULT_TARGET_OS,
+            include_mitigations=True,
+            no_ingest=True,
+            dry_run=False,
+            verbose=False,
+            confirmed=True,
+            open_report=False,
+            show_spinner=False,
+        )
 
 
 def load_prompt() -> str:

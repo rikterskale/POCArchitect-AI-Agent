@@ -152,6 +152,31 @@ def test_cli_rejects_url_and_batch_together(tmp_path):
     assert "Provide either --url or --batch, not both" in result.stdout
 
 
+def test_doctor_offline_runs_installation_diagnosis(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = RUNNER.invoke(
+        cli.app, ["--format", "json", "--no-color", "doctor", "--offline"]
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["event"] == "preflight"
+    assert payload["message"] == "Preflight passed."
+
+
+def test_demo_creates_report_without_credentials_or_network(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = RUNNER.invoke(cli.app, ["--format", "json", "--no-color", "demo"])
+
+    assert result.exit_code == 0, result.stdout
+    report = tmp_path / "reports" / "demo"
+    reports = list(report.glob("*.md"))
+    assert reports
+    assert "credential-free report" in reports[0].read_text(encoding="utf-8")
+
+
 def test_process_batch_file_continues_after_non_dry_typer_exit(tmp_path, monkeypatch):
     batch_file = tmp_path / "batch.txt"
     batch_file.write_text(

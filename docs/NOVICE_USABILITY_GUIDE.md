@@ -179,14 +179,23 @@ git check-ignore .env
 From the repository root with the virtual environment active, run:
 
 ~~~bash
+python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color
+~~~
+
+The URL is a placeholder. Because <code>--no-ingest</code> is present, POCArchitect does not contact it. <code>--dry-run</code> stops before the provider call and <code>--no-color</code> removes terminal styling. This workflow prints a compact summary and was executed during this review. Add <code>--format json</code> for machine-readable events or <code>--full</code> for the complete prompt.
+
+For automation, use the JSON Lines form:
+
+~~~bash
 python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --format json --no-color
 ~~~
 
-The URL is a placeholder. Because <code>--no-ingest</code> is present, POCArchitect does not contact it. <code>--dry-run</code> stops before the provider call, <code>--format json</code> produces JSON Lines, and <code>--no-color</code> removes terminal styling. This workflow was executed during this review.
-
 ## 16. Verify the First Run Succeeded
 
-The safe example exits with code 0 and prints two JSON objects. The final object has <code>"event": "dry_run"</code> and the message <code>Dry-run complete; no provider call was made.</code>.
+The text safe example exits with code 0 and prints a compact summary. The JSON
+variant exits with code 0 and prints two JSON objects; the final object has
+<code>"event": "dry_run"</code> and the message <code>Dry-run complete; no provider
+call was made.</code>.
 
 Also verify the local installation without credentials:
 
@@ -210,6 +219,37 @@ python -m pocarchitect preflight --offline --output-dir ./my-reports
 POCArchitect local-provider preflight requests only
 <code>&lt;base-url&gt;/models</code>. It does not test chat completions, model
 suitability, the full prompt, or report generation.
+
+## 17a. Use the Consolidated Doctor Command
+
+For a single credential-free diagnosis of the installation, Git, prompt asset,
+dependencies, and output directory, run:
+
+~~~bash
+python -m pocarchitect --format json --no-color doctor --offline
+~~~
+
+For a local provider, omit <code>--offline</code> and provide its endpoint:
+
+~~~bash
+python -m pocarchitect --format json --no-color doctor --provider local --base-url http://localhost:11434/v1
+~~~
+
+The local check confirms only the endpoint's <code>/models</code> response; it
+does not prove model quality or full report generation.
+
+## 17b. Exercise the Full Path Without Credentials
+
+Run the built-in demo after installation:
+
+~~~bash
+python -m pocarchitect --format json --no-color demo
+~~~
+
+The demo uses a temporary in-process OpenAI-compatible endpoint, creates a real
+Markdown report under <code>reports/demo/</code>, and makes no network request or
+billable provider call. Delete that demonstration folder whenever it is no
+longer useful.
 
 ## 17. If Verification Fails: Diagnose and Fix It
 
