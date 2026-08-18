@@ -116,7 +116,7 @@ def check_git_command() -> tuple[bool, str]:
         return False, "FAIL: Git executable not found"
     try:
         # nosec B603 - executable comes from shutil.which("git")
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             [git, "--version"],
             capture_output=True,
             check=True,
@@ -153,7 +153,7 @@ def check_cli_command() -> tuple[bool, str]:
     for cmd in candidates:
         try:
             # nosec B603, B607 - fixed module/CLI diagnostic commands
-            subprocess.run(cmd, capture_output=True, check=True)
+            subprocess.run(cmd, capture_output=True, check=True)  # nosec B603, B607
             return True, f"OK: Available via: {' '.join(cmd[:3])}".strip()
         except (OSError, subprocess.CalledProcessError):
             continue

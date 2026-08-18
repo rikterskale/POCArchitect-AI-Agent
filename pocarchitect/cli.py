@@ -235,10 +235,10 @@ def open_in_default_viewer(path: Path) -> bool:
             os.startfile(str(path))  # type: ignore[attr-defined]  # nosec B606 - OS default viewer for an operator-selected report
         elif sys.platform == "darwin":
             # nosec B603, B607 - fixed viewer executable and selected report path
-            subprocess.run(["open", str(path)], check=False)
+            subprocess.run(["open", str(path)], check=False)  # nosec B603, B607
         else:
             # nosec B603, B607 - fixed viewer executable and selected report path
-            subprocess.run(["xdg-open", str(path)], check=False)
+            subprocess.run(["xdg-open", str(path)], check=False)  # nosec B603, B607
         return True
     except Exception:
         return False
@@ -737,7 +737,7 @@ def build_grounding_context(
                 repository=repo_name,
             )
             # nosec B603, B607 - fixed git executable and bounded public clone arguments
-            subprocess.run(
+            subprocess.run(  # nosec B603, B607
                 [
                     "git",
                     "clone",
