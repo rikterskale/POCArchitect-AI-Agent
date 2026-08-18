@@ -14,6 +14,7 @@ credentials on a command line or commit `.env`.
 | Verify installation without provider access | `python -m pocarchitect preflight --offline` |
 | Diagnose installation and provider readiness | `python -m pocarchitect --format json --no-color doctor --offline` |
 | Generate a no-cost end-to-end demo report | `python -m pocarchitect --format json --no-color demo` |
+| Run the complete credential-free first-day proof | `python -m pocarchitect quickstart` |
 | Verify a custom report path | `python -m pocarchitect preflight --offline --output-dir <PATH>` |
 | Safely inspect a prompt | `python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run` |
 | Analyze one authorized URL | `python -m pocarchitect --url <AUTHORIZED_URL> --provider <PROVIDER>` |
@@ -60,11 +61,12 @@ pocarchitect doctor --offline
 pocarchitect demo
 ```
 
-Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. The
+Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. Python
+3.14 is best-effort until it is added to the matrix. The
 first-run matrix installs release artifacts and runs the offline readiness gate
 on Linux, Windows, and macOS. Interactive shell behavior and paid-provider calls
-remain outside that gate. The project does not enforce a processor-architecture
-requirement.
+remain outside that gate. Native x86_64 is the primary support target; ARM64,
+Apple Silicon, WSL/Git Bash, and Docker Desktop are best-effort host paths.
 
 ## Authoritative entry points
 
@@ -139,6 +141,17 @@ python -m pocarchitect --format json --no-color doctor --provider local --base-u
 
 The first command is credential-free. The second also checks the selected local
 endpoint's `/models` path.
+
+For a single first-day proof that combines the offline diagnosis and the local
+demo report:
+
+```bash
+python -m pocarchitect quickstart
+```
+
+The JSON form includes stable diagnostic `code` values on each preflight row,
+such as `DEPENDENCY`, `OUTPUT_NOT_WRITABLE`, and
+`PROVIDER_CREDENTIAL`.
 
 Cloud-provider preflight checks the key for the selected provider:
 

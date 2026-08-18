@@ -57,6 +57,7 @@ REQUIRED_COMMANDS = {
     "config",
     "batch-status",
     "batch-reset",
+    "quickstart",
 }
 SAFE_EXAMPLE_URL = "https://github.com/example/poc"
 
@@ -542,6 +543,15 @@ def pillar_features(work: Path) -> Pillar:
         demo.returncode == 0
         and any(event.get("event") == "report_saved" for event in demo_events)
         and any(event.get("event") == "report_digest" for event in demo_events),
+    )
+
+    quickstart = run_cli(["--format", "json", "--no-color", "quickstart"], work)
+    quickstart_events = json_events(quickstart.stdout)
+    p.record(
+        "`quickstart` runs doctor and demo without credentials",
+        quickstart.returncode == 0
+        and any(event.get("event") == "preflight" for event in quickstart_events)
+        and any(event.get("event") == "report_saved" for event in quickstart_events),
     )
 
     # "No exceptions" made enforceable: every long option the CLI exposes must be

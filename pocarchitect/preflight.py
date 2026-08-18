@@ -28,6 +28,16 @@ ENV_KEY_NAMES = list(PROVIDER_KEY_NAMES.values())
 
 REQUIRED_DEPS = ["typer", "rich", "openai", "dotenv", "tenacity"]
 
+DIAGNOSTIC_CODES = {
+    "Python >=3.10": "PYTHON_VERSION",
+    "Git executable": "GIT_MISSING_OR_UNUSABLE",
+    "CLI command": "CLI_UNAVAILABLE",
+    "System prompt": "PROMPT_ASSET_MISSING",
+    "Output directory": "OUTPUT_NOT_WRITABLE",
+    "Provider readiness": "PROVIDER_CHECK_SKIPPED",
+    "Local endpoint": "LOCAL_ENDPOINT_UNAVAILABLE",
+}
+
 
 def _is_valid_key_value(value: str | None) -> bool:
     if value is None:
@@ -166,7 +176,19 @@ def main(
 
     def add_row(check: str, status: str, ok: bool = True, fix: str = "") -> None:
         remediation = "" if ok else fix
-        results.append({"check": check, "status": status, "remediation": remediation})
+        code = DIAGNOSTIC_CODES.get(check)
+        if check.startswith("Dependency: "):
+            code = "DEPENDENCY"
+        if check.startswith("API key ("):
+            code = "PROVIDER_CREDENTIAL"
+        results.append(
+            {
+                "check": check,
+                "code": code or "PREFLIGHT_CHECK",
+                "status": status,
+                "remediation": remediation,
+            }
+        )
         table.add_row(check, status, remediation or "—")
 
     has_failure = False
@@ -268,6 +290,7 @@ def main(
                 event_payload(
                     "preflight",
                     "Preflight failed." if has_failure else "Preflight passed.",
+                    diagnostic_version=1,
                     provider=provider,
                     offline=offline,
                     checks=results,

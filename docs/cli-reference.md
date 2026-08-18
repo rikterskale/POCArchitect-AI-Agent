@@ -63,6 +63,14 @@ Generate a local demo report without credentials, network, or provider cost.
 |---|---|---|---|
 | — | — | — | No options |
 
+## Command: `quickstart`
+
+Run the credential-free doctor and demo journey in one command.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| — | — | — | No options |
+
 ## Command: `batch-status`
 
 Show a concise, machine-readable summary of batch recovery state.
@@ -129,6 +137,7 @@ Show effective settings and where each value comes from (keys masked).
 | `preflight` | Run environment preflight checks |
 | `doctor` | Diagnose installation, Git, output, and selected-provider readiness. |
 | `demo` | Generate a local demo report without credentials, network, or provider cost. |
+| `quickstart` | Run the credential-free doctor and demo journey in one command. |
 | `batch-status` | Show a concise, machine-readable summary of batch recovery state. |
 | `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. |
 | `workflow-init` | Create a new auditable finding-driven workflow state file. |

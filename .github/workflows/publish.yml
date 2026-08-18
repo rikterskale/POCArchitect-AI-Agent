@@ -24,6 +24,10 @@ jobs:
         run: |
           python scripts/validate_distribution.py dist
           python -c "import pathlib, re, tomllib; tag='${{ github.event.release.tag_name }}'; version=tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']; assert tag == 'v'+version, f'{tag} does not match v{version}'"
+      - name: Run the release readiness gate against the exact artifacts
+        run: |
+          python scripts/validate_fresh_install.py dist --artifact wheel
+          python scripts/validate_fresh_install.py dist --artifact sdist
       - name: Upload release distributions for auditability
         uses: actions/upload-artifact@v4
         with:

@@ -421,6 +421,20 @@ def demo() -> None:
         )
 
 
+@app.command("quickstart")
+def quickstart() -> None:
+    """Run the credential-free doctor and demo journey in one command."""
+    run_preflight(
+        provider=DEFAULT_PROVIDER,
+        require_api_key=False,
+        offline=True,
+        output_dir=Path.cwd() / "reports",
+        output_format=output_format,
+        no_color=no_color_state,
+    )
+    demo()
+
+
 def load_prompt() -> str:
     try:
         prompt_file = files("pocarchitect") / "POC_Architect_Prompt.md"

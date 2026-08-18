@@ -139,6 +139,8 @@ def test_preflight_json_is_one_machine_readable_event(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["event"] == "preflight"
     assert payload["offline"] is True
+    assert payload["diagnostic_version"] == 1
+    assert all(row["code"] for row in payload["checks"])
     assert "\x1b" not in json.dumps(payload)
 
 

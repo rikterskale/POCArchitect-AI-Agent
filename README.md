@@ -37,7 +37,15 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 
 ## Start here
 
-If you are new to terminals, Git, or Python, begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
+If you are new to terminals, Git, or Python, the canonical onboarding path is the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps. The [Command Guide](docs/command-guide.md) is the advanced reference; the platform, Docker, and local-provider guides are supplements.
+
+After installation, the shortest credential-free proof is:
+
+```bash
+python -m pocarchitect quickstart
+```
+
+This runs the offline installation diagnosis and creates a local demo report.
 
 ## Install
 
@@ -66,6 +74,10 @@ python -m pocarchitect demo
 ```
 
 Once the package is published, `uvx pocarchitect demo` is also supported.
+
+The supported release path is the PyPI package only after the publish workflow
+has completed for the matching `v<version>` release tag. Before that point,
+install from a repository checkout or a release artifact.
 
 After installing, the quickest guided path is the interactive wizard, which stores a provider key in a local `.env` and checks readiness:
 
@@ -117,6 +129,11 @@ python -m pocarchitect --help | Select-Object -First 20
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
 | Docker Desktop/Linux Docker | Validated in CI | CI builds the image and runs its `--help` smoke test; mount a writable host directory to `/reports` for reports. |
 | ARM64/Apple Silicon/Windows ARM | Not separately validated | The package is pure Python, but provider, Git, Docker, and local-model compatibility depends on the host; use `doctor` and `demo` after installation. |
+
+Python 3.10–3.13 are CI-supported. Python 3.14 is best-effort until it is
+added to the matrix. Native x86_64 Linux, Windows, and macOS are the primary
+support targets. ARM64/Apple Silicon, WSL/Git Bash, and Docker Desktop are
+best-effort host paths and are not release-blocking validation targets today.
 
 ## Batch progress and recovery
 
@@ -201,6 +218,7 @@ python scripts/generate_docs.py
 - [Local OpenAI-Compatible Provider Guide](docs/ollama-setup-guide.md) — Ollama-specific setup notes and limitations.
 - [Architecture](docs/architecture.md) — implementation-oriented component overview.
 - [Finding-driven workflow engine](docs/finding-driven-workflow-engine.md) — architecture, lifecycle, branching, persistence, and product integration contract.
+- [Finding-driven workflow quickstart](docs/finding-workflow.md#first-cli-workflow) — complete durable workflow example from initialization to archival.
 - [Documentation Gap Analysis](docs/DOCUMENTATION_GAP_ANALYSIS.md) — current-tree evidence, all 28 findings, and verified remediation closure matrix.
 - [Release Readiness Standard](docs/RELEASE_READINESS.md) — the six-pillar new-user readiness gate enforced in CI.
 - [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — **historical snapshot** of commit `60d55d47c7ceb621df2f124764f01403a99f346b`; do not use it as current behavior or validation evidence.

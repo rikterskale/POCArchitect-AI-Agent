@@ -65,6 +65,30 @@ The same boundary supports interactive and automated modes. A UI renders `Step`,
 - Use `mode="automated"` and the same command/recommendation protocol for agent orchestration; user-injected findings remain indistinguishable as durable domain objects except for `source`.
 - Add an API adapter that accepts commands (`add_finding`, `decide`, `complete_step`, `resolve_action`) and returns state plus recommendations.
 
+## First CLI workflow
+
+The workflow commands are a supported durable finding-management interface for
+operators and integrators. They are separate from the URL-analysis command:
+the main command creates an LLM report, while these commands manage scope,
+findings, remediation, verification, closure, and archival.
+
+Start a state file, inspect the current recommendation, and apply commands with
+JSON payloads:
+
+```bash
+python -m pocarchitect workflow-init --state reports/workflow.json
+python -m pocarchitect workflow-status --state reports/workflow.json
+python -m pocarchitect workflow-apply --state reports/workflow.json --command decide --payload '{"key":"scope_defined","value":true}'
+python -m pocarchitect workflow-apply --state reports/workflow.json --command complete_step --payload '{"step_id":"scope"}'
+python -m pocarchitect workflow-apply --state reports/workflow.json --command decide --payload '{"key":"authorized","value":true}'
+python -m pocarchitect workflow-apply --state reports/workflow.json --command complete_step --payload '{"step_id":"authorize"}'
+```
+
+Continue by completing `discover`, injecting or reviewing findings, resolving
+required actions, and following `workflow-status` recommendations until the
+state reaches `archive`. Each command persists atomically; invalid commands
+leave the prior state intact.
+
 The engine is intentionally conservative: unknown IDs, corrupt state, invalid ranges, invalid lifecycle transitions, out-of-order completion, and unresolved closure work fail explicitly and leave the prior state intact.
 
 ## Completeness and edge-case guarantees

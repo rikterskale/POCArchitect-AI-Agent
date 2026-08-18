@@ -1,5 +1,5 @@
 # POCArchitect AI Agent - Dockerfile (v0.2.0) - Reliable saving on Windows
-FROM python:3.12-slim AS builder
+FROM python:3.12.11-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
@@ -11,7 +11,7 @@ COPY pocarchitect/ ./pocarchitect/
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
 
 # Final stage
-FROM python:3.12-slim
+FROM python:3.12.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
