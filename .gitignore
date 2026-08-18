@@ -24,6 +24,9 @@ MANIFEST
 # Locally generated review artifacts.
 /review-output/
 
+# Claude/Codex local configuration.
+.claude/
+
 # Virtual environments
 .venv
 venv/
