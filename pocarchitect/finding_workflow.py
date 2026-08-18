@@ -211,9 +211,13 @@ class WorkflowEngine:
         self.state = state or WorkflowState()
         self.steps = tuple(steps)
         if not self.steps or len({step.id for step in self.steps}) != len(self.steps):
-            raise WorkflowError("Workflow must define one or more uniquely identified steps")
+            raise WorkflowError(
+                "Workflow must define one or more uniquely identified steps"
+            )
         if self.state.current_step_id not in {step.id for step in self.steps}:
-            raise WorkflowError(f"Unknown current workflow step: {self.state.current_step_id}")
+            raise WorkflowError(
+                f"Unknown current workflow step: {self.state.current_step_id}"
+            )
         self._recalculate()
 
     def _audit(self, event: str, **data: Any) -> None:

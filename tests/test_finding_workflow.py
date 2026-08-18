@@ -124,7 +124,9 @@ def test_override_requires_explanation_and_progress_is_recommendable():
 
 def test_snapshot_is_a_complete_guidance_read_model():
     engine = WorkflowEngine()
-    finding = engine.inject_finding(title="User observation", severity=6, confidence=100)
+    finding = engine.inject_finding(
+        title="User observation", severity=6, confidence=100
+    )
 
     snapshot = engine.snapshot()
 
