@@ -4,16 +4,9 @@ Ollama Pre-Flight Checker for POCArchitect
 Run this BEFORE using --provider local
 """
 
-import sys
-
-# (#11) Check for requests dependency before importing
-try:
-    import requests
-except ImportError:
-    print("ERROR: 'requests' is not installed.")
-    print("Install it with: pip install requests")
-    print("(It is not included in POCArchitect's core dependencies.)")
-    sys.exit(1)
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from rich.console import Console
 from rich.panel import Panel
@@ -29,29 +22,29 @@ TEST_MODEL = (
 
 def check_ollama_running() -> tuple[bool, str]:
     try:
-        r = requests.get(f"{OLLAMA_URL}/api/version", timeout=3)
-        if r.status_code == 200:
+        status, data = request_json("GET", "/api/version", timeout=3)
+        if status == 200:
             return (
                 True,
-                f"✅ Ollama server is running (v{r.json().get('version', 'unknown')})",
+                f"✅ Ollama server is running (v{data.get('version', 'unknown')})",
             )
         return False, "❌ Ollama responded but not healthy"
-    except requests.RequestException as e:
+    except (OSError, ValueError) as e:
         return False, f"❌ Ollama server check failed: {e}"
 
 
 def check_model_available() -> tuple[bool, str]:
     try:
-        r = requests.post(
-            f"{OLLAMA_URL}/api/show", json={"name": TEST_MODEL}, timeout=5
+        status, _ = request_json(
+            "POST", "/api/show", {"name": TEST_MODEL}, timeout=5
         )
-        if r.status_code == 200:
+        if status == 200:
             return True, f"✅ Model '{TEST_MODEL}' is pulled and ready"
         return (
             False,
             f"❌ Model '{TEST_MODEL}' not found (run `ollama pull {TEST_MODEL}`)",
         )
-    except requests.RequestException as e:
+    except (OSError, ValueError) as e:
         return False, f"❌ Error checking model: {e}"
 
 
@@ -68,9 +61,10 @@ def check_openai_compatible_endpoint() -> tuple[bool, str]:
             ],
             "temperature": 0.0,
         }
-        r = requests.post(f"{OLLAMA_URL}/v1/chat/completions", json=payload, timeout=30)
-        if r.status_code == 200:
-            data = r.json()
+        status, data = request_json(
+            "POST", "/v1/chat/completions", payload, timeout=30
+        )
+        if status == 200:
             response_text = (
                 data.get("choices", [{}])[0].get("message", {}).get("content", "")
             )
@@ -78,9 +72,33 @@ def check_openai_compatible_endpoint() -> tuple[bool, str]:
                 True,
                 f"✅ OpenAI-compatible endpoint works!\n   Response: {response_text.strip()}",
             )
-        return False, f"❌ OpenAI-compatible endpoint failed (status {r.status_code})"
-    except (requests.RequestException, ValueError, IndexError) as e:
+        return False, f"❌ OpenAI-compatible endpoint failed (status {status})"
+    except (OSError, ValueError, IndexError) as e:
         return False, f"❌ OpenAI-compatible endpoint error: {e}"
+
+
+def request_json(
+    method: str,
+    path: str,
+    payload: dict | None = None,
+    *,
+    timeout: float,
+) -> tuple[int, dict]:
+    """Make one bounded JSON request using only the Python standard library."""
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = Request(
+        f"{OLLAMA_URL}{path}",
+        data=body,
+        method=method,
+        headers={"Content-Type": "application/json"} if body else {},
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return int(response.status), json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        return error.code, {}
+    except URLError as error:
+        raise OSError(error.reason) from error
 
 
 def main():

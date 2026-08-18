@@ -202,6 +202,13 @@ exercised hermetically in CI, so a single real-provider smoke test remains a
 **manual release step**, recorded in the release checklist. Everything up to and
 including the provider request/response contract is now automated.
 
+An opt-in GitHub Actions workflow is provided at
+`.github/workflows/provider-smoke.yml`. Run it manually with repository secrets
+for the selected provider before publishing a release. It uses `--no-ingest`
+and the example URL, so the check exercises the provider request and report
+write without cloning an external repository. The request can still incur
+provider charges; use a low-cost model and set provider-side spending limits.
+
 > Note: `--open` invokes the OS file viewer. On the Linux CI runner this is a
 > headless no-op that still exercises the code path; the gate skips the actual
 > launch on Windows to avoid opening a GUI application during a local run, and

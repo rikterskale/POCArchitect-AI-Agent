@@ -38,6 +38,34 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 
 If you are new to terminals, Git, or Python, begin with the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps.
 
+## Install
+
+For a published release, install from PyPI:
+
+```bash
+python -m pip install pocarchitect
+pocarchitect doctor --offline
+pocarchitect demo
+```
+
+The repository includes a PyPI trusted-publishing workflow. Configure trusted
+publishing for the repository before publishing a release. Until then, use the
+source-checkout or release-artifact paths below.
+
+For a source checkout:
+
+```bash
+git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
+cd POCArchitect-AI-Agent
+python -m venv .venv
+# Activate .venv, then:
+python -m pip install -e ".[all]"
+python -m pocarchitect doctor --offline
+python -m pocarchitect demo
+```
+
+Once the package is published, `uvx pocarchitect demo` is also supported.
+
 After installing, the quickest guided path is the interactive wizard, which stores a provider key in a local `.env` and checks readiness:
 
 ```bash
@@ -70,6 +98,13 @@ resolved writable output directory. Pass `--output-dir` to check the same custom
 path a real run will use. A real cloud-provider run additionally checks the
 matching provider key. Local preflight requests only `<base-url>/models`; it
 does not test chat completions or model suitability.
+
+On Windows, help is rendered as plain text so diagnostic capture remains safe:
+
+```powershell
+python -m pocarchitect --help > help.txt
+python -m pocarchitect --help | Select-Object -First 20
+```
 
 ## Supported-platform matrix
 

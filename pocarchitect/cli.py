@@ -18,6 +18,7 @@ from typing import Literal, Optional
 from urllib.parse import urlparse
 
 import typer
+import typer.rich_utils as typer_rich_utils
 from dotenv import dotenv_values, load_dotenv
 from openai import OpenAI
 from rich.console import Console
@@ -61,12 +62,29 @@ from .state import (
 
 load_dotenv(override=False)
 
+
+def configure_platform_help() -> None:
+    """Keep Typer help safe when Windows treats redirected output as a console.
+
+    Some PowerShell hosts expose a console-like stdout handle even when the
+    process is piped or redirected. Rich then selects its legacy Windows
+    renderer and can raise ``OSError: [Errno 22] Invalid argument``. Plain
+    help remains readable and is more useful than a renderer that crashes.
+    """
+    if sys.platform.startswith("win"):
+        typer_rich_utils.FORCE_TERMINAL = False
+
+
+configure_platform_help()
+
 app = typer.Typer(
     name="pocarchitect",
     help="POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.",
     add_completion=True,
     no_args_is_help=True,
-    rich_markup_mode="rich",
+    # Typer's Rich help renderer can select the legacy Windows console writer
+    # even for PowerShell pipes/redirection. Plain Click help is robust there.
+    rich_markup_mode=None if sys.platform.startswith("win") else "rich",
 )
 
 console = Console()

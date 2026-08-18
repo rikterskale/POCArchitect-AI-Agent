@@ -51,6 +51,15 @@ project release is distributed through repository artifacts rather than a
 guaranteed PyPI package. Runtime dependencies are pinned in `pyproject.toml`
 and `requirements.txt` for reproducible clean installs.
 
+The repository includes a release workflow for PyPI trusted publishing. Once a
+release is published, the shortest supported path is:
+
+```bash
+python -m pip install pocarchitect
+pocarchitect doctor --offline
+pocarchitect demo
+```
+
 Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. The
 first-run matrix installs release artifacts and runs the offline readiness gate
 on Linux, Windows, and macOS. Interactive shell behavior and paid-provider calls

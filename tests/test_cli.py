@@ -2,6 +2,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 
 import pytest
 import typer
@@ -11,6 +12,22 @@ from typer.testing import CliRunner
 from pocarchitect import cli
 
 RUNNER = CliRunner()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows Rich help regression")
+def test_windows_help_uses_plain_renderer_for_redirected_output():
+    result = subprocess.run(
+        [sys.executable, "-m", "pocarchitect", "--help"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Usage: python -m pocarchitect" in result.stdout
+    assert cli.app.rich_markup_mode is None
 
 
 def test_normalize_github_repo_url_supports_common_variants():

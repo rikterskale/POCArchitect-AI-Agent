@@ -46,7 +46,8 @@ python docs/ollama_preflight_check.py
 
 This helper performs exactly three checks against `http://localhost:11434`: Ollama `/api/version`, availability of the configured model through `/api/show`, and one short `/v1/chat/completions` request. It reports the tested base URL and model. It does not run POCArchitect's full prompt, create a report, judge response quality, or establish that host resources are sufficient.
 
-> **Prerequisite:** The checker requires the `requests` library. Install it with `pip install requests` if not already available.
+The checker uses Python's standard library plus Rich, which is already installed
+with POCArchitect. No separate `requests` installation is required.
 
 Before a real run, check the endpoint through POCArchitect:
 
@@ -82,4 +83,11 @@ You can combine with any other flags:
 | Out of memory | Choose and pull a smaller model in Ollama, then pass its exact name with `--model` |
 | Slow generation | Choose a model appropriate for the local hardware; POCArchitect has no performance-control flag for Ollama |
 
-**Validation status:** The POCArchitect local-endpoint preflight behavior is covered by tests. Ollama installation, model download, and a live local endpoint were not run during this documentation review.
+**Resource note:** The default `qwen2.5-coder:32b` model can require substantial
+RAM/VRAM and may be slow or unavailable on modest hardware. For a first local
+smoke test, pull a smaller model and pass its exact name with `--model`.
+
+**Validation status:** The POCArchitect local-endpoint preflight behavior and
+the helper's standard-library transport are covered by tests. Ollama
+installation, model download, GPU behavior, and a live local endpoint remain
+manual checks.

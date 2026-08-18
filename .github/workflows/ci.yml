@@ -144,6 +144,12 @@ jobs:
       - name: Smoke test Docker image
         run: docker run --rm pocarchitect:test --help
 
+      - name: Smoke test Docker report persistence
+        run: |
+          docker volume create pocarchitect-smoke
+          docker run --rm -v pocarchitect-smoke:/reports pocarchitect:test --format json --no-color demo
+          docker run --rm --entrypoint python -v pocarchitect-smoke:/reports pocarchitect:test -c "from pathlib import Path; reports = list(Path('/reports/demo').glob('*.md')); assert reports, 'No demo report persisted in /reports'"
+
   package:
     needs: quality
     runs-on: ubuntu-latest

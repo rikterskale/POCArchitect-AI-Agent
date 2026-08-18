@@ -37,3 +37,33 @@ def test_helper_success_reports_only_the_three_bounded_checks(monkeypatch):
     assert helper.TEST_MODEL in text
     assert "PERFECTLY READY" not in text
     assert "full prompt" in text
+
+
+def test_helper_request_json_uses_standard_library_transport(monkeypatch):
+    helper = load_helper()
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"version": "0.1"}'
+
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["method"] = request.method
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr(helper, "urlopen", fake_urlopen)
+    status, payload = helper.request_json("GET", "/api/version", timeout=3)
+
+    assert status == 200
+    assert payload == {"version": "0.1"}
+    assert captured == {"method": "GET", "timeout": 3}

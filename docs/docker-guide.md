@@ -47,6 +47,24 @@ docker run --rm pocarchitect:latest \
 
 This does not clone the URL, call a provider, require a key, or write a report. A successful run prints `DRY RUN MODE` and the prompt.
 
+### Credential-free report smoke test
+
+This exercises the container's provider boundary and verifies that the report
+volume is usable without a cloud credential:
+
+```bash
+docker volume create pocarchitect-smoke
+docker run --rm \
+  -v pocarchitect-smoke:/reports \
+  pocarchitect:latest \
+  --format json --no-color demo
+docker run --rm \
+  --entrypoint python \
+  -v pocarchitect-smoke:/reports \
+  pocarchitect:latest \
+  -c "from pathlib import Path; assert list(Path('/reports/demo').glob('*.md'))"
+```
+
 PowerShell:
 
 ```powershell
@@ -164,6 +182,7 @@ pocarch-preview --url https://github.com/example/poc --no-ingest --dry-run --no-
 - **"Permission denied" on reports** → The container runs as non-root `pocuser`. Create a host `reports` folder you can write to, mount it at `/reports`, then repeat the safe dry run before a real run.
 - **Git clone fails** → Confirm the URL is a public GitHub repository and that the container has network access. To validate the CLI without cloning, repeat the command with `--no-ingest --dry-run`.
 - **API key not found** → Check that `.env` is in the directory where you run Docker and contains the key matching `--provider`; then rerun preflight with that same provider, for example `docker run --rm --env-file .env pocarchitect:latest preflight --provider openai`.
+- **Help fails when captured on Windows** → Use the current image and put global options before the command, for example `docker run --rm pocarchitect:latest --format json --no-color demo`. Native Windows CLI help is rendered as plain text for safe redirection.
 - **Rebuild after changes** → `docker build --no-cache -t pocarchitect:latest .`
 
 ---
