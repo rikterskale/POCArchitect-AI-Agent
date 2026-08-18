@@ -1,0 +1,481 @@
+"""Finding-driven, resumable guided workflow engine.
+
+The module is deliberately UI-agnostic: a CLI, web UI, or agent can render
+``recommendations()`` and submit the returned commands through the same API.
+All mutations are event-audited and the state is safe to persist as JSON.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import uuid
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class WorkflowError(ValueError):
+    """Invalid command, transition, or persisted workflow state."""
+
+
+class FindingStatus(str, Enum):
+    OPEN = "open"
+    VALIDATED = "validated"
+    EXPLOITED = "exploited"
+    MITIGATED = "mitigated"
+    CLOSED = "closed"
+
+
+class WorkflowPhase(str, Enum):
+    INTAKE = "intake"
+    SCOPE = "scope"
+    AUTHORIZATION = "authorization"
+    DISCOVERY = "discovery"
+    VALIDATION = "validation"
+    IMPACT = "impact"
+    REMEDIATION = "remediation"
+    REPORTING = "reporting"
+    CLOSURE = "closure"
+    ARCHIVED = "archived"
+
+
+@dataclass
+class Finding:
+    """A durable observation and the evidence/decisions derived from it."""
+
+    title: str
+    description: str = ""
+    severity: int = 0  # 0-10; normalized rather than tied to a vendor scale
+    confidence: int = 50  # 0-100
+    source: str = "user"
+    id: str = field(default_factory=lambda: f"finding-{uuid.uuid4().hex[:12]}")
+    status: FindingStatus = FindingStatus.OPEN
+    tags: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    related_finding_ids: list[str] = field(default_factory=list)
+    recommended_actions: list[str] = field(default_factory=list)
+    created_at: str = field(default_factory=_now)
+    updated_at: str = field(default_factory=_now)
+    history: list[dict[str, Any]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.title.strip():
+            raise WorkflowError("Finding title is required")
+        if not 0 <= self.severity <= 10 or not 0 <= self.confidence <= 100:
+            raise WorkflowError("Finding severity must be 0-10 and confidence 0-100")
+        self.status = FindingStatus(self.status)
+
+
+@dataclass
+class PendingAction:
+    id: str
+    title: str
+    kind: str
+    finding_id: str | None = None
+    required: bool = True
+    status: str = "pending"
+    rationale: str = ""
+
+
+@dataclass
+class WorkflowState:
+    """Complete snapshot needed to resume and explain a workflow."""
+
+    id: str = field(default_factory=lambda: f"workflow-{uuid.uuid4().hex[:12]}")
+    version: int = 1
+    current_phase: WorkflowPhase = WorkflowPhase.INTAKE
+    current_step_id: str = "scope"
+    completed_steps: list[str] = field(default_factory=list)
+    findings: dict[str, Finding] = field(default_factory=dict)
+    pending_actions: dict[str, PendingAction] = field(default_factory=dict)
+    decisions: list[dict[str, Any]] = field(default_factory=list)
+    audit_log: list[dict[str, Any]] = field(default_factory=list)
+    progress_percent: float = 0.0
+    risk_score: float = 0.0
+    mode: str = "interactive"
+    terminal: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Step:
+    id: str
+    phase: WorkflowPhase
+    title: str
+    explanation: str
+
+
+STEPS: tuple[Step, ...] = (
+    Step(
+        "scope",
+        WorkflowPhase.SCOPE,
+        "Define scope",
+        "Identify assets, objectives, exclusions, and stakeholders.",
+    ),
+    Step(
+        "authorize",
+        WorkflowPhase.AUTHORIZATION,
+        "Confirm authorization",
+        "Confirm the work is permitted and record its boundaries.",
+    ),
+    Step(
+        "discover",
+        WorkflowPhase.DISCOVERY,
+        "Collect observations",
+        "Gather evidence from approved sources; observations become findings.",
+    ),
+    Step(
+        "validate",
+        WorkflowPhase.VALIDATION,
+        "Validate findings",
+        "Confirm relevance, reproducibility, severity, and confidence.",
+    ),
+    Step(
+        "assess-impact",
+        WorkflowPhase.IMPACT,
+        "Assess impact",
+        "Determine affected assets, business impact, and exploitability.",
+    ),
+    Step(
+        "plan-remediation",
+        WorkflowPhase.REMEDIATION,
+        "Plan remediation",
+        "Create treatment actions for material findings.",
+    ),
+    Step(
+        "verify-remediation",
+        WorkflowPhase.REMEDIATION,
+        "Verify remediation",
+        "Re-test mitigations and update finding lifecycles.",
+    ),
+    Step(
+        "report",
+        WorkflowPhase.REPORTING,
+        "Prepare final report",
+        "Explain scope, evidence, decisions, residual risk, and exceptions.",
+    ),
+    Step(
+        "close",
+        WorkflowPhase.CLOSURE,
+        "Approve closure",
+        "Obtain closure decision and confirm no required work remains.",
+    ),
+    Step(
+        "archive",
+        WorkflowPhase.ARCHIVED,
+        "Archive record",
+        "Freeze the auditable record and mark the workflow complete.",
+    ),
+)
+
+
+class WorkflowEngine:
+    """Command-style engine for interactive and automated/agent-driven use."""
+
+    def __init__(
+        self, state: WorkflowState | None = None, steps: Iterable[Step] = STEPS
+    ):
+        self.state = state or WorkflowState()
+        self.steps = tuple(steps)
+        self._recalculate()
+
+    def _audit(self, event: str, **data: Any) -> None:
+        self.state.audit_log.append({"at": _now(), "event": event, **data})
+
+    def _recalculate(self) -> None:
+        findings = list(self.state.findings.values())
+        self.state.risk_score = round(
+            sum(f.severity * (f.confidence / 100) for f in findings), 2
+        )
+        self.state.progress_percent = round(
+            100 * len(self.state.completed_steps) / len(self.steps), 1
+        )
+        # Keep derived required actions coherent after every command.
+        for finding in findings:
+            if finding.status == FindingStatus.OPEN:
+                self._ensure_action(
+                    f"validate:{finding.id}",
+                    "Validate finding",
+                    "validate",
+                    finding.id,
+                    "Open finding requires validation.",
+                )
+            elif (
+                finding.status in (FindingStatus.VALIDATED, FindingStatus.EXPLOITED)
+                and finding.severity >= 4
+            ):
+                self._ensure_action(
+                    f"remediate:{finding.id}",
+                    "Plan or verify remediation",
+                    "remediate",
+                    finding.id,
+                    "Material finding requires treatment.",
+                )
+        for action_id, action in list(self.state.pending_actions.items()):
+            if action.finding_id and action.finding_id not in self.state.findings:
+                del self.state.pending_actions[action_id]
+
+    def _ensure_action(
+        self, action_id: str, title: str, kind: str, finding_id: str, rationale: str
+    ) -> None:
+        if action_id not in self.state.pending_actions:
+            self.state.pending_actions[action_id] = PendingAction(
+                action_id, title, kind, finding_id, True, "pending", rationale
+            )
+
+    def _step(self, step_id: str) -> Step:
+        try:
+            return next(step for step in self.steps if step.id == step_id)
+        except StopIteration as exc:
+            raise WorkflowError(f"Unknown workflow step: {step_id}") from exc
+
+    def add_finding(self, finding: Finding | None = None, **values: Any) -> Finding:
+        finding = finding or Finding(**values)
+        if finding.id in self.state.findings:
+            raise WorkflowError(f"Finding already exists: {finding.id}")
+        self.state.findings[finding.id] = finding
+        self._audit(
+            "finding.created",
+            finding_id=finding.id,
+            title=finding.title,
+            source=finding.source,
+        )
+        self._recalculate()
+        return finding
+
+    def enrich_finding(
+        self,
+        finding_id: str,
+        *,
+        evidence: Iterable[str] = (),
+        tags: Iterable[str] = (),
+        description: str | None = None,
+    ) -> Finding:
+        finding = self._finding(finding_id)
+        finding.evidence.extend(x for x in evidence if x not in finding.evidence)
+        finding.tags.extend(x for x in tags if x not in finding.tags)
+        if description is not None:
+            finding.description = description
+        finding.updated_at = _now()
+        finding.history.append({"at": finding.updated_at, "event": "enriched"})
+        self._audit("finding.enriched", finding_id=finding_id)
+        return finding
+
+    def update_finding_status(
+        self, finding_id: str, status: FindingStatus, *, reason: str = ""
+    ) -> Finding:
+        finding = self._finding(finding_id)
+        status = FindingStatus(status)
+        previous = finding.status
+        allowed = {
+            FindingStatus.OPEN: {FindingStatus.VALIDATED},
+            FindingStatus.VALIDATED: {FindingStatus.EXPLOITED, FindingStatus.MITIGATED},
+            FindingStatus.EXPLOITED: {FindingStatus.MITIGATED},
+            FindingStatus.MITIGATED: {FindingStatus.CLOSED},
+            FindingStatus.CLOSED: set(),
+        }
+        if status != finding.status and status not in allowed[finding.status]:
+            raise WorkflowError(
+                f"Invalid finding transition {finding.status.value} -> {status.value}"
+            )
+        finding.status = status
+        finding.updated_at = _now()
+        finding.history.append(
+            {
+                "at": finding.updated_at,
+                "event": "status.changed",
+                "from": previous.value,
+                "to": status.value,
+                "reason": reason,
+            }
+        )
+        self._audit(
+            "finding.status_changed",
+            finding_id=finding_id,
+            status=status.value,
+            reason=reason,
+        )
+        self._recalculate()
+        return finding
+
+    def decide(self, key: str, value: Any, *, rationale: str = "") -> None:
+        if not key.strip():
+            raise WorkflowError("Decision key is required")
+        self.state.decisions.append(
+            {"key": key, "value": value, "rationale": rationale, "at": _now()}
+        )
+        self._audit("decision.recorded", key=key, value=value, rationale=rationale)
+
+    def correlate(self, finding_id: str, related_finding_ids: Iterable[str]) -> Finding:
+        finding = self._finding(finding_id)
+        related = list(dict.fromkeys(related_finding_ids))
+        for related_id in related:
+            self._finding(related_id)
+        finding.related_finding_ids = [item for item in related if item != finding_id]
+        finding.updated_at = _now()
+        self._audit(
+            "finding.correlated",
+            finding_id=finding_id,
+            related_finding_ids=finding.related_finding_ids,
+        )
+        return finding
+
+    def resolve_action(self, action_id: str, *, note: str = "") -> None:
+        action = self.state.pending_actions.get(action_id)
+        if action is None:
+            raise WorkflowError(f"Unknown action: {action_id}")
+        action.status = "done"
+        self._audit("action.completed", action_id=action_id, note=note)
+        self._recalculate()
+
+    def complete_step(
+        self, step_id: str | None = None, *, override: bool = False, rationale: str = ""
+    ) -> str:
+        step_id = step_id or self.state.current_step_id
+        self._step(step_id)
+        if step_id in self.state.completed_steps:
+            return self._next_step(step_id)
+        if step_id != self.state.current_step_id and not override:
+            raise WorkflowError(
+                f"Current step is {self.state.current_step_id}; use override for out-of-order completion"
+            )
+        blockers = self.blockers(step_id)
+        if blockers and not override:
+            raise WorkflowError("Step is blocked: " + "; ".join(blockers))
+        self.state.completed_steps.append(step_id)
+        self._audit(
+            "step.completed", step_id=step_id, override=override, rationale=rationale
+        )
+        next_id = self._next_step(step_id)
+        self.state.current_step_id = next_id
+        self.state.current_phase = self._step(next_id).phase
+        self.state.terminal = next_id == "archive" and step_id == "archive"
+        self._recalculate()
+        return next_id
+
+    def _next_step(self, step_id: str) -> str:
+        index = next(i for i, step in enumerate(self.steps) if step.id == step_id)
+        return self.steps[min(index + 1, len(self.steps) - 1)].id
+
+    def blockers(self, step_id: str | None = None) -> list[str]:
+        step_id = step_id or self.state.current_step_id
+        if step_id == "authorize" and not self._decision("authorized"):
+            return ["Record an authorized=true decision."]
+        if step_id == "discover" and not self._decision("scope_defined"):
+            return ["Record a scope_defined=true decision."]
+        if step_id in {
+            "assess-impact",
+            "plan-remediation",
+            "verify-remediation",
+            "report",
+        } and any(f.status == FindingStatus.OPEN for f in self.state.findings.values()):
+            return ["Validate all open findings before continuing."]
+        if step_id == "close":
+            if any(
+                a.required and a.status != "done"
+                for a in self.state.pending_actions.values()
+            ):
+                return ["Complete all required pending actions."]
+            if any(
+                f.status != FindingStatus.CLOSED for f in self.state.findings.values()
+            ):
+                return ["Close or explicitly waive every finding."]
+        return []
+
+    def _decision(self, key: str) -> bool:
+        return any(d["key"] == key and d["value"] is True for d in self.state.decisions)
+
+    def _finding(self, finding_id: str) -> Finding:
+        if finding_id not in self.state.findings:
+            raise WorkflowError(f"Unknown finding: {finding_id}")
+        return self.state.findings[finding_id]
+
+    def recommendations(self) -> list[dict[str, Any]]:
+        step = self._step(self.state.current_step_id)
+        blockers = self.blockers(step.id)
+        result = [
+            {"kind": "blocker", "title": text, "required": True} for text in blockers
+        ]
+        if not blockers:
+            result.append(
+                {
+                    "kind": "step",
+                    "step_id": step.id,
+                    "title": step.title,
+                    "explanation": step.explanation,
+                    "required": True,
+                }
+            )
+        for action in self.state.pending_actions.values():
+            if action.status == "pending":
+                result.append({"kind": action.kind, **asdict(action)})
+        if not result:
+            result.append({"kind": "complete", "title": "No action is pending."})
+        return result
+
+    def query_findings(
+        self,
+        *,
+        status: FindingStatus | None = None,
+        min_severity: int = 0,
+        tag: str | None = None,
+    ) -> list[Finding]:
+        return [
+            f
+            for f in self.state.findings.values()
+            if (status is None or f.status == FindingStatus(status))
+            and f.severity >= min_severity
+            and (tag is None or tag in f.tags)
+        ]
+
+    def save(self, path: Path) -> None:
+        payload = asdict(self.state)
+        payload["current_phase"] = self.state.current_phase.value
+        payload["findings"] = {
+            key: {**asdict(value), "status": value.status.value}
+            for key, value in self.state.findings.items()
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        ) as tmp:
+            json.dump(payload, tmp, indent=2, sort_keys=True)
+            tmp.write("\n")
+            temporary = Path(tmp.name)
+        try:
+            os.replace(temporary, path)
+        except OSError:
+            temporary.unlink(missing_ok=True)
+            raise
+
+    @classmethod
+    def load(cls, path: Path) -> WorkflowEngine:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            findings = {
+                key: Finding(**value)
+                for key, value in payload.pop("findings", {}).items()
+            }
+            actions = {
+                key: PendingAction(**value)
+                for key, value in payload.pop("pending_actions", {}).items()
+            }
+            payload["current_phase"] = WorkflowPhase(payload["current_phase"])
+            state = WorkflowState(**payload, findings=findings, pending_actions=actions)
+            return cls(state)
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise WorkflowError(f"Cannot load workflow state: {path}") from exc
