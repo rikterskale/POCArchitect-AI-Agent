@@ -229,17 +229,16 @@ def main():
     parser = argparse.ArgumentParser(description="Bogus Python POC example")
     parser.add_argument("--target", required=True, help="Full target endpoint URL")
     parser.add_argument("--api-key", required=False, help="Optional API key")
-    parser.add_argument("--insecure", action="store_true", help="Disable TLS verification")
+    parser.add_argument(
+        "--insecure", action="store_true", help="Disable TLS verification"
+    )
     args = parser.parse_args()
 
     headers = {"Content-Type": "application/json"}
     if args.api_key:
         headers["X-API-Key"] = args.api_key
 
-    payload = {
-        "action": "status-check",
-        "mode": "demo"
-    }
+    payload = {"action": "status-check", "mode": "demo"}
 
     response = requests.post(
         args.target,

@@ -9,8 +9,8 @@ reviewed in this generator. Use --check in CI to detect drift.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import click
 from typer.main import get_command

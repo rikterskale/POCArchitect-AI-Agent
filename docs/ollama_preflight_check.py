@@ -35,9 +35,7 @@ def check_ollama_running() -> tuple[bool, str]:
 
 def check_model_available() -> tuple[bool, str]:
     try:
-        status, _ = request_json(
-            "POST", "/api/show", {"name": TEST_MODEL}, timeout=5
-        )
+        status, _ = request_json("POST", "/api/show", {"name": TEST_MODEL}, timeout=5)
         if status == 200:
             return True, f"✅ Model '{TEST_MODEL}' is pulled and ready"
         return (
@@ -61,9 +59,7 @@ def check_openai_compatible_endpoint() -> tuple[bool, str]:
             ],
             "temperature": 0.0,
         }
-        status, data = request_json(
-            "POST", "/v1/chat/completions", payload, timeout=30
-        )
+        status, data = request_json("POST", "/v1/chat/completions", payload, timeout=30)
         if status == 200:
             response_text = (
                 data.get("choices", [{}])[0].get("message", {}).get("content", "")

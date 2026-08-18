@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,9 +7,9 @@ import pytest
 from pocarchitect.finding_workflow import (
     Finding,
     FindingStatus,
+    WorkflowCommandError,
     WorkflowEngine,
     WorkflowError,
-    WorkflowCommandError,
     WorkflowPhase,
 )
 
@@ -335,3 +336,10 @@ def test_custom_route_without_validation_has_no_report_dead_end():
     engine.complete_step("verify-remediation")
     assert engine.state.current_step_id == "report"
     assert engine.can_complete("report")["allowed"] is True
+
+
+def test_workflow_loader_rejects_unknown_schema(tmp_path):
+    path = tmp_path / "workflow.json"
+    path.write_text(json.dumps({"version": 1}), encoding="utf-8")
+    with pytest.raises(WorkflowError, match="Unsupported workflow schema"):
+        WorkflowEngine.load(path)

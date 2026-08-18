@@ -15,10 +15,15 @@ The engine has four deliberately separate concerns:
 
 ```python
 finding = engine.inject_finding(
-    title="Exposed service", severity=8, confidence=75,
-    evidence=["scanner-result-123"], tags=["network"],
+    title="Exposed service",
+    severity=8,
+    confidence=75,
+    evidence=["scanner-result-123"],
+    tags=["network"],
 )
-engine.enrich_finding(finding.id, description="...", evidence=["..."], tags=["internet-facing"])
+engine.enrich_finding(
+    finding.id, description="...", evidence=["..."], tags=["internet-facing"]
+)
 engine.update_finding_status(finding.id, FindingStatus.VALIDATED, reason="Reproduced")
 ```
 

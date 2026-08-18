@@ -2,20 +2,23 @@
 
 ## Reporting a vulnerability
 
-**POCArchitect does not accept vulnerability reports.**
+POCArchitect handles untrusted source code and can transmit selected content to
+external model providers. Security reports are welcome and should be handled
+privately through GitHub Security Advisories. If private advisories are
+unavailable, contact the repository maintainer through the verified contact on
+the repository profile. Do not include credentials, private source, or exploit
+payloads in a public issue.
 
-This project is maintained on an as-is, best-effort basis. It has no security
-response process, no coordinated-disclosure channel, and no commitment to
-triage, acknowledge, or remediate reported security issues. Please do not open
-GitHub issues, pull requests, private security advisories, or email describing
-security vulnerabilities — they will not be actioned.
+Include the affected version/commit, operating system and Python version,
+reproduction steps, impact, and a safe mitigation. The project aims to
+acknowledge reports within 7 calendar days and publish a fix or mitigation
+decision within 30 days when practical. Coordinated disclosure dates should be
+agreed with the reporter.
 
-## No security support
+## Supported versions
 
-- No versions are covered by any security-support or maintenance commitment.
-- No security patches, advisories, or CVEs are issued by this project.
-- The software is provided "AS IS", without warranty of any kind, as stated in
-  the [LICENSE](LICENSE).
+Only the latest released version and the current `main` branch receive
+security fixes. Users should update before relying on a fix.
 
 ## Using this tool responsibly
 

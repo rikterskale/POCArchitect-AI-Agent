@@ -5,10 +5,9 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
-from pathlib import Path
-from typing import Optional
 
 from dotenv import dotenv_values
 from rich.console import Console
@@ -30,7 +29,7 @@ ENV_KEY_NAMES = list(PROVIDER_KEY_NAMES.values())
 REQUIRED_DEPS = ["typer", "rich", "openai", "dotenv", "tenacity"]
 
 
-def _is_valid_key_value(value: Optional[str]) -> bool:
+def _is_valid_key_value(value: str | None) -> bool:
     if value is None:
         return False
     cleaned = value.strip()
@@ -53,7 +52,7 @@ def check_dependency(name: str) -> tuple[bool, str]:
         return False, "FAIL: Missing"
 
 
-def check_api_key(provider: Optional[str] = None) -> tuple[bool, str]:
+def check_api_key(provider: str | None = None) -> tuple[bool, str]:
     """Check only the selected cloud provider, or all providers for legacy checks."""
     env_path = Path.cwd() / ".env"
     env_file_values = dotenv_values(env_path) if env_path.exists() else {}
@@ -69,7 +68,7 @@ def check_api_key(provider: Optional[str] = None) -> tuple[bool, str]:
     return False, "FAIL: No API key found"
 
 
-def check_local_endpoint(base_url: Optional[str] = None) -> tuple[bool, str]:
+def check_local_endpoint(base_url: str | None = None) -> tuple[bool, str]:
     """Verify that the selected OpenAI-compatible local endpoint can list models."""
     endpoint = (base_url or DEFAULT_LOCAL_BASE_URL).rstrip("/")
     try:
@@ -113,7 +112,7 @@ def check_git_command() -> tuple[bool, str]:
 
 
 def check_output_directory_writable(
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
 ) -> tuple[bool, str]:
     out_dir = output_dir or default_output_dir()
     try:
@@ -147,8 +146,8 @@ def main(
     require_api_key: bool = True,
     offline: bool = False,
     provider: str = DEFAULT_PROVIDER,
-    base_url: Optional[str] = None,
-    output_dir: Optional[Path] = None,
+    base_url: str | None = None,
+    output_dir: Path | None = None,
     output_format: str = "text",
     no_color: bool = False,
 ):

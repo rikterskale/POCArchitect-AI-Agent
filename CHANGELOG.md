@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No unreleased changes recorded yet._
+- Hardened repository ingestion with bounded scans, symlink/special-file rejection,
+  prompt-size limits, and fail-closed clone failures.
+- Expanded secret redaction, atomic collision-safe report writes, locked batch
+  ledgers, workflow schema validation, and a workflow CLI surface.
+- Added security reporting guidance, package classifiers, static security CI,
+  Docker health checks, and release distribution validation.
 
 ## [0.2.0]
 

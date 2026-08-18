@@ -24,6 +24,17 @@ DEFAULT_TEMPERATURE = 0.2
 DEFAULT_RISK_LEVEL = "High"
 DEFAULT_TARGET_OS = "Linux"
 
+# Bounded limits for untrusted repository ingestion and provider calls.
+MAX_CLONE_SECONDS = 90
+MAX_GROUNDING_FILES = 25
+MAX_GROUNDING_FILE_BYTES = 250_000
+MAX_GROUNDING_TOTAL_BYTES = 5_000_000
+MAX_REPOSITORY_FILES_SCANNED = 20_000
+MAX_GROUNDING_CHARACTERS = 180_000
+MAX_PROMPT_CHARACTERS = 500_000
+MAX_PROVIDER_ATTEMPTS = 3
+MAX_OUTPUT_TOKENS = 8_192
+
 
 def default_output_dir(cwd: Path | None = None) -> Path:
     """Return the report path used when the operator does not provide one."""

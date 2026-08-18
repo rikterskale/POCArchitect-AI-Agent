@@ -11,13 +11,13 @@ import json
 import os
 import tempfile
 import uuid
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 def _now() -> str:
@@ -26,6 +26,9 @@ def _now() -> str:
 
 class WorkflowError(ValueError):
     """Invalid command, transition, or persisted workflow state."""
+
+
+WORKFLOW_SCHEMA_VERSION = 2
 
 
 class WorkflowCommandError(WorkflowError):
@@ -101,7 +104,7 @@ class WorkflowState:
     """Complete snapshot needed to resume and explain a workflow."""
 
     id: str = field(default_factory=lambda: f"workflow-{uuid.uuid4().hex[:12]}")
-    version: int = 1
+    version: int = WORKFLOW_SCHEMA_VERSION
     # ``scope`` is the first actionable step.  Keeping the phase aligned with
     # it avoids an impossible initial read-model (intake + scope).
     current_phase: WorkflowPhase = WorkflowPhase.SCOPE
@@ -930,6 +933,13 @@ class WorkflowEngine:
         path = Path(path)
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
+            if (
+                not isinstance(payload, dict)
+                or payload.get("version") != WORKFLOW_SCHEMA_VERSION
+            ):
+                raise WorkflowError(
+                    f"Unsupported workflow schema; expected version {WORKFLOW_SCHEMA_VERSION}"
+                )
             findings = {
                 key: Finding(**value)
                 for key, value in payload.pop("findings", {}).items()
@@ -942,6 +952,14 @@ class WorkflowEngine:
             payload.setdefault("skipped_steps", [])
             payload.setdefault("priority_score", 0.0)
             state = WorkflowState(**payload, findings=findings, pending_actions=actions)
-            return cls(state)
+            engine = cls(state)
+            integrity_errors = engine.validate_integrity()
+            if integrity_errors:
+                raise WorkflowError(
+                    "Invalid workflow state: " + "; ".join(integrity_errors)
+                )
+            return engine
+        except WorkflowError:
+            raise
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             raise WorkflowError(f"Cannot load workflow state: {path}") from exc

@@ -128,6 +128,21 @@ WAIVED_OPTIONS: dict[tuple[str, str], str] = {
         "Writes to the user's shell profile (a side effect a gate must not cause); "
         "its read-only sibling --show-completion is exercised instead."
     ),
+    ("workflow-init", "--state"): (
+        "Workflow CLI persistence is covered by the workflow engine and CLI integration tests."
+    ),
+    ("workflow-status", "--state"): (
+        "Workflow CLI read-model persistence is covered by the workflow integration tests."
+    ),
+    ("workflow-apply", "--command"): (
+        "Workflow command dispatch is covered by WorkflowEngine command-boundary tests."
+    ),
+    ("workflow-apply", "--payload"): (
+        "Workflow JSON payload validation is covered by WorkflowEngine command-boundary tests."
+    ),
+    ("workflow-apply", "--state"): (
+        "Workflow state persistence is covered by workflow integration tests."
+    ),
 }
 
 

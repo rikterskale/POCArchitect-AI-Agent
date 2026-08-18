@@ -80,6 +80,32 @@ Reset a ledger by moving its prior contents to a timestamped backup.
 | `--batch-state` | PATH | reports/batch_progress.json | Batch ledger to reset. |
 | `--yes` | BOOLEAN | False | Confirm the recoverable reset without an interactive prompt. |
 
+## Command: `workflow-init`
+
+Create a new auditable finding-driven workflow state file.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--state` | PATH | reports/workflow.json | — |
+
+## Command: `workflow-status`
+
+Show the current workflow read model and recommendations.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--state` | PATH | reports/workflow.json | — |
+
+## Command: `workflow-apply`
+
+Apply one auditable workflow command and persist the resulting state.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--command` | TEXT | required | WorkflowEngine command name. |
+| `--payload` | TEXT | {} | JSON object passed to the command. |
+| `--state` | PATH | reports/workflow.json | — |
+
 ## Command: `setup`
 
 Interactive first-run wizard: choose a provider, store a key, verify readiness.
@@ -105,6 +131,9 @@ Show effective settings and where each value comes from (keys masked).
 | `demo` | Generate a local demo report without credentials, network, or provider cost. |
 | `batch-status` | Show a concise, machine-readable summary of batch recovery state. |
 | `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. |
+| `workflow-init` | Create a new auditable finding-driven workflow state file. |
+| `workflow-status` | Show the current workflow read model and recommendations. |
+| `workflow-apply` | Apply one auditable workflow command and persist the resulting state. |
 | `setup` | Interactive first-run wizard: choose a provider, store a key, verify readiness. |
 | `config` | Show effective settings and where each value comes from (keys masked). |
 

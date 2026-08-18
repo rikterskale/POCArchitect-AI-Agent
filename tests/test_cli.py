@@ -323,6 +323,38 @@ def test_redact_sensitive_input_removes_values_before_transfer():
     assert "[REDACTED]" in redacted
 
 
+def test_redact_sensitive_input_covers_common_cloud_and_bearer_tokens():
+    source = "ghp_12345678901234567890 AKIA1234567890ABCDEF Bearer abcdefghijklmnop"
+    redacted, categories, count = cli.redact_sensitive_input(source)
+    assert count >= 2
+    assert categories
+    assert "ghp_12345678901234567890" not in redacted
+    assert "AKIA1234567890ABCDEF" not in redacted
+    assert "Bearer abcdefghijklmnop" not in redacted
+
+
+def test_save_report_uses_unique_collision_safe_names(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "output_format", "json")
+    first = cli.save_report(
+        "# first",
+        "https://github.com/example/poc",
+        tmp_path,
+        "local",
+        "demo",
+        cli.GroundingResult("", "disabled"),
+    )
+    second = cli.save_report(
+        "# second",
+        "https://github.com/example/poc",
+        tmp_path,
+        "local",
+        "demo",
+        cli.GroundingResult("", "disabled"),
+    )
+    assert first != second
+    assert first.exists() and second.exists()
+
+
 def test_json_dry_run_is_machine_readable_and_no_color():
     result = RUNNER.invoke(
         cli.app,

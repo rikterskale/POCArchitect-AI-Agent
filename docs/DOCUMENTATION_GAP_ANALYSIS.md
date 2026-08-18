@@ -496,7 +496,7 @@ cell uses recalculated current `path:line` citations. Its fingerprint binds each
 finding to its citation coordinates and normalized cited-file content so line-
 ending conversion does not create drift while evidence or coordinate changes do.
 
-<!-- closure-evidence-sha256: fa6e7e68e88439cad08047f72288d0eb41eebd8b1c4a73a6ff6a4d1f5fda0615 -->
+<!-- closure-evidence-sha256: 5243650cca5844619bbe5a771cb2263d55bf8de7d43f91c03b868a643fc53089 -->
 
 | Finding | Status | Current evidence | Verified resolution |
 |---|---|---|---|

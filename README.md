@@ -21,6 +21,7 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Retry logic + timeouts on LLM calls; fast, friendly errors for unknown models
 - Reports print their absolute path with an optional `--open`, plus a short preview
 - Finding-driven workflow kernel with resumable guided state, lifecycle gates, and audited recommendations
+- Auditable workflow CLI (`workflow-init`, `workflow-status`, `workflow-apply`) for durable finding handling
 - Shell completion (`--install-completion`), `--dry-run` (summary, or `--full`), and `--verbose`
 
 ## Feature status

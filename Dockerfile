@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
 # Final stage
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash pocuser
@@ -28,6 +31,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 USER pocuser
 
 VOLUME ["/reports"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD ["pocarchitect", "doctor", "--offline"]
 
 ENTRYPOINT ["pocarchitect"]
 CMD ["--help"]
