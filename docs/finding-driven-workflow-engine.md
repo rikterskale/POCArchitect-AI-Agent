@@ -8,7 +8,7 @@ The engine has four deliberately separate concerns:
 
 1. **Durable domain state** — `WorkflowState` stores the current phase and step, completed and skipped steps, findings, actions, decisions, audit events, scores, mode, and terminal state.
 2. **Finding lifecycle** — `Finding` stores the observation, evidence, confidence, severity, relationships, recommended actions, metadata, and status history. The normal lifecycle is `open → validated → exploited → mitigated → closed`; invalid jumps fail safely.
-3. **Policy and orchestration** — `WorkflowEngine` recalculates risk, priority, derived actions, blockers, branch skips, and progress after every mutation.
+3. **Policy and orchestration** — `WorkflowEngine` recalculates risk, priority, derived actions, blockers, branch skips, and progress after every mutation. Terminal findings may be `closed` after treatment or `waived` as an explicitly justified false positive/accepted exception.
 4. **Read model and persistence** — `snapshot()` is the stable UI/agent read model, including finding/action detail, decisions, audit history, scores, and guidance; `save()`/`load()` use atomic JSON replacement so an interrupted write does not corrupt resumability.
 
 ## Finding and state contracts

@@ -63,6 +63,35 @@ def test_invalid_lifecycle_and_unknown_references_fail_safely():
         engine.resolve_action("missing")
 
 
+def test_false_positive_can_be_waived_without_stranding_closure():
+    engine = WorkflowEngine()
+    finding = engine.inject_finding(title="False positive", severity=7)
+
+    with pytest.raises(WorkflowError, match="non-empty rationale"):
+        engine.waive_finding(finding.id, rationale=" ")
+
+    engine.waive_finding(finding.id, rationale="Reproduced as a test-only asset")
+    assert finding.status == FindingStatus.WAIVED
+    assert finding.id not in engine.state.open_findings
+    assert engine.state.pending_actions[f"validate:{finding.id}"].status == "done"
+    assert any(event["event"] == "finding.waived" for event in engine.state.audit_log)
+
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+    engine.complete_step("discover")
+    engine.complete_step("validate")
+    engine.complete_step("assess-impact")
+    engine.complete_step("plan-remediation")
+    engine.complete_step("verify-remediation")
+    engine.complete_step("report")
+    engine.decide("closure_approved", True)
+    engine.complete_step("close")
+    engine.complete_step("archive")
+    assert engine.state.terminal is True
+
+
 def test_override_and_agent_mode_are_audited():
     engine = WorkflowEngine()
     engine.state.mode = "automated"

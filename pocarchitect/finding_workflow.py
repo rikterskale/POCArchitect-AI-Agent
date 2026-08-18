@@ -38,6 +38,7 @@ class FindingStatus(str, Enum):
     EXPLOITED = "exploited"
     MITIGATED = "mitigated"
     CLOSED = "closed"
+    WAIVED = "waived"
 
 
 class WorkflowPhase(str, Enum):
@@ -124,7 +125,7 @@ class WorkflowState:
         return [
             finding_id
             for finding_id, finding in self.findings.items()
-            if finding.status != FindingStatus.CLOSED
+            if finding.status not in (FindingStatus.CLOSED, FindingStatus.WAIVED)
         ]
 
     @property
@@ -330,6 +331,10 @@ class WorkflowEngine:
                         and status in (FindingStatus.MITIGATED, FindingStatus.CLOSED)
                     )
                     or (action.kind == "verify" and status == FindingStatus.CLOSED)
+                    or (
+                        action.kind in {"validate", "impact", "remediate", "verify"}
+                        and status == FindingStatus.WAIVED
+                    )
                 )
                 if obsolete:
                     action.status = "done"
@@ -421,11 +426,16 @@ class WorkflowEngine:
             raise WorkflowError(f"Unknown finding status: {status}") from exc
         previous = finding.status
         allowed = {
-            FindingStatus.OPEN: {FindingStatus.VALIDATED},
-            FindingStatus.VALIDATED: {FindingStatus.EXPLOITED, FindingStatus.MITIGATED},
+            FindingStatus.OPEN: {FindingStatus.VALIDATED, FindingStatus.WAIVED},
+            FindingStatus.VALIDATED: {
+                FindingStatus.EXPLOITED,
+                FindingStatus.MITIGATED,
+                FindingStatus.WAIVED,
+            },
             FindingStatus.EXPLOITED: {FindingStatus.MITIGATED},
             FindingStatus.MITIGATED: {FindingStatus.CLOSED},
             FindingStatus.CLOSED: set(),
+            FindingStatus.WAIVED: set(),
         }
         if status != finding.status and status not in allowed[finding.status]:
             raise WorkflowError(
@@ -449,6 +459,18 @@ class WorkflowEngine:
             reason=reason,
         )
         self._recalculate()
+        return finding
+
+    def waive_finding(self, finding_id: str, *, rationale: str) -> Finding:
+        """Resolve a false positive or accepted exception with an audit trail."""
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise WorkflowError("A finding waiver requires a non-empty rationale")
+        finding = self.update_finding_status(
+            finding_id, FindingStatus.WAIVED, reason=rationale.strip()
+        )
+        self._audit(
+            "finding.waived", finding_id=finding_id, rationale=rationale.strip()
+        )
         return finding
 
     def decide(self, key: str, value: Any, *, rationale: str = "") -> None:
@@ -619,6 +641,7 @@ class WorkflowEngine:
             "inject_finding": self.inject_finding,
             "enrich_finding": self.enrich_finding,
             "update_finding_status": self.update_finding_status,
+            "waive_finding": self.waive_finding,
             "correlate": self.correlate,
             "decide": self.decide,
             "resolve_action": self.resolve_action,
@@ -718,7 +741,8 @@ class WorkflowEngine:
             ):
                 return ["Complete all required pending actions."]
             if any(
-                f.status != FindingStatus.CLOSED for f in self.state.findings.values()
+                f.status not in (FindingStatus.CLOSED, FindingStatus.WAIVED)
+                for f in self.state.findings.values()
             ):
                 return ["Close or explicitly waive every finding."]
         return []
@@ -768,7 +792,7 @@ class WorkflowEngine:
                 self.state.findings.values(),
                 key=lambda item: (item.status == FindingStatus.CLOSED, -item.severity),
             ):
-                if finding.status != FindingStatus.CLOSED:
+                if finding.status not in (FindingStatus.CLOSED, FindingStatus.WAIVED):
                     result.append(
                         {
                             "kind": "finding",
@@ -802,6 +826,7 @@ class WorkflowEngine:
             FindingStatus.EXPLOITED: "plan-remediation",
             FindingStatus.MITIGATED: "verify-remediation",
             FindingStatus.CLOSED: "none",
+            FindingStatus.WAIVED: "none",
         }[finding.status]
 
     def snapshot(self) -> dict[str, Any]:
