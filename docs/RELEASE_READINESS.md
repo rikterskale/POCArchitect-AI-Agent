@@ -15,9 +15,11 @@ explicitly waived with a stated reason — see
 [Option coverage, enforced](#option-coverage-enforced). It is invoked two ways
 in CI (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):
 
-- The **`release-readiness` job** builds the wheel, installs it into a clean
-  virtual environment, and runs the gate against that install — proving what a
-  user receives, not what the working tree contains.
+- The **`package` job** builds one wheel and source distribution, validates the
+  packaged documentation, and uploads those exact artifacts.
+- The **`release-readiness` matrix** installs those artifacts into disposable
+  virtual environments on Linux, Windows, and macOS, then runs the gate against
+  each install — proving what users receive, not what the working tree contains.
 - The **test suite** runs the same gate (`tests/test_release_readiness.py`) so
   regressions are caught on every push, and `build` depends on both.
 
@@ -39,14 +41,17 @@ Enforced checks:
 - `pocarchitect preflight --offline --format json` reports **Preflight passed**
   in a clean install (Python, dependencies, entry point, prompt asset, writable
   output directory).
-- The `pocarchitect` console script is registered as an entry point (not only
-  `python -m pocarchitect`).
+- During clean-artifact checks, the generated `pocarchitect` console executable
+  itself runs `--version` and `--help` (not only `python -m pocarchitect`), and
+  its entry point is registered. Source-tree runs use the module entry point.
 - `pocarchitect --show-completion` emits a shell-completion script (the feature
   ships without requiring the user to first mutate their shell profile).
 
-**CI proof:** the `release-readiness` job installs **from the built wheel** into
-a fresh `venv`, so an editable/source checkout cannot mask a packaging defect
-(missing package data, broken entry point, unshipped module).
+**CI gate:** the `release-readiness` matrix installs the built wheel on Linux
+(minimum and maximum supported Python), Windows, and macOS, and installs the
+source distribution on Linux. Each case uses a fresh `venv`, runs `pip check`,
+and starts outside the checkout so editable source files and runner packages
+cannot mask a packaging defect.
 
 ---
 
@@ -179,14 +184,13 @@ python scripts/release_readiness.py            # human-readable report
 python scripts/release_readiness.py --format json
 ```
 
-For a true first-day simulation, run it against a wheel install rather than an
-editable checkout:
+For a true first-day simulation, build the artifacts and use the same
+cross-platform clean-install driver as CI:
 
 ```bash
 python -m build
-python -m venv /tmp/fresh
-/tmp/fresh/bin/pip install dist/*.whl
-/tmp/fresh/bin/python scripts/release_readiness.py
+python scripts/validate_fresh_install.py dist --artifact wheel
+python scripts/validate_fresh_install.py dist --artifact sdist
 ```
 
 Exit code `0` means release-ready; `1` means at least one pillar failed, and the

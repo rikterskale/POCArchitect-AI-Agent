@@ -32,11 +32,12 @@ import subprocess
 import sys
 import tempfile
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Iterator
+from typing import ClassVar
 
 # A run of token-shaped characters long enough to be an unmasked secret. The
 # masking helper only ever reveals a 4-char prefix, so a match means a real leak.
@@ -167,6 +168,34 @@ def run_cli(
         encoding="utf-8",
         errors="replace",
         timeout=120,
+        check=False,
+    )
+
+
+def run_console(
+    args: list[str], cwd: Path, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Invoke the generated console executable exactly as an installed user does."""
+    name = "pocarchitect.exe" if os.name == "nt" else "pocarchitect"
+    executable = Path(sys.executable).resolve().parent / name
+    if not executable.is_file():
+        return subprocess.CompletedProcess(
+            [str(executable), *args],
+            127,
+            "",
+            f"Console executable not found: {executable}",
+        )
+    return subprocess.run(
+        [str(executable), *args],
+        cwd=str(cwd),
+        env=env or _clean_env(),
+        input="",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=120,
+        check=False,
     )
 
 
@@ -180,9 +209,9 @@ class _MockProviderHandler(BaseHTTPRequestHandler):
     lets the gate prove that ``--model`` and ``--temperature`` reached the wire.
     """
 
-    requests: list[dict] = []
+    requests: ClassVar[list[dict]] = []
 
-    def log_message(self, *args: object) -> None:  # noqa: D401 — silence logging
+    def log_message(self, *args: object) -> None:
         pass
 
     def _send(self, code: int, obj: dict) -> None:
@@ -193,13 +222,13 @@ class _MockProviderHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self) -> None:  # noqa: N802 — http.server API
+    def do_GET(self) -> None:
         if self.path.endswith("/models"):
             self._send(200, {"object": "list", "data": [{"id": MOCK_MODEL}]})
         else:
             self._send(404, {"error": "not found"})
 
-    def do_POST(self) -> None:  # noqa: N802 — http.server API
+    def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
         try:
             payload = json.loads(self.rfile.read(length) or b"{}")
@@ -257,7 +286,7 @@ def all_long_options() -> set[tuple[str, str]]:
     root = get_command(app)
     options: set[tuple[str, str]] = set()
 
-    def collect(command_path: str, command) -> None:  # noqa: ANN001 — click object
+    def collect(command_path: str, command) -> None:
         for param in command.params:
             names = list(getattr(param, "opts", [])) + list(
                 getattr(param, "secondary_opts", [])
@@ -286,20 +315,24 @@ def json_events(stdout: str) -> list[dict]:
 
 
 # ── Pillar 1: Proven installation ────────────────────────────────────────────
-def pillar_installation(work: Path) -> Pillar:
+def pillar_installation(work: Path, require_console_script: bool = False) -> Pillar:
     p = Pillar("installation", "Proven installation")
 
-    version = run_cli(["--version"], work)
+    launcher = run_console if require_console_script else run_cli
+    launch_name = "pocarchitect" if require_console_script else "python -m pocarchitect"
+
+    version = launcher(["--version"], work)
     p.record(
-        "`--version` runs and reports a version",
+        f"Installed `{launch_name} --version` runs and reports a version",
         version.returncode == 0 and "POCArchitect" in version.stdout,
         version.stdout.strip() or version.stderr.strip(),
     )
 
-    help_result = run_cli(["--help"], work)
+    help_result = launcher(["--help"], work)
     p.record(
-        "`--help` runs",
+        f"Installed `{launch_name} --help` runs",
         help_result.returncode == 0 and "Usage" in help_result.stdout,
+        help_result.stdout.strip() or help_result.stderr.strip(),
     )
 
     preflight_output = work / "preflight-output"
@@ -811,6 +844,7 @@ def _run_script(rel: str, *args: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
         timeout=120,
+        check=False,
     )
 
 
@@ -847,9 +881,9 @@ def pillar_documentation() -> Pillar:
     return p
 
 
-def collect(work: Path) -> list[Pillar]:
+def collect(work: Path, require_console_script: bool = False) -> list[Pillar]:
     return [
-        pillar_installation(work),
+        pillar_installation(work, require_console_script=require_console_script),
         pillar_troubleshooting(work),
         pillar_features(work),
         pillar_recovery(work),
@@ -896,10 +930,18 @@ def render_json(pillars: list[Pillar]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--format", choices=["text", "json"], default="text")
+    parser.add_argument(
+        "--require-console-script",
+        action="store_true",
+        help="Require the generated pocarchitect executable from an artifact install.",
+    )
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as tmp:
-        pillars = collect(Path(tmp))
+        pillars = collect(
+            Path(tmp),
+            require_console_script=args.require_console_script,
+        )
 
     output = render_json(pillars) if args.format == "json" else render_text(pillars)
     print(output)

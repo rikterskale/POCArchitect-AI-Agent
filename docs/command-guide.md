@@ -44,9 +44,11 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[all]'
 ```
 
-Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. The macOS
-path is documented but is not independently tested in current repository
-evidence. The project does not enforce a processor-architecture requirement.
+Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. The
+first-run matrix installs release artifacts and runs the offline readiness gate
+on Linux, Windows, and macOS. Interactive shell behavior and paid-provider calls
+remain outside that gate. The project does not enforce a processor-architecture
+requirement.
 
 ## Authoritative entry points
 
@@ -371,10 +373,14 @@ docker build -t pocarchitect:test .
 docker run --rm pocarchitect:test --help
 python -m build
 python scripts/validate_distribution.py dist
+python scripts/validate_fresh_install.py dist --artifact wheel
+python scripts/validate_fresh_install.py dist --artifact sdist
 ```
 
-CI repeats tests on Python 3.10-3.13. Codecov upload and hosted runner outcomes
-are CI-only; local command success does not prove those services succeed.
+CI repeats tests on Python 3.10-3.13. Its first-run matrix installs wheels on
+Linux, Windows, and macOS plus the sdist on Linux. Codecov upload and hosted
+runner outcomes are CI-only; local command success does not prove those services
+succeed.
 
 Documentation controls have intentionally bounded claims:
 
@@ -387,6 +393,7 @@ Documentation controls have intentionally bounded claims:
 | `validate_documentation_reports.py` | Report structure, closure evidence ranges/fingerprint, historical banner | Behavioral truth of cited code |
 | `validate_ci_workflow.py` | Required checked-in CI invariants and absence of retired mutators | Hosted CI success |
 | `validate_distribution.py` | Local Markdown targets inside the built sdist | External links or wheel-installed docs |
+| `validate_fresh_install.py` | Isolated wheel/sdist install, dependency consistency, and the first-day readiness gate | Paid providers or interactive host-shell behavior |
 | `release_readiness.py` | Five hermetic first-day pillars and live option coverage, ideally against an installed wheel | External provider, native Docker, or every host environment |
 
 The former `apply_ci_fixes.py`, its embedded template, and

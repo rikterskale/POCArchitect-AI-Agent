@@ -7,9 +7,9 @@
 | Status | **PARTIALLY VERIFIED** |
 | Reviewed branch | <code>main</code> |
 | Detected project version | <code>0.2.0</code> |
-| Last documentation update | 2026-08-15 |
-| Verified platforms | Existing Windows PowerShell virtual environment; Ubuntu CI uses Python 3.10–3.13; Docker CI builds the image and runs <code>--help</code> |
-| Validation limitations | No clean-room installation, live provider request, live Ollama request, or native Docker Desktop run was performed in this review |
+| Last documentation update | 2026-08-17 |
+| CI-gated platforms | Linux wheels on Python 3.10/3.13, Linux sdist on 3.12, and Windows/macOS wheels on 3.12; Docker CI builds the image and runs <code>--help</code> |
+| Validation limitations | No live cloud-provider request, live Ollama request, interactive setup session, WSL/Git Bash run, or native Docker Desktop run is automated |
 
 ## 1. What This Guide Helps You Do
 
@@ -35,7 +35,7 @@ Only analyze repositories you are authorized to inspect. A real grounded run clo
 
 You need Python 3.10 or newer, Git, and a terminal: Windows Terminal with PowerShell on Windows or a Bash-compatible terminal on Linux. Check Python with <code>py --version</code> in PowerShell or <code>python3 --version</code> in Bash, and check Git with <code>git --version</code>. A provider credential is required only for a real cloud-provider run.
 
-Ubuntu CI validates Python 3.10–3.13. The safe workflow was reviewed in an existing Windows virtual environment. macOS and clean Windows/Linux installations were not independently tested. The repository requires Python 3.10+ but does not enforce a processor-architecture restriction.
+CI runs unit tests on Ubuntu with Python 3.10–3.13. It also installs release artifacts into disposable environments and runs the offline first-day readiness gate on Windows and macOS with Python 3.12, on Linux wheels with Python 3.10 and 3.13, and on a Linux source distribution with Python 3.12. The repository requires Python 3.10+ but does not enforce a processor-architecture restriction.
 
 ## 7. Basic Terms Explained
 
@@ -355,8 +355,9 @@ public option to disable <code>include_mitigations</code>. Source candidates are
 selected by fixed filename keywords/extensions, files over 250,000 bytes are
 skipped, content is truncated at 7,500 characters, and only the first 25
 matches are included. Cloud responses, live credentials/endpoints, native
-Docker Desktop, macOS, and clean-room installation paths remain external or
-unverified.
+Docker Desktop behavior, WSL/Git Bash, and interactive shell-specific behavior
+remain external or unverified. Clean artifact installation and offline first-day
+behavior are enforced on Linux, Windows, and macOS in CI.
 
 ## 27. Collect Diagnostic Information and Report a Problem
 

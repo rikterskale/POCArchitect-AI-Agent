@@ -1,8 +1,9 @@
 # POCArchitect Windows PowerShell Supplement
 
-Status: **PARTIALLY VERIFIED**. The safe CLI workflow has been exercised in an
-existing Windows environment; a native clean-room installation, provider-backed
-run, and Docker Desktop run have not been independently validated.
+Status: **PARTIALLY VERIFIED**. CI clean-installs the wheel and runs the offline
+readiness gate on Windows/Python 3.12. Interactive PowerShell setup,
+provider-backed operation, WSL/Git Bash, and Docker Desktop remain outside that
+gate.
 
 > The repository-wide [Novice Usability Guide](../NOVICE_USABILITY_GUIDE.md) is
 > authoritative for behavior, safety, providers, grounding, batch semantics,

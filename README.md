@@ -57,9 +57,9 @@ does not test chat completions or model suitability.
 
 | Platform/path | Status | Notes |
 |---|---|---|
-| Linux Bash | Validated in CI | CI exercises Ubuntu with Python 3.10–3.13. |
-| Windows PowerShell | Partially validated | The safe CLI workflow was reviewed in an existing Windows virtual environment; native Windows CI is not configured. |
-| macOS | Not independently tested | The Bash/Zsh installation path is documented, but no current macOS run is repository evidence. |
+| Linux Bash | CI-gated | Unit tests cover Python 3.10–3.13; the first-run matrix installs wheels on 3.10/3.13 and the sdist on 3.12. |
+| Windows PowerShell | CI-gated | The first-run matrix installs the wheel on Windows/Python 3.12 and runs the offline readiness gate. |
+| macOS | CI-gated | The first-run matrix installs the wheel on macOS/Python 3.12 and runs the offline readiness gate. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
 | Docker Desktop/Linux Docker | Validated in CI | CI builds the image and runs its `--help` smoke test; mount a writable host directory to `/reports` for reports. |
 

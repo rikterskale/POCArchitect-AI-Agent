@@ -144,12 +144,7 @@ jobs:
       - name: Smoke test Docker image
         run: docker run --rm pocarchitect:test --help
 
-  release-readiness:
-    # New-user release readiness standard (docs/RELEASE_READINESS.md).
-    # Not a coverage threshold: this proves a first-day user can install, be
-    # guided through failures, exercise every feature, recover from mistakes,
-    # and find accurate docs. The gate runs against a wheel installed into a
-    # clean environment so it validates the shipped artifact, not the checkout.
+  package:
     needs: quality
     runs-on: ubuntu-latest
     steps:
@@ -161,48 +156,80 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-dev.txt
-            pyproject.toml
 
-      - name: Build distribution
+      - name: Build distributions
         run: |
           python -m pip install --upgrade pip build
           python -m build
 
-      - name: Install from wheel into a clean environment (proven installation)
-        run: |
-          python -m venv /tmp/fresh
-          /tmp/fresh/bin/python -m pip install --upgrade pip
-          /tmp/fresh/bin/python -m pip install dist/*.whl
+      - name: Validate packaged documentation links
+        run: python scripts/validate_distribution.py dist
 
-      - name: Enforce release readiness standard
-        run: /tmp/fresh/bin/python scripts/release_readiness.py --format text
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-distributions
+          path: dist/
+          if-no-files-found: error
+
+  release-readiness:
+    # New-user release readiness standard (docs/RELEASE_READINESS.md).
+    # The matrix installs the built artifacts into disposable virtual
+    # environments so source files and preinstalled runner packages cannot hide
+    # packaging, entry-point, dependency, or platform defects.
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.10"
+            artifact: wheel
+          - os: ubuntu-latest
+            python-version: "3.13"
+            artifact: wheel
+          - os: windows-latest
+            python-version: "3.12"
+            artifact: wheel
+          - os: macos-latest
+            python-version: "3.12"
+            artifact: wheel
+          - os: ubuntu-latest
+            python-version: "3.12"
+            artifact: sdist
+    runs-on: ${{ matrix.os }}
+    name: First run (${{ matrix.os }}, Python ${{ matrix.python-version }}, ${{ matrix.artifact }})
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-distributions
+          path: dist
+
+      - name: Exercise a clean first install
+        run: python scripts/validate_fresh_install.py dist --artifact ${{ matrix.artifact }}
 
   build:
-    needs: [quality, test, security, docker, release-readiness]
+    needs: [quality, test, security, docker, package, release-readiness]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+      - name: Download validated release artifacts
+        uses: actions/download-artifact@v4
         with:
-          python-version: "3.12"
-          cache: pip
+          name: release-distributions
+          path: dist
 
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-
-      - name: Build package
-        run: python -m build
-
-      - name: Validate packaged documentation links
-        run: python scripts/validate_distribution.py dist
-
-      - name: List built artifacts
+      - name: List releasable artifacts
         run: ls -la dist/
