@@ -71,3 +71,49 @@ def test_override_and_agent_mode_are_audited():
     )
     assert next_step == "authorize"
     assert engine.state.audit_log[-1]["override"] is True
+
+
+def test_empty_scope_takes_a_safe_branch_to_report_and_archive():
+    engine = WorkflowEngine()
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+    assert engine.complete_step("discover") == "report"
+    assert {"validate", "assess-impact", "plan-remediation", "verify-remediation"}.issubset(
+        set(engine.state.skipped_steps)
+    )
+    engine.complete_step("report")
+    engine.complete_step("close")
+    engine.complete_step("archive")
+    assert engine.state.terminal is True
+    assert engine.state.progress_percent == 100.0
+
+
+def test_finding_actions_reconcile_with_lifecycle_and_priority():
+    engine = WorkflowEngine()
+    finding = engine.inject_finding(
+        title="Confirmed injection", severity=8, confidence=80, source="scanner"
+    )
+    assert engine.state.priority_score == 6.4
+    assert engine.state.pending_actions[f"validate:{finding.id}"].status == "pending"
+
+    engine.update_finding_status(finding.id, FindingStatus.VALIDATED)
+    assert engine.state.pending_actions[f"validate:{finding.id}"].status == "done"
+    assert engine.state.pending_actions[f"impact:{finding.id}"].status == "pending"
+    assert engine.state.pending_actions[f"remediate:{finding.id}"].status == "pending"
+
+    engine.resolve_action(f"impact:{finding.id}")
+    engine.update_finding_status(finding.id, FindingStatus.MITIGATED)
+    assert engine.state.pending_actions[f"remediate:{finding.id}"].status == "done"
+    assert engine.state.pending_actions[f"verify:{finding.id}"].status == "pending"
+    engine.resolve_action(f"verify:{finding.id}")
+    engine.update_finding_status(finding.id, FindingStatus.CLOSED)
+    assert engine.state.priority_score == 0.0
+
+
+def test_override_requires_explanation_and_progress_is_recommendable():
+    engine = WorkflowEngine()
+    with pytest.raises(WorkflowError, match="rationale"):
+        engine.complete_step("scope", override=True)
+    assert any(item["kind"] == "progress" for item in engine.recommendations())

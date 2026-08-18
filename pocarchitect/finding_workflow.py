@@ -63,6 +63,7 @@ class Finding:
     evidence: list[str] = field(default_factory=list)
     related_finding_ids: list[str] = field(default_factory=list)
     recommended_actions: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
     history: list[dict[str, Any]] = field(default_factory=list)
@@ -95,12 +96,14 @@ class WorkflowState:
     current_phase: WorkflowPhase = WorkflowPhase.INTAKE
     current_step_id: str = "scope"
     completed_steps: list[str] = field(default_factory=list)
+    skipped_steps: list[str] = field(default_factory=list)
     findings: dict[str, Finding] = field(default_factory=dict)
     pending_actions: dict[str, PendingAction] = field(default_factory=dict)
     decisions: list[dict[str, Any]] = field(default_factory=list)
     audit_log: list[dict[str, Any]] = field(default_factory=list)
     progress_percent: float = 0.0
     risk_score: float = 0.0
+    priority_score: float = 0.0
     mode: str = "interactive"
     terminal: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -196,8 +199,24 @@ class WorkflowEngine:
         self.state.risk_score = round(
             sum(f.severity * (f.confidence / 100) for f in findings), 2
         )
+        # Priority weights urgency (severity), certainty (confidence), and
+        # exploitability. It is intentionally transparent and replaceable by
+        # a policy adapter at the application boundary.
+        self.state.priority_score = round(
+            sum(
+                f.severity
+                * (f.confidence / 100)
+                * (1.25 if f.status == FindingStatus.EXPLOITED else 1.0)
+                for f in findings
+                if f.status != FindingStatus.CLOSED
+            ),
+            2,
+        )
         self.state.progress_percent = round(
-            100 * len(self.state.completed_steps) / len(self.steps), 1
+            100
+            * (len(set(self.state.completed_steps) | set(self.state.skipped_steps)))
+            / len(self.steps),
+            1,
         )
         # Keep derived required actions coherent after every command.
         for finding in findings:
@@ -209,17 +228,52 @@ class WorkflowEngine:
                     finding.id,
                     "Open finding requires validation.",
                 )
-            elif (
-                finding.status in (FindingStatus.VALIDATED, FindingStatus.EXPLOITED)
-                and finding.severity >= 4
+            elif finding.status in (
+                FindingStatus.VALIDATED,
+                FindingStatus.EXPLOITED,
             ):
                 self._ensure_action(
-                    f"remediate:{finding.id}",
-                    "Plan or verify remediation",
-                    "remediate",
+                    f"impact:{finding.id}",
+                    "Assess finding impact",
+                    "impact",
                     finding.id,
-                    "Material finding requires treatment.",
+                    "Validated finding needs impact and exploitability assessment.",
                 )
+                if finding.severity >= 4:
+                    self._ensure_action(
+                        f"remediate:{finding.id}",
+                        "Plan or verify remediation",
+                        "remediate",
+                        finding.id,
+                        "Material finding requires treatment.",
+                    )
+            elif (
+                finding.status == FindingStatus.MITIGATED
+            ):
+                self._ensure_action(
+                    f"verify:{finding.id}",
+                    "Verify remediation",
+                    "verify",
+                    finding.id,
+                    "Mitigated finding requires verification before closure.",
+                )
+        # Lifecycle changes make earlier derived actions obsolete. Mark them
+        # done rather than deleting them, preserving the audit-friendly trail.
+        for action in self.state.pending_actions.values():
+            if action.finding_id and action.finding_id in self.state.findings:
+                status = self.state.findings[action.finding_id].status
+                obsolete = (
+                    action.kind == "validate" and status != FindingStatus.OPEN
+                ) or (
+                    action.kind == "impact"
+                    and status
+                    not in (FindingStatus.VALIDATED, FindingStatus.EXPLOITED)
+                ) or (
+                    action.kind == "remediate"
+                    and status in (FindingStatus.MITIGATED, FindingStatus.CLOSED)
+                ) or (action.kind == "verify" and status == FindingStatus.CLOSED)
+                if obsolete:
+                    action.status = "done"
         for action_id, action in list(self.state.pending_actions.items()):
             if action.finding_id and action.finding_id not in self.state.findings:
                 del self.state.pending_actions[action_id]
@@ -268,7 +322,13 @@ class WorkflowEngine:
         finding.updated_at = _now()
         finding.history.append({"at": finding.updated_at, "event": "enriched"})
         self._audit("finding.enriched", finding_id=finding_id)
+        self._recalculate()
         return finding
+
+    def inject_finding(self, **values: Any) -> Finding:
+        """Explicit entry point for user, connector, or agent observations."""
+        values.setdefault("source", "injected")
+        return self.add_finding(**values)
 
     def update_finding_status(
         self, finding_id: str, status: FindingStatus, *, reason: str = ""
@@ -351,11 +411,18 @@ class WorkflowEngine:
         blockers = self.blockers(step_id)
         if blockers and not override:
             raise WorkflowError("Step is blocked: " + "; ".join(blockers))
+        if override and not rationale.strip():
+            raise WorkflowError("An override requires a non-empty rationale")
         self.state.completed_steps.append(step_id)
         self._audit(
             "step.completed", step_id=step_id, override=override, rationale=rationale
         )
         next_id = self._next_step(step_id)
+        while next_id != step_id and self._should_skip(next_id):
+            if next_id not in self.state.skipped_steps:
+                self.state.skipped_steps.append(next_id)
+                self._audit("step.skipped", step_id=next_id, reason="finding-driven branch")
+            next_id = self._next_step(next_id)
         self.state.current_step_id = next_id
         self.state.current_phase = self._step(next_id).phase
         self.state.terminal = next_id == "archive" and step_id == "archive"
@@ -365,6 +432,17 @@ class WorkflowEngine:
     def _next_step(self, step_id: str) -> str:
         index = next(i for i, step in enumerate(self.steps) if step.id == step_id)
         return self.steps[min(index + 1, len(self.steps) - 1)].id
+
+    def _should_skip(self, step_id: str) -> bool:
+        """Branch low-signal workflows while retaining a complete report route."""
+        if self.state.findings:
+            return False
+        return step_id in {
+            "validate",
+            "assess-impact",
+            "plan-remediation",
+            "verify-remediation",
+        }
 
     def blockers(self, step_id: str | None = None) -> list[str]:
         step_id = step_id or self.state.current_step_id
@@ -379,6 +457,22 @@ class WorkflowEngine:
             "report",
         } and any(f.status == FindingStatus.OPEN for f in self.state.findings.values()):
             return ["Validate all open findings before continuing."]
+        if step_id == "plan-remediation":
+            incomplete = [
+                a.title
+                for a in self.state.pending_actions.values()
+                if a.required and a.status != "done" and a.kind == "impact"
+            ]
+            if incomplete:
+                return ["Resolve required finding actions: " + ", ".join(incomplete)]
+        if step_id == "verify-remediation":
+            incomplete = [
+                a.title
+                for a in self.state.pending_actions.values()
+                if a.required and a.status != "done" and a.kind == "remediate"
+            ]
+            if incomplete:
+                return ["Resolve required finding actions: " + ", ".join(incomplete)]
         if step_id == "close":
             if any(
                 a.required and a.status != "done"
@@ -418,6 +512,16 @@ class WorkflowEngine:
         for action in self.state.pending_actions.values():
             if action.status == "pending":
                 result.append({"kind": action.kind, **asdict(action)})
+        result.append(
+            {
+                "kind": "progress",
+                "phase": self.state.current_phase.value,
+                "step_id": self.state.current_step_id,
+                "percent": self.state.progress_percent,
+                "risk_score": self.state.risk_score,
+                "priority_score": self.state.priority_score,
+            }
+        )
         if not result:
             result.append({"kind": "complete", "title": "No action is pending."})
         return result
@@ -475,6 +579,8 @@ class WorkflowEngine:
                 for key, value in payload.pop("pending_actions", {}).items()
             }
             payload["current_phase"] = WorkflowPhase(payload["current_phase"])
+            payload.setdefault("skipped_steps", [])
+            payload.setdefault("priority_score", 0.0)
             state = WorkflowState(**payload, findings=findings, pending_actions=actions)
             return cls(state)
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
