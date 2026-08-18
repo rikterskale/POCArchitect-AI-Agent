@@ -260,3 +260,44 @@ def test_snapshot_contains_durable_guidance_context_without_shared_mutables():
     assert snapshot["actions"][f"validate:{finding.id}"]["status"] == "pending"
     snapshot["findings"][finding.id]["recommended_actions"].append("mutated")
     assert finding.recommended_actions == ["triage"]
+
+
+def test_query_findings_returns_defensive_copies():
+    engine = WorkflowEngine()
+    finding = engine.inject_finding(title="Read model safety", tags=["api"])
+
+    result = engine.query_findings(tag="api")
+    result[0].tags.append("mutated")
+    result[0].severity = 10
+
+    assert finding.tags == ["api"]
+    assert finding.severity == 0
+
+
+def test_command_boundary_rolls_back_failed_mutation():
+    engine = WorkflowEngine()
+    finding = engine.inject_finding(title="Atomic command")
+    before = engine.snapshot()
+
+    with pytest.raises(WorkflowError, match="severity"):
+        engine.apply("enrich_finding", finding_id=finding.id, evidence=["must-rollback"], severity=11)
+
+    assert engine.snapshot() == before
+
+
+def test_custom_route_without_validation_has_no_report_dead_end():
+    from pocarchitect.finding_workflow import STEPS
+
+    route = tuple(step for step in STEPS if step.id != "validate")
+    engine = WorkflowEngine(steps=route)
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+    engine.inject_finding(title="Custom route observation")
+    engine.complete_step("discover")
+    engine.complete_step("assess-impact")
+    engine.complete_step("plan-remediation")
+    engine.complete_step("verify-remediation")
+    assert engine.state.current_step_id == "report"
+    assert engine.can_complete("report")["allowed"] is True

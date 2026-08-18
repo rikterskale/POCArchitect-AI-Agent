@@ -19,6 +19,7 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Docker image with a writable `/reports` volume
 - Retry logic + timeouts on LLM calls; fast, friendly errors for unknown models
 - Reports print their absolute path with an optional `--open`, plus a short preview
+- Finding-driven workflow kernel with resumable guided state, lifecycle gates, and audited recommendations
 - Shell completion (`--install-completion`), `--dry-run` (summary, or `--full`), and `--verbose`
 
 ## Start here
@@ -134,6 +135,7 @@ python scripts/generate_docs.py
 - [Docker Guide](docs/docker-guide.md) — image build, safe runs, provider confirmation, and report mounts.
 - [Local OpenAI-Compatible Provider Guide](docs/ollama-setup-guide.md) — Ollama-specific setup notes and limitations.
 - [Architecture](docs/architecture.md) — implementation-oriented component overview.
+- [Finding-driven workflow engine](docs/finding-driven-workflow-engine.md) — architecture, lifecycle, branching, persistence, and product integration contract.
 - [Documentation Gap Analysis](docs/DOCUMENTATION_GAP_ANALYSIS.md) — current-tree evidence, all 28 findings, and verified remediation closure matrix.
 - [Release Readiness Standard](docs/RELEASE_READINESS.md) — the five-pillar new-user readiness gate enforced in CI.
 - [Documentation Review Report](docs/DOCUMENTATION_REVIEW_REPORT.md) — **historical snapshot** of commit `60d55d47c7ceb621df2f124764f01403a99f346b`; do not use it as current behavior or validation evidence.

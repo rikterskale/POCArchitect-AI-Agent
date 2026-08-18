@@ -71,3 +71,22 @@ These rules are intentionally small and inspectable. A future product can replac
 ## Product integration
 
 At the application boundary, keep one engine per workflow ID. Render `snapshot()` for the guided screen, map buttons/forms/agent tools to `decide`, `add_finding`/`inject_finding`, `enrich_finding`, `update_finding_status`, `resolve_action`, and `complete_step`, then persist after each successful command. Interactive mode should show blockers and consequences before asking for confirmation; automated mode can consume the same recommendations and provide an override rationale when policy allows it.
+
+## Reliability contract
+
+`apply()` is the mutation boundary for UI and agent integrations. It is
+transactional: if a command has an invalid payload or violates a workflow
+rule, the complete in-memory state is restored before the error is returned.
+This prevents partially enriched findings or half-applied branch decisions.
+
+`query_findings()` returns defensive copies, while `snapshot()` is the full
+read model. A client can therefore sort, annotate, or cache query results
+without mutating the live workflow. `save()` accepts either a `Path` or string,
+rejects invalid references before writing, and atomically replaces the target
+JSON file. These guarantees make the same engine safe behind an HTTP API,
+background worker, CLI, or agent loop.
+
+Custom ordered routes may omit optional finding phases. The engine only applies
+validation gates when a validation step exists, so a product-specific route
+cannot strand an open finding at reporting; the normal closure gate still
+requires the finding to be treated or explicitly handled.

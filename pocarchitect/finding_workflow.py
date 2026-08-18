@@ -627,12 +627,21 @@ class WorkflowEngine:
         handler = handlers.get(command)
         if handler is None:
             raise WorkflowCommandError(f"Unsupported workflow command: {command}")
+        # Commands are the public mutation boundary.  A connector can fail
+        # after doing some work (or a future handler can gain a new validation
+        # branch), so make the boundary atomic rather than relying on every
+        # handler to implement its own rollback correctly.
+        before = deepcopy(self.state)
         try:
             return handler(**payload)
         except TypeError as exc:
+            self.state = before
             raise WorkflowCommandError(
                 f"Invalid payload for workflow command {command}: {exc}"
             ) from exc
+        except WorkflowError:
+            self.state = before
+            raise
 
     def validate_integrity(self) -> list[str]:
         """Return invariant violations without mutating state.
@@ -667,6 +676,7 @@ class WorkflowEngine:
             return ["Record an authorized=true decision."]
         if step_id == "discover" and not self._decision("scope_defined"):
             return ["Record a scope_defined=true decision."]
+        has_validation_step = self._has_step("validate")
         if step_id == "validate" and any(
             f.status == FindingStatus.OPEN for f in self.state.findings.values()
         ):
@@ -676,7 +686,9 @@ class WorkflowEngine:
             "plan-remediation",
             "verify-remediation",
             "report",
-        } and any(f.status == FindingStatus.OPEN for f in self.state.findings.values()):
+        } and has_validation_step and any(
+            f.status == FindingStatus.OPEN for f in self.state.findings.values()
+        ):
             return ["Validate all open findings before continuing."]
         if step_id == "plan-remediation":
             incomplete = [
@@ -835,15 +847,22 @@ class WorkflowEngine:
         if not 0 <= min_severity <= 10:
             raise WorkflowError("Minimum finding severity must be 0-10")
         return [
-            f
+            deepcopy(f)
             for f in self.state.findings.values()
             if (normalized_status is None or f.status == normalized_status)
             and f.severity >= min_severity
             and (tag is None or tag in f.tags)
         ]
 
-    def save(self, path: Path) -> None:
+    def save(self, path: Path | str) -> None:
         payload = asdict(self.state)
+        path = Path(path)
+        integrity_errors = self.validate_integrity()
+        if integrity_errors:
+            raise WorkflowError(
+                "Cannot persist invalid workflow state: "
+                + "; ".join(integrity_errors)
+            )
         payload["current_phase"] = self.state.current_phase.value
         payload["findings"] = {
             key: {**asdict(value), "status": value.status.value}
@@ -868,7 +887,8 @@ class WorkflowEngine:
             raise
 
     @classmethod
-    def load(cls, path: Path) -> WorkflowEngine:
+    def load(cls, path: Path | str) -> WorkflowEngine:
+        path = Path(path)
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
             findings = {
