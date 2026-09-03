@@ -2,7 +2,7 @@
 
 > Turn messy PoCs into clean, reproducible blueprints.
 
-POCArchitect is a command-line tool that creates a structured Markdown analysis report from an authorized Proof-of-Concept (PoC) URL. For GitHub repository URLs, it can shallow-clone and select source files as grounding before sending a redacted preview to the selected LLM provider.
+POCArchitect is a command-line tool that creates structured analysis reports and reproducible project blueprints from authorized Proof-of-Concept (PoC) sources. It accepts GitHub repositories, local directories, package/image identifiers, and download URLs; GitHub and local sources can be used as bounded, redacted grounding.
 
 It does not execute the retrieved PoC. A report is generated only after a real provider call succeeds; report content depends on the selected provider and the available source material.
 
@@ -23,6 +23,11 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Finding-driven workflow kernel with resumable guided state, lifecycle gates, and audited recommendations
 - Auditable workflow CLI (`workflow-init`, `workflow-status`, `workflow-apply`) for durable finding handling
 - Shell completion (`--install-completion`), `--dry-run` (summary, or `--full`), and `--verbose`
+- Rich three-pane dashboard, per-phase timing, grounding curation, and a post-run summary card
+- Dry-run sample report, inferred Mermaid architecture, report history/diffs, and HTML/PDF/JSON export
+- Local-directory analysis, multi-source comparison, OSV vulnerability enrichment, and analyzer plugins
+- Blueprint-to-scaffold generation, per-repository `.pocarchitect.toml`, example gallery, and typo suggestions
+- Reusable GitHub Action, pre-commit hook, scheduled workflow template, and optional Gist publishing
 
 ## Feature status
 
@@ -33,6 +38,8 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 | Local OpenAI-compatible provider | Stable integration boundary | Running endpoint and compatible model |
 | GitHub grounding and batch recovery | Stable | Public authorized repositories; Git |
 | Finding-driven workflow kernel | Stable library capability | Integrate through the documented workflow API |
+| Local source, history/diff, export, scaffold, comparison | Stable | None |
+| OSV enrichment and report publishing | Opt-in integration | Network; authenticated `gh` for publishing |
 | ARM64/Apple Silicon/Windows ARM | Experimental/untested | Validate Git, Docker, and local-provider compatibility on the host |
 
 ## Start here
@@ -159,6 +166,8 @@ provider choices. Configure another OpenAI-compatible endpoint through
 | Option | Description | Default |
 |---|---|---|
 | `--url`, `-u` | Single PoC GitHub URL (or `owner/repo` shorthand) | Required (or use `--batch`) |
+| `--source` | GitHub URL, package/image identifier, or download URL | None |
+| `--path` | Local source directory, including unpushed code | None |
 | `--batch`, `-b` | Path to `.txt` file with multiple URLs | None |
 | `--provider`, `-p` | LLM provider | `xai` |
 | `--model`, `-m` | Model name | Provider-specific (e.g., `grok-3`) |
@@ -173,6 +182,12 @@ provider choices. Configure another OpenAI-compatible endpoint through
 | `--verbose`, `-v` | Extra grounding details | `false` |
 | `--batch-state` | Custom resumable batch-ledger path | `reports/batch_progress.json` for batch runs |
 | `--max-estimated-cost` | Abort before a cloud call above this estimated USD input-cost limit | None |
+| `--curate` | Interactively exclude selected grounding files before transfer | `false` |
+| `--dashboard` | Render run progress, grounding files, and report preview in three panes | `false` |
+| `--diff` | Save a unified diff against the latest report for the source | `false` |
+| `--scaffold` | Generate a safe project skeleton after the report | `false` |
+| `--report-format` | Also export as `html`, `pdf`, or `json` | Project config / `markdown` |
+| `--vuln-scan` | Query OSV for exact dependency versions found in grounding | `false` |
 | `--format` | Text or JSON Lines output for main runs and `preflight` | `text` |
 | `--no-color` | Disable terminal styling | `false` |
 | `--version`, `-V` | Show version and exit | — |
@@ -189,7 +204,32 @@ Useful no-cost diagnostics:
 python -m pocarchitect --format json --no-color doctor --offline
 python -m pocarchitect --format json --no-color demo
 python -m pocarchitect models
+python -m pocarchitect explore
+python -m pocarchitect init
 ```
+
+## Product workflow
+
+Create reusable defaults and analyze an unpushed checkout:
+
+```bash
+pocarchitect init
+pocarchitect --path . --curate --dashboard --vuln-scan --diff --scaffold --report-format html
+```
+
+Preview the complete report shape without provider spend, compare candidate repositories,
+and inspect saved versions:
+
+```bash
+pocarchitect --source pypi:example-package --no-ingest --dry-run
+pocarchitect compare ./candidate-a ./candidate-b --output reports/comparison.md
+pocarchitect history
+pocarchitect export reports/POCAnalysis_example.md --format pdf
+```
+
+`action.yml` provides a reusable GitHub Action and `.pre-commit-hooks.yaml` exposes a
+credential-free local check. The scheduled workflow is safe by default and can be adapted
+to an authenticated provider run when a team wants persisted trend reports.
 
 `doctor` checks the installation and selected provider readiness. `demo` starts
 a temporary local OpenAI-compatible endpoint and writes a real Markdown report

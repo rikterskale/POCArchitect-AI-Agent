@@ -1,0 +1,8 @@
+- id: pocarchitect-dry-run
+  name: POCArchitect safe dry-run
+  description: Validate the POCArchitect prompt path without credentials or provider calls
+  entry: pocarchitect --path . --dry-run --no-color --format json
+  language: python
+  pass_filenames: false
+  always_run: true
+

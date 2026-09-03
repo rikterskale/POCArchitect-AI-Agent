@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import click
+from typer.core import TyperOption
 from typer.main import get_command
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +28,7 @@ def markdown_cell(value: object) -> str:
 
 
 def option_type(option: click.Option) -> str:
-    if isinstance(option.type, click.Choice):
+    if isinstance(option.type, click.Choice) or hasattr(option.type, "choices"):
         return markdown_cell(" | ".join(str(choice) for choice in option.type.choices))
     return option.type.name.upper()
 
@@ -35,7 +36,7 @@ def option_type(option: click.Option) -> str:
 def option_rows(command: click.Command) -> list[str]:
     rows = []
     for parameter in command.params:
-        if not isinstance(parameter, click.Option) or parameter.hidden:
+        if not isinstance(parameter, (click.Option, TyperOption)) or parameter.hidden:
             continue
         flags = ", ".join(
             f"`{flag}`" for flag in (*parameter.opts, *parameter.secondary_opts)
@@ -126,7 +127,9 @@ Explanatory policy text and sensitivity classifications are maintained in
 `pocarchitect` loads a `.env` file from the current working directory without
 overriding already-set environment variables. For cloud providers, a non-empty,
 non-placeholder environment value takes precedence over the value in `.env`.
-There is no configuration file other than `.env`.
+Non-secret project defaults can also be stored in the nearest
+`.pocarchitect.toml`; create it with `pocarchitect init`. Explicit CLI options
+take precedence, while provider secrets remain environment/`.env` only.
 
 | Setting | Type | Required when | Default | Allowed values | Sensitive | Source location |
 |---|---|---|---|---|---|---|
@@ -166,6 +169,12 @@ chooses to make.
 | `--target-os` | string | Optional | `{DEFAULT_TARGET_OS}` | Free text; no CLI validation | No | `pocarchitect/cli.py` |
 | `--include-mitigations` / `--no-mitigations` | flag | Optional | On | Use `--no-mitigations` to omit mitigation instructions | No | `pocarchitect/cli.py` |
 | `--no-ingest` | flag | Optional | Off | Present or absent | No | `pocarchitect/cli.py` |
+| `.pocarchitect.toml: provider` | choice | Optional | `{DEFAULT_PROVIDER}` | {provider_choices} | No | nearest project config |
+| `.pocarchitect.toml: risk_level` | string | Optional | `{DEFAULT_RISK_LEVEL}` | Free text | No | nearest project config |
+| `.pocarchitect.toml: target_os` | string | Optional | `{DEFAULT_TARGET_OS}` | Free text | No | nearest project config |
+| `.pocarchitect.toml: include_mitigations` | boolean | Optional | `true` | `true`, `false` | No | nearest project config |
+| `.pocarchitect.toml: output_dir` | path | Optional | `reports` | Writable path | No | nearest project config |
+| `.pocarchitect.toml: report_format` | choice | Optional | `markdown` | `markdown`, `html`, `pdf`, `json` | No | nearest project config |
 
 For a complete option list, see [CLI Reference](cli-reference.md). Root
 `--format` and `--no-color` options apply to `batch-status` and `batch-reset`

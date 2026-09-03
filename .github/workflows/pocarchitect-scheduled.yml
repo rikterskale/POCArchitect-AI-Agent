@@ -1,0 +1,20 @@
+name: Scheduled POCArchitect health trend
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          source: ${{ github.server_url }}/${{ github.repository }}
+          dry-run: "true"
+

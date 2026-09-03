@@ -8,6 +8,8 @@ include .env.example
 include requirements.txt
 include requirements-dev.txt
 include pytest.ini
+include action.yml
+include .pre-commit-hooks.yaml
 
 # The critical prompt file (and any other package data)
 include pocarchitect/POC_Architect_Prompt.md

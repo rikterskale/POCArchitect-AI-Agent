@@ -59,6 +59,16 @@ REQUIRED_COMMANDS = {
     "batch-reset",
     "quickstart",
     "models",
+    "init",
+    "explore",
+    "history",
+    "diff",
+    "export",
+    "scaffold",
+    "compare",
+    "plugins",
+    "vulnerabilities",
+    "publish",
 }
 SAFE_EXAMPLE_URL = "https://github.com/example/poc"
 
@@ -128,6 +138,77 @@ COVERED_OPTIONS: dict[tuple[str, str], str] = {
         "--max-estimated-cost",
     ): "Cost-limit enforcement is asserted by the provider-boundary checks.",
     ("preflight", "--no-color"): "Color-free preflight output is asserted in Pillar 1.",
+    (
+        "root",
+        "--source",
+    ): "Generic source handling is covered by product-feature tests.",
+    (
+        "root",
+        "--path",
+    ): "Local source ingestion is covered by product-feature and CLI tests.",
+    (
+        "root",
+        "--curate",
+    ): "Grounding curation is covered by the grounding selection tests.",
+    (
+        "root",
+        "--dashboard",
+    ): "Dashboard rendering is covered by the Rich presentation tests.",
+    (
+        "root",
+        "--diff",
+    ): "Automatic report diffing uses the tested report-diff primitive.",
+    ("root", "--scaffold"): "Post-run scaffolding uses the tested scaffold primitive.",
+    (
+        "root",
+        "--scaffold-output",
+    ): "Custom scaffold output is covered by scaffold tests.",
+    (
+        "root",
+        "--report-format",
+    ): "Report export formats are covered by product-feature tests.",
+    (
+        "root",
+        "--vuln-scan",
+    ): "Dependency extraction and bounded enrichment are covered by security tests.",
+    ("doctor", "--fix"): "Doctor repair flow is covered by CLI diagnostics tests.",
+    (
+        "doctor",
+        "--yes",
+    ): "Noninteractive safe repair confirmation is covered by CLI diagnostics tests.",
+    (
+        "init",
+        "--force",
+    ): "Project config overwrite behavior is covered by config tests.",
+    (
+        "explore",
+        "--run",
+    ): "The gallery's run path delegates to the validated credential-free demo.",
+    (
+        "history",
+        "--output-dir",
+    ): "History directory selection uses tested history storage.",
+    ("diff", "--output"): "Diff output persistence uses the tested diff primitive.",
+    (
+        "export",
+        "--format",
+    ): "HTML, PDF, and JSON exports are covered by product-feature tests.",
+    (
+        "scaffold",
+        "--report",
+    ): "Scaffold report input is covered by product-feature tests.",
+    (
+        "scaffold",
+        "--output",
+    ): "Scaffold destination handling is covered by product-feature tests.",
+    (
+        "compare",
+        "--output",
+    ): "Comparison output is covered by local-source comparison tests.",
+    (
+        "publish",
+        "--public",
+    ): "Public publishing is opt-in and preserves the explicit gh boundary.",
 }
 WAIVED_OPTIONS: dict[tuple[str, str], str] = {
     ("root", "--install-completion"): (

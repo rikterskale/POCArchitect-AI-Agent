@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Rich dashboard, grounding curation, per-phase timing, dry-run report previews, and post-run summary cards.
+- Local and generic source inputs, project configuration scaffolding, report history/diffs, comparison, architecture diagrams, blueprint scaffolds, and HTML/PDF/JSON export.
+- OSV dependency enrichment, analyzer entry points, example gallery, typo suggestions, guided doctor repairs, Gist publishing, a reusable GitHub Action, pre-commit hook, and scheduled analysis template.
+
 - Hardened repository ingestion with bounded scans, symlink/special-file rejection,
   prompt-size limits, and fail-closed clone failures.
 - Expanded secret redaction, atomic collision-safe report writes, locked batch

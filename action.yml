@@ -1,0 +1,63 @@
+name: POCArchitect analysis
+description: Analyze a repository with POCArchitect and retain the generated report
+inputs:
+  source:
+    description: Source URL or identifier to analyze
+    required: true
+  provider:
+    description: xai, openai, groq, or local
+    required: false
+    default: openai
+  model:
+    description: Optional provider model override
+    required: false
+    default: ""
+  dry-run:
+    description: Avoid provider calls and generate only a preview
+    required: false
+    default: "true"
+  comment:
+    description: Post the report or dry-run result on pull requests
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Install POCArchitect
+      shell: bash
+      run: python -m pip install "${{ github.action_path }}"
+    - name: Analyze source
+      shell: bash
+      env:
+        POCA_SOURCE: ${{ inputs.source }}
+        POCA_PROVIDER: ${{ inputs.provider }}
+        POCA_MODEL: ${{ inputs.model }}
+        POCA_DRY_RUN: ${{ inputs.dry-run }}
+        POCA_LOG: ${{ runner.temp }}/pocarchitect-events.jsonl
+      run: |
+        args=(--source "$POCA_SOURCE" --provider "$POCA_PROVIDER" --yes --format json)
+        if [[ -n "$POCA_MODEL" ]]; then args+=(--model "$POCA_MODEL"); fi
+        if [[ "$POCA_DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+        pocarchitect "${args[@]}" | tee "$POCA_LOG"
+    - name: Comment on pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        POCA_LOG: ${{ runner.temp }}/pocarchitect-events.jsonl
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        report=$(find reports -name 'POCAnalysis_*.md' -type f 2>/dev/null | sort | tail -1)
+        if [[ -n "$report" ]]; then
+          gh pr comment "$PR_NUMBER" --body-file "$report"
+        else
+          printf 'POCArchitect dry-run completed successfully. No provider call or report write was performed.\n' > "${{ runner.temp }}/pocarchitect-comment.md"
+          gh pr comment "$PR_NUMBER" --body-file "${{ runner.temp }}/pocarchitect-comment.md"
+        fi
+    - name: Upload reports
+      if: ${{ inputs.dry-run != 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: pocarchitect-reports
+        path: reports/
+        if-no-files-found: error
