@@ -4,7 +4,10 @@
 
 POCArchitect is a command-line tool that creates structured analysis reports and reproducible project blueprints from authorized Proof-of-Concept (PoC) sources. It accepts GitHub repositories, local directories, package/image identifiers, and download URLs; GitHub and local sources can be used as bounded, redacted grounding.
 
-It does not execute the retrieved PoC. A report is generated only after a real provider call succeeds; report content depends on the selected provider and the available source material.
+It does not execute the retrieved PoC. A real-source report is generated only
+after a provider call succeeds; credential-free demos use clearly labeled,
+deterministic local content. Real report content depends on the selected
+provider and the available source material.
 
 ## Features
 
@@ -28,9 +31,10 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Local-directory analysis, multi-source comparison, OSV vulnerability enrichment, and analyzer plugins
 - Blueprint-to-scaffold generation, per-repository `.pocarchitect.toml`, example gallery, and typo suggestions
 - Reusable GitHub Action, pre-commit hook, scheduled workflow template, and optional Gist publishing
-- Production-focused local web GUI with accessible navigation, exact transfer
-  re-estimation, resilient live progress, report search/copy/download, and
-  launch-scoped security controls
+- Production-focused local web GUI with a one-click credential-free demo,
+  readable accessible navigation, smart provider selection and refresh, exact
+  transfer re-estimation, resilient live progress, complete session report
+  discovery, and launch-scoped security controls
 
 ## Feature status
 
@@ -92,6 +96,9 @@ The GUI binds only to `127.0.0.1`, opens with a launch-specific session, and
 keeps prepared source content in backend memory. A provider call begins only
 after the transfer review is explicitly approved. Changing the selected files
 recalculates transfer size, token, cost, and redaction metadata before approval.
+Select **Create credential-free demo** on first launch to reach a complete local
+report without entering a source, configuring a provider, or making a network
+request.
 
 For a release artifact, download the matching wheel or source distribution from
 the project's release assets and install it in a fresh virtual environment:
@@ -268,7 +275,11 @@ local-only and does not provide a remotely bindable server mode.
 The interface supports keyboard navigation, reduced-motion preferences,
 responsive desktop/mobile layouts, interrupted-progress recovery, and a
 searchable local report library. Active runs are recovered after a page refresh
-for as long as the launch process remains running.
+for as long as the launch process remains running. It preselects an available
+cloud provider, can detect a newly added provider key without a GUI restart, and
+keeps reports from custom output directories discoverable for the current
+session. CLI and GUI demo reports under `reports/demo/` also appear in the
+library.
 
 `doctor` checks the installation and selected provider readiness. `demo` starts
 a temporary local OpenAI-compatible endpoint and writes a real Markdown report

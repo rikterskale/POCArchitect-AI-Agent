@@ -62,6 +62,11 @@ def test_gui_assets_preserve_csp_accessibility_and_responsive_contracts():
     assert "sessionStorage" in javascript
     assert "requestSelectionEstimate" in javascript
     assert "recoverRun" in javascript
+    assert 'id="run-demo"' in html
+    assert 'id="refresh-providers"' in html
+    assert "preferredProvider" in javascript
+    assert "/api/demo" in javascript
+    assert not re.search(r"(?:font(?:-size)?\s*:[^;]*\s)(?:8|9)px", css)
 
 
 def test_gui_requires_launch_session_and_sets_security_headers():
@@ -164,12 +169,60 @@ def test_gui_prepare_approve_run_and_download(tmp_path):
         assert download.status_code == 200
         assert b"# GUI report" in download.content
 
+        library = client.get("/api/reports").json()["reports"]
+        assert any(
+            report["artifact_id"] == result["report_artifact_id"] for report in library
+        )
+
         reused = client.post(
             "/api/runs",
             json={"preparation_id": preparation["preparation_id"]},
             headers={"Origin": "http://127.0.0.1:8765"},
         )
         assert reused.status_code == 409
+
+
+def test_gui_demo_reaches_a_report_without_source_provider_or_credential(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "pocarchitect.gui.default_output_dir", lambda: tmp_path / "reports"
+    )
+    monkeypatch.setattr(
+        "pocarchitect.features.run_plugins",
+        lambda *_: (_ for _ in ()).throw(
+            AssertionError("demo must not run third-party analyzers")
+        ),
+    )
+    token = "test-session-token"
+    app = create_app(
+        session_token=token,
+        port=8765,
+        runtime=GuiRuntime(AnalysisService()),
+    )
+
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        assert client.get(f"/?token={token}", follow_redirects=True).status_code == 200
+        started = client.post("/api/demo", headers={"Origin": "http://127.0.0.1:8765"})
+        assert started.status_code == 202
+
+        job_id = started.json()["job_id"]
+        for _ in range(100):
+            job = client.get(f"/api/runs/{job_id}").json()
+            if job["status"] in {"completed", "failed"}:
+                break
+            time.sleep(0.01)
+
+        assert job["status"] == "completed", job
+        assert job["result"]["content"].startswith("# POCArchitect Demo Report")
+        messages = [event["message"] for event in job["events"]]
+        assert "Generating the demo locally. No provider request is made." in messages
+
+        library = client.get("/api/reports").json()["reports"]
+        assert any(
+            report["artifact_id"] == job["result"]["report_artifact_id"]
+            for report in library
+        )
 
 
 def test_gui_rejects_non_loopback_binding():

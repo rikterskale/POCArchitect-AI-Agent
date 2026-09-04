@@ -69,6 +69,11 @@ Browser form
   -> queue one analysis job
   -> stream structured progress events
   -> register completed report/export artifacts by opaque ID
+
+First-run demo action
+  -> queue a deterministic local job without source input or credentials
+  -> bypass the real-provider call with packaged demonstration content
+  -> write, register, render, and download the report through the normal path
 ```
 
 `AnalysisService.prepare()` retains prompt and source content in backend memory
@@ -83,6 +88,13 @@ rebuilds the bounded, redacted prompt in memory and returns updated byte, token,
 cost, and redaction counts without exposing source content or contacting the
 provider. The browser stores only the opaque active job identifier in session
 storage so a refresh can recover a queued or running analysis.
+
+At bootstrap, the browser keeps the configured default provider when available
+and otherwise selects the first configured cloud provider. A readiness refresh
+can load a newly added `.env` key without restarting the GUI; existing process
+environment values retain precedence. The report registry combines the default
+output directory, its `demo` directory, and reports completed in custom output
+directories during the current process.
 
 The HTTP boundary validates the loopback host and configured port, requires the
 launch cookie for every API route, requires an exact same-origin value for

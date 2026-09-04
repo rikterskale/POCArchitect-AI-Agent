@@ -18,7 +18,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import typer
-from dotenv import dotenv_values
+from dotenv import dotenv_values, load_dotenv
 
 from .config import (
     DEFAULT_LOCAL_BASE_URL,
@@ -58,6 +58,7 @@ class AnalysisRequest:
     vulnerability_scan: bool = False
     diff_previous: bool = False
     scaffold: bool = False
+    run_analyzers: bool = True
 
 
 @dataclass(frozen=True)
@@ -352,7 +353,9 @@ class AnalysisService:
                 raise AnalysisServiceError(str(error)) from error
 
         redacted, _, _ = cli.redact_sensitive_input(grounding.content)
-        plugin_sections = run_plugins(request.source, redacted)
+        plugin_sections = (
+            run_plugins(request.source, redacted) if request.run_analyzers else []
+        )
         vulnerabilities: list[dict[str, Any]] | None = None
         if request.vulnerability_scan:
             packages = extract_dependencies(redacted)
@@ -507,14 +510,18 @@ def provider_configuration() -> dict[str, bool]:
     from .preflight import _is_valid_key_value
 
     env_path = Path.cwd() / ".env"
+    # Let a running GUI pick up a newly-created credential after the operator
+    # returns from the terminal setup wizard. Existing environment variables
+    # keep precedence and changed values still require a process restart.
+    if env_path.is_file():
+        load_dotenv(dotenv_path=env_path, override=False)
     env_file_values = dotenv_values(env_path) if env_path.is_file() else {}
     return {
         provider: (
             True
             if provider == "local"
-            else _is_valid_key_value(
-                os.getenv(environment_name) or env_file_values.get(environment_name)
-            )
+            else _is_valid_key_value(os.getenv(environment_name))
+            or _is_valid_key_value(env_file_values.get(environment_name))
         )
         for provider, environment_name in {
             **PROVIDER_KEY_NAMES,

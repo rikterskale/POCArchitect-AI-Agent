@@ -41,7 +41,7 @@
               <h1>Architecture analysis, grounded in your evidence.</h1>
               <p class="heading-copy">Inspect a repository, review the exact transfer, and create a decision-ready blueprint without losing control of source data.</p>
             </div>
-            <button class="secondary-action is-hidden" id="new-analysis" type="button"><span aria-hidden="true">＋</span> New analysis</button>
+            <button class="secondary-action is-hidden" id="new-analysis" type="button"><span aria-hidden="true">＋</span><span id="new-analysis-label">New analysis</span></button>
           </div>
 
           <div class="workspace-grid">
@@ -54,13 +54,13 @@
               <fieldset class="form-section" id="source-section">
                 <legend>Source</legend>
                 <div class="segmented-control" role="group" aria-label="Source type">
-                  <button type="button" class="segment is-active" data-source-mode="url" aria-pressed="true"><span aria-hidden="true">↗</span> Repository or URL</button>
+                  <button type="button" class="segment is-active" data-source-mode="url" aria-pressed="true"><span aria-hidden="true">↗</span> Repository or source</button>
                   <button type="button" class="segment" data-source-mode="local" aria-pressed="false"><span aria-hidden="true">⌂</span> Local directory</button>
                 </div>
                 <label class="field field-wide" for="source">
-                  <span id="source-label">Source URL</span>
-                  <input id="source" name="source" type="text" required autocomplete="off" spellcheck="false" placeholder="https://github.com/owner/repository" aria-describedby="source-hint source-error">
-                  <small id="source-hint">GitHub repositories can be shallow-cloned for grounded analysis.</small>
+                  <span id="source-label">Repository, package, image, or URL</span>
+                  <input id="source" name="source" type="text" required autocomplete="off" spellcheck="false" placeholder="owner/repository or https://…" aria-describedby="source-hint source-error">
+                  <small id="source-hint">Examples: owner/repository, pypi:package, docker:image, or an HTTP(S) URL.</small>
                   <small class="field-error is-hidden" id="source-error" role="alert"></small>
                 </label>
               </fieldset>
@@ -129,6 +129,11 @@
                 <h3>Know what leaves your machine.</h3>
                 <p>Prepare a source to inventory bounded files, redact recognized secrets, and estimate provider input before approval.</p>
                 <div class="empty-features" aria-label="Preparation safeguards"><span>File-level control</span><span>Secret redaction</span><span>Cost estimate</span></div>
+                <div class="demo-cta">
+                  <p><strong>First time here?</strong> See the finished experience with a safe local example.</p>
+                  <button class="secondary-action demo-action" id="run-demo" type="button"><span class="button-label">Create credential-free demo</span><span aria-hidden="true">→</span></button>
+                  <small>No source read · No provider call · No credential · No cost</small>
+                </div>
               </div>
 
               <div class="loading-state is-hidden" id="review-loading" aria-live="polite" aria-busy="true">
@@ -172,7 +177,7 @@
 
             <aside class="context-rail" aria-label="Session information">
               <section class="trust-card"><p class="eyebrow">Transfer policy</p><h2>Explicit approval at every boundary.</h2><ol><li><span>01</span><div><strong>Inspect locally</strong><small>Selection and redaction happen before approval.</small></div></li><li><span>02</span><div><strong>Review precisely</strong><small>File-level controls define the provider payload.</small></div></li><li><span>03</span><div><strong>Authorize once</strong><small>Prepared transfers expire and cannot be replayed.</small></div></li></ol></section>
-              <section class="readiness-card"><div class="rail-heading"><p class="eyebrow">Provider readiness</p><span class="readiness-dot" id="provider-readiness-dot"></span></div><h3 id="provider-readiness-name">Checking configuration</h3><p id="provider-readiness-copy">Confirming the selected provider without exposing credentials.</p></section>
+              <section class="readiness-card"><div class="rail-heading"><p class="eyebrow">Provider readiness</p><span class="readiness-dot" id="provider-readiness-dot"></span></div><h3 id="provider-readiness-name">Checking configuration</h3><p id="provider-readiness-copy">Confirming the selected provider without exposing credentials.</p><div class="readiness-actions"><button class="text-button is-hidden" id="copy-setup" type="button">Copy setup command</button><button class="text-button" id="refresh-providers" type="button">Recheck</button></div></section>
               <section class="session-card"><div><span class="pulse" aria-hidden="true"></span><strong>Private session</strong></div><p>Bound to this computer and protected by a launch-specific, HTTP-only session.</p><small id="version-label">POCArchitect</small></section>
             </aside>
           </div>

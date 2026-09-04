@@ -132,9 +132,9 @@ function setSourceMode(mode) {
     button.setAttribute("aria-pressed", String(active));
   });
   const local = mode === "local";
-  byId("source-label").textContent = local ? "Local directory path" : "Source URL";
-  byId("source").placeholder = local ? "/path/to/authorized/source" : "https://github.com/owner/repository";
-  byId("source-hint").textContent = local ? "The backend reads this directory locally; content remains in memory until approval." : "GitHub repositories can be shallow-cloned for grounded analysis.";
+  byId("source-label").textContent = local ? "Local directory path" : "Repository, package, image, or URL";
+  byId("source").placeholder = local ? "/path/to/authorized/source" : "owner/repository or https://…";
+  byId("source-hint").textContent = local ? "The backend reads this directory locally; content remains in memory until approval." : "Examples: owner/repository, pypi:package, docker:image, or an HTTP(S) URL.";
   clearSourceError();
 }
 
@@ -151,13 +151,19 @@ function updateProvider({ preserveModel = false } = {}) {
   const configured = Boolean(state.bootstrap.providers[provider]);
   const label = byId("provider-state");
   const name = byId("provider").selectedOptions[0]?.textContent || provider;
-  label.textContent = provider === "local" ? "Endpoint connectivity is verified when the run starts." : configured ? "Credential detected in the backend." : "Credential not detected. Configure it in .env and relaunch.";
+  label.textContent = provider === "local" ? "No cloud key needed. Endpoint connectivity is checked when the run starts." : configured ? "Credential detected in the backend." : "Credential not detected. Run pocarchitect setup, then recheck.";
   label.classList.toggle("provider-ready", configured || provider === "local");
   label.classList.toggle("provider-warning", !configured && provider !== "local");
   byId("provider-readiness-dot").className = `readiness-dot ${configured || provider === "local" ? "is-ready" : "is-warning"}`;
-  byId("provider-readiness-name").textContent = configured || provider === "local" ? `${name} is available` : `${name} needs configuration`;
-  byId("provider-readiness-copy").textContent = provider === "local" ? "The endpoint remains local; connectivity is checked only after approval." : configured ? "A credential is present. Its value is never sent to this interface." : "Add the provider key to .env, then relaunch the GUI before running an analysis.";
+  byId("provider-readiness-name").textContent = provider === "local" ? `${name} needs no cloud key` : configured ? `${name} is ready` : `${name} needs configuration`;
+  byId("provider-readiness-copy").textContent = provider === "local" ? "The endpoint remains local; connectivity and the model are checked only after approval." : configured ? "A credential is present. Its value is never sent to this interface." : "Run pocarchitect setup in another terminal. Return here and select Recheck—no GUI restart needed for a newly added key.";
+  byId("copy-setup").classList.toggle("is-hidden", configured || provider === "local");
   updateRunAvailability();
+}
+
+function preferredProvider(bootstrap) {
+  if (bootstrap.providers[bootstrap.default_provider]) return bootstrap.default_provider;
+  return ["openai", "xai", "groq"].find((provider) => bootstrap.providers[provider]) || bootstrap.default_provider;
 }
 
 function payloadFromForm() {
@@ -295,8 +301,9 @@ function renderPreparation(preparation) {
   updateSelectionLabel();
   const minutes = Math.round(Number(preparation.expires_in_seconds || 1800) / 60);
   byId("review-expiry").textContent = `Prepared reviews expire after ${minutes} minutes and can be used once.`;
-  setInlineError("review-error", providerReady() ? "" : "The selected provider is not configured. Add its credential to .env and relaunch before running.");
+  setInlineError("review-error", providerReady() ? "" : "The selected provider is not configured. Run pocarchitect setup in another terminal, then select Recheck.");
   updateRunAvailability();
+  byId("new-analysis-label").textContent = "Edit configuration";
   focusPanel("review-title");
 }
 
@@ -425,13 +432,14 @@ function startElapsedTimer(startedAt = null) {
 function showRunState() {
   hide("review-content"); hide("review-empty"); hide("review-loading"); hide("report-content");
   show("run-content"); hide("run-error-actions"); show("new-analysis");
+  byId("new-analysis-label").textContent = "New analysis";
   setReviewStatus("Running", "running");
 }
 
 async function startRun() {
   if (!state.preparation || !byId("approval").checked) return;
   if (!providerReady()) {
-    setInlineError("review-error", "The selected provider is not configured. Add its credential to .env and relaunch before running.");
+    setInlineError("review-error", "The selected provider is not configured. Run pocarchitect setup in another terminal, then select Recheck.");
     return;
   }
   const button = byId("run-button");
@@ -458,6 +466,33 @@ async function startRun() {
   } finally {
     setButtonBusy(button, false);
     updateRunAvailability();
+  }
+}
+
+async function startDemo() {
+  const button = byId("run-demo");
+  setButtonBusy(button, true, "Creating demo…");
+  setConfigurationLocked(true, "Demo");
+  showRunState();
+  byId("event-log").textContent = "";
+  byId("run-state-label").textContent = "Credential-free demo";
+  byId("run-heading").textContent = "Creating a safe example report.";
+  state.seenEvents.clear();
+  resetPhases();
+  startElapsedTimer();
+  try {
+    const started = await api("/api/demo", { method: "POST" });
+    state.activeJobId = started.job_id;
+    sessionStorage.setItem("pocarchitect.activeJob", started.job_id);
+    watchRun(started.job_id);
+  } catch (error) {
+    window.clearInterval(state.elapsedTimer);
+    hide("run-content"); hide("new-analysis"); show("review-empty");
+    setReviewStatus("Needs attention", "error");
+    setConfigurationLocked(false);
+    toast(error.message, "error");
+  } finally {
+    setButtonBusy(button, false);
   }
 }
 
@@ -535,6 +570,7 @@ function renderRunFailure(message) {
 
 function renderCompletedRun(result) {
   hide("run-content"); hide("review-content"); show("report-content"); show("new-analysis");
+  byId("new-analysis-label").textContent = "New analysis";
   setReviewStatus("Complete", "complete");
   state.reportContent = result.content || "";
   byId("report-name").textContent = result.report_name;
@@ -711,6 +747,7 @@ function resetAnalysis() {
   state.activeJobId = null; state.preparation = null; state.seenEvents.clear(); state.reportContent = "";
   hide("review-content"); hide("review-loading"); hide("run-content"); hide("report-content"); hide("new-analysis"); show("review-empty");
   setReviewStatus("Waiting"); setConfigurationLocked(false); setInlineError("review-error"); setInlineError("form-error"); clearSourceError();
+  byId("new-analysis-label").textContent = "New analysis";
   byId("approval").checked = false; byId("event-log").textContent = "";
   byId("source").focus();
 }
@@ -728,7 +765,7 @@ async function resumeActiveJob() {
   } catch (_) { sessionStorage.removeItem("pocarchitect.activeJob"); }
 }
 
-async function loadBootstrap() {
+async function loadBootstrap({ resume = true } = {}) {
   setConnection("loading");
   try {
     const preserveProvider = state.preparation?.provider || (state.bootstrap ? byId("provider").value : null);
@@ -736,13 +773,28 @@ async function loadBootstrap() {
     byId("version-label").textContent = `POCArchitect v${state.bootstrap.version}`;
     byId("output-dir").placeholder = state.bootstrap.default_output_dir;
     state.reports = state.bootstrap.reports || [];
-    byId("provider").value = preserveProvider || state.bootstrap.default_provider;
+    byId("provider").value = preserveProvider || preferredProvider(state.bootstrap);
     updateProvider({ preserveModel: Boolean(state.preparation) }); renderReportList(); setConnection("ready");
-    await resumeActiveJob();
+    if (resume) await resumeActiveJob();
   } catch (error) {
     setConnection("error");
     setInlineError("form-error", error.message);
     toast(error.message, "error");
+  }
+}
+
+async function recheckProviders() {
+  const button = byId("refresh-providers");
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = "Checking…";
+  await loadBootstrap({ resume: false });
+  button.disabled = false;
+  button.textContent = label;
+  if (providerReady()) {
+    setInlineError("review-error");
+    updateRunAvailability();
+    toast("Provider readiness updated.", "success");
   }
 }
 
@@ -755,6 +807,7 @@ function bindEvents() {
   byId("provider").addEventListener("change", () => updateProvider());
   byId("source").addEventListener("input", clearSourceError);
   byId("analysis-form").addEventListener("submit", prepareAnalysis);
+  byId("run-demo").addEventListener("click", startDemo);
   byId("approval").addEventListener("change", updateRunAvailability);
   byId("run-button").addEventListener("click", startRun);
   byId("toggle-files").addEventListener("click", () => {
@@ -769,6 +822,8 @@ function bindEvents() {
   byId("report-search").addEventListener("input", renderReportList);
   byId("copy-report").addEventListener("click", () => copyText(state.reportContent, "Report"));
   byId("library-copy").addEventListener("click", () => copyText(state.libraryContent, "Report"));
+  byId("copy-setup").addEventListener("click", () => copyText("pocarchitect setup", "Setup command"));
+  byId("refresh-providers").addEventListener("click", recheckProviders);
   byId("retry-connection").addEventListener("click", loadBootstrap);
   window.addEventListener("hashchange", () => setView(window.location.hash.slice(1), { updateHash: false }));
   window.addEventListener("beforeunload", (event) => {

@@ -1,7 +1,12 @@
 import pytest
 
 from pocarchitect import cli
-from pocarchitect.service import AnalysisRequest, AnalysisService, AnalysisServiceError
+from pocarchitect.service import (
+    AnalysisRequest,
+    AnalysisService,
+    AnalysisServiceError,
+    provider_configuration,
+)
 
 
 def test_service_prepares_metadata_without_exposing_source_content(tmp_path):
@@ -119,3 +124,17 @@ def test_event_capture_is_context_local_and_suppresses_console(monkeypatch):
 
     assert captured == [{"event": "example", "message": "message", "value": 1}]
     assert printed == []
+
+
+def test_provider_configuration_picks_up_a_new_key_without_gui_restart(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert provider_configuration()["openai"] is False
+
+    (tmp_path / ".env").write_text(
+        "OPENAI_API_KEY=test-key-added-after-launch\n", encoding="utf-8"
+    )
+
+    assert provider_configuration()["openai"] is True

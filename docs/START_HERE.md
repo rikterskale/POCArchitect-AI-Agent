@@ -2,8 +2,9 @@
 
 This is the recommended first-use guide for POCArchitect. Follow it from top to
 bottom and you will install the application, prove that it works without using
-a credential, configure a provider safely, open the graphical interface, and
-create your first authorized analysis report.
+a credential, open the graphical interface, and create a safe example report.
+Provider setup is needed only when you are ready to create a real authorized
+analysis report.
 
 You do not need prior Python, Git, AI-provider, or command-line experience.
 When Windows and macOS/Linux use different commands, both are shown. Run only
@@ -17,18 +18,21 @@ the commands for your operating system.
 
 ## The shortest successful path
 
-If Python and Git are already installed, this is the entire recommended path:
+If Python and Git are already installed, this is the shortest credential-free
+path to a finished report:
 
 1. Open a terminal in the POCArchitect folder.
 2. Create and activate a virtual environment.
 3. Install POCArchitect with the GUI dependencies.
 4. Run the credential-free quickstart.
-5. Configure one model provider.
-6. Launch the GUI and review the transfer before approving it.
+5. Launch the GUI.
+6. Select **Create credential-free demo**.
 
 The exact commands and success checks are provided below. Do not skip the
 credential-free quickstart; it catches most installation problems before a
-real source or provider is involved.
+real source or provider is involved. When you are ready for a real analysis,
+configure one provider, select **Recheck** in the open GUI, enter an authorized
+source, and review the transfer before approving it.
 
 ## Contents
 
@@ -329,6 +333,10 @@ This command:
 is printed. Open that Markdown file in a text editor to confirm that a report
 was created.
 
+This verifies the command-line installation. After you launch the GUI, its
+**Create credential-free demo** action gives you a second, one-click check of
+the complete browser-to-report experience. Neither path needs provider setup.
+
 If you want to run the two parts separately:
 
 ```text
@@ -358,8 +366,13 @@ repeat `quickstart` until it succeeds.
 
 ## 7. Configure a provider safely
 
-A real report needs either a cloud provider or a running local
+An analysis of a real source needs either a cloud provider or a running local
 OpenAI-compatible endpoint. You need only one.
+
+> [!TIP]
+> Provider setup is optional for the credential-free GUI demo. To see the
+> finished experience first, skip to [Launch and use the GUI](#8-launch-and-use-the-gui),
+> create the demo, and return here only when you want to analyze a real source.
 
 | Choice | What you need | Credential name |
 |---|---|---|
@@ -374,7 +387,8 @@ review that provider's pricing and data-handling terms before a real run.
 
 ### Recommended: use the guided setup
 
-If the GUI is running, stop it with `Ctrl+C`. Then run:
+If the GUI is already running, leave it open. Open a second terminal in the
+repository folder, activate `.venv`, and run:
 
 ```text
 pocarchitect setup
@@ -390,6 +404,10 @@ The wizard asks you to:
 For a cloud provider, the key is written to `.env` in the current repository
 folder and is not printed. For a local provider, the wizard checks the endpoint
 but does not manage or start the local service.
+
+Return to the GUI and select **Recheck** in the **Provider readiness** card. A
+newly added key becomes available immediately. If setup replaces a key that the
+GUI process had already loaded, restart the GUI before using the replacement.
 
 After setup, view the effective configuration with masked credentials:
 
@@ -503,14 +521,28 @@ If port 8765 is already in use, choose another port:
 pocarchitect gui --port 8876
 ```
 
+### See the finish line without setup
+
+Before entering any configuration, select **Create credential-free demo** in
+the initial **Transfer review** panel. POCArchitect creates and opens a
+deterministic local example report without reading a source, contacting a
+provider, using a credential, running plugins, or incurring cost.
+
+This proves the browser-to-report path and places the example under
+`reports/demo/`, where it is also available from **Reports**. Select **New
+analysis** from the completed demo when you are ready to enter an authorized
+source. A real analysis still requires the normal transfer review and explicit
+approval.
+
 ### Configure the analysis
 
 The left panel is **Analysis configuration**.
 
-1. Choose **Repository or URL** for a GitHub repository, package, image, or
+1. Choose **Repository or source** for a GitHub repository, package, image, or
    advisory URL. Choose **Local directory** for a folder already on this
    computer.
-2. Enter the source. A GitHub source can be a complete URL or `owner/repository`.
+2. Enter the source. Accepted examples include `owner/repository`,
+   `pypi:package`, `docker:image`, and an HTTP(S) URL.
 3. Choose the configured provider.
 4. Review the model. For a local provider, the model name must exist on the
    local service.
@@ -521,8 +553,16 @@ The left panel is **Analysis configuration**.
    guidance.
 
 The provider-readiness card on the right reports whether a cloud credential is
-present. It never displays the credential value. If you configured `.env` after
-starting the GUI, stop and relaunch the GUI.
+present. It never displays the credential value. The GUI preselects the default
+provider when it is ready; otherwise it preselects the first configured cloud
+provider. If no cloud provider is configured, it keeps the default visible and
+offers the exact setup command.
+
+If you add a previously missing key to `.env` while the GUI is open, select
+**Recheck** in the provider-readiness card. The new key becomes available without
+a restart. If you replace the value of a key that was already loaded, restart
+the GUI so the original process environment cannot silently change underneath
+an active session.
 
 ### Optional advanced controls
 
@@ -546,6 +586,10 @@ Select **Prepare transfer review**.
 At this point POCArchitect may read or clone the source, but it has **not** made
 a model-provider call. The configuration locks so the review always matches
 the prepared request.
+
+If you need to change an entry, select **Edit configuration**. Your form values
+remain in place, and the prepared review is discarded so you can prepare a new
+one that matches the revised settings.
 
 The transfer review shows:
 
@@ -585,6 +629,10 @@ After completion you can:
 - copy the Markdown;
 - download the selected export format; or
 - open **Reports** to search recent Markdown reports.
+
+The report library includes Markdown reports in the default output directory,
+credential-free reports under `reports/demo/`, and reports written to a custom
+output directory during the current GUI session.
 
 Generated model output can be wrong or incomplete. Review claims, commands,
 and mitigations before acting on them.
@@ -881,7 +929,7 @@ Replace `openai` or the endpoint as needed.
 | `Address already in use` | Another application is using port 8765 | Run `pocarchitect gui --port 8876` | The browser opens the new address |
 | `Open the GUI from its launch URL` or `GUI session required` | The browser lacks the launch cookie or the process was restarted | Stop and relaunch with `--no-open`, then use the new complete URL | `/` opens the workspace rather than an error |
 | GUI shows **Disconnected** | The terminal process stopped or the local connection was interrupted | Confirm the GUI terminal is still running; otherwise relaunch it | The status returns to **Ready** |
-| Provider needs configuration | The selected cloud key is missing, a placeholder, or was added after GUI launch | Run `pocarchitect setup` or fix `.env`, then relaunch the GUI | Provider readiness reports available |
+| Provider needs configuration | The selected cloud key is missing, a placeholder, or the GUI has not rechecked it | Run `pocarchitect setup` or fix `.env`, then select **Recheck**; restart only when replacing a key already loaded by the GUI | Provider readiness reports available |
 | `No API key found` | The key name does not match the selected provider | Use `XAI_API_KEY`, `OPENAI_API_KEY`, or `GROQ_API_KEY` exactly | Provider preflight passes |
 | Local endpoint unavailable | The local service is stopped, its URL differs, or it lacks `/v1` compatibility | Start the service and pass its correct base URL | Local preflight passes |
 | Model not found | The model name is unavailable to the account or local service | Run `pocarchitect models` and check the provider's available models | Retry with an available model |

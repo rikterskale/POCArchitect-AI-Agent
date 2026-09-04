@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- One-click credential-free GUI demo, automatic selection of an available cloud
+  provider, in-place readiness refresh for newly added keys, current-session
+  custom-output report discovery, persistent demo discovery, clearer source
+  wording, and a GUI readability pass.
 - Optional loopback-only web GUI with one-time transfer approval, structured
   progress streaming, source-file curation, and safe report browsing.
 - Presentation-neutral prepare/execute analysis service and embedded event

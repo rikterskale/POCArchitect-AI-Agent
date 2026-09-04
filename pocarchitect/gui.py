@@ -47,6 +47,41 @@ MAX_API_BODY_BYTES = 65_536
 MAX_REPORT_PREVIEW_BYTES = 2 * 1024 * 1024
 LOGGER = logging.getLogger(__name__)
 
+GUI_DEMO_CONTENT = """# POCArchitect Demo Report
+
+This credential-free example shows the complete report experience without
+reading a real source, contacting a model provider, using a credential, or
+incurring cost.
+
+## Executive summary
+
+POCArchitect turns bounded source evidence into a structured architecture
+brief. A real analysis always pauses for file-level transfer review and explicit
+approval before any selected, redacted content can reach a provider.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[Authorized source] --> B[Local inspection]
+    B --> C[Transfer review]
+    C --> D[Explicit approval]
+    D --> E[Provider analysis]
+    E --> F[Local report]
+```
+
+## Example finding
+
+- **Status:** Demonstration only
+- **Evidence:** No real source was inspected for this report.
+- **Recommendation:** Start a new analysis, choose an authorized source, and
+  review the exact transfer before approving a real provider call.
+
+## Next step
+
+Select **New analysis** to create a report from your own authorized evidence.
+"""
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -127,6 +162,7 @@ class GuiRuntime:
         self._jobs: dict[str, GuiJob] = {}
         self._artifacts: dict[str, Path] = {}
         self._artifact_ids: dict[Path, str] = {}
+        self._session_reports: set[Path] = set()
         self._lock = threading.RLock()
         self._executor = ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="pocarchitect-gui"
@@ -176,6 +212,24 @@ class GuiRuntime:
             )
             self._jobs[job.id] = job
         self._executor.submit(self._execute, job.id, prepared, payload.selected_files)
+        return job
+
+    def submit_demo(self) -> GuiJob:
+        """Queue a credential-free, deterministic report for first-run discovery."""
+
+        with self._lock:
+            self._purge_jobs()
+            job = GuiJob(id=f"run-{uuid_token()}")
+            job.events.append(
+                {
+                    "event": "queued",
+                    "message": "Credential-free demo queued.",
+                    "at": _now(),
+                    "sequence": 0,
+                }
+            )
+            self._jobs[job.id] = job
+        self._executor.submit(self._execute_demo, job.id)
         return job
 
     def _event_sink(self, job_id: str, payload: dict[str, object]) -> None:
@@ -251,6 +305,44 @@ class GuiRuntime:
                 job_id, "The analysis failed unexpectedly. Check the terminal log."
             )
 
+    def _execute_demo(self, job_id: str) -> None:
+        with self._lock:
+            job = self._jobs[job_id]
+            job.status = "running"
+            job.updated_at = _now()
+
+        def demo_event(payload: dict[str, object]) -> None:
+            event = dict(payload)
+            if event.get("event") == "provider_started":
+                event["message"] = (
+                    "Generating the demo locally. No provider request is made."
+                )
+            self._event_sink(job_id, event)
+
+        try:
+            request = AnalysisRequest(
+                source="https://github.com/example/pocarchitect-demo",
+                provider="local",
+                model="demo-model",
+                temperature=0.0,
+                output_dir=str(default_output_dir() / "demo"),
+                no_ingest=True,
+                run_analyzers=False,
+            )
+            prepared = self.service.prepare(request, demo_event)
+            result = self.service.execute(
+                prepared,
+                [],
+                demo_event,
+                response_override=GUI_DEMO_CONTENT,
+            )
+            self._finish(job_id, result)
+        except AnalysisServiceError as error:
+            self._fail(job_id, str(error))
+        except Exception:
+            LOGGER.exception("Unexpected GUI demo failure")
+            self._fail(job_id, "The demo failed unexpectedly. Check the terminal log.")
+
     def _finish(self, job_id: str, result: AnalysisResult) -> None:
         with self._lock:
             report_id = self._register_artifact(result.report_path)
@@ -259,6 +351,7 @@ class GuiRuntime:
                 if result.export_path.resolve() == result.report_path.resolve()
                 else self._register_artifact(result.export_path)
             )
+            self._session_reports.add(result.report_path.resolve())
             job = self._jobs[job_id]
             job.status = "completed"
             job.updated_at = _now()
@@ -307,12 +400,19 @@ class GuiRuntime:
     def reports(self) -> list[dict[str, object]]:
         output = default_output_dir().resolve()
         rows: list[dict[str, object]] = []
-        if not output.is_dir():
-            return rows
+        candidate_paths: set[Path] = set()
+        if output.is_dir():
+            candidate_paths.update(output.glob("POCAnalysis_*.md"))
+            demo_output = output / "demo"
+            if demo_output.is_dir():
+                candidate_paths.update(demo_output.glob("POCAnalysis_*.md"))
+        with self._lock:
+            candidate_paths.update(self._session_reports)
+
         candidates: list[tuple[float, Path]] = []
-        for path in output.glob("POCAnalysis_*.md"):
+        for path in candidate_paths:
             try:
-                candidates.append((path.stat().st_mtime, path))
+                candidates.append((path.stat().st_mtime, path.resolve()))
             except OSError:
                 continue
         for _, path in sorted(candidates, reverse=True)[:40]:
@@ -494,6 +594,11 @@ def create_app(
             job = app.state.runtime.submit(payload)
         except AnalysisServiceError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
+        return {"job_id": job.id, "status": job.status}
+
+    @app.post("/api/demo", status_code=202)
+    async def start_demo() -> dict[str, object]:
+        job = app.state.runtime.submit_demo()
         return {"job_id": job.id, "status": job.status}
 
     @app.post("/api/preparations/{preparation_id}/estimate")
