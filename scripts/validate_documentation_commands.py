@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-GUIDE = ROOT / "docs" / "NOVICE_USABILITY_GUIDE.md"
+GUIDE = ROOT / "docs" / "START_HERE.md"
 RUNNER = CliRunner()
 DOCUMENTED_COMMANDS = (
     "python -m pocarchitect --version",

@@ -76,7 +76,9 @@ Enforced checks:
 - The interactive `setup` wizard, run non-interactively, refuses with a clear
   exit code `2` and points the user at the scriptable alternative
   (`preflight` plus the provider key variable) instead of hanging on a prompt.
-- The [Novice Usability Guide](NOVICE_USABILITY_GUIDE.md) ships a
+- The comprehensive [Start Here guide](START_HERE.md) provides the recommended
+  first-use journey, and the validation-oriented
+  [Novice Usability Guide](NOVICE_USABILITY_GUIDE.md) ships a
   troubleshooting matrix and a "diagnose and fix" section.
 
 ---

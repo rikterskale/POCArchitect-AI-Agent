@@ -50,6 +50,47 @@ are also needed.
 | Batch state | `pocarchitect/state.py` | Versioned load, atomic writes, summaries, and recoverable reset |
 | System prompt | `pocarchitect/POC_Architect_Prompt.md` | Provider instructions and report structure |
 | Grounding and report saving | `pocarchitect/cli.py` | Clone/selection, ingestion outcomes, metadata, and body hash |
+| Analysis service | `pocarchitect/service.py` | Prepare/approve/execute boundary shared with embedded clients |
+| Local GUI API and job runtime | `pocarchitect/gui.py` | Authenticated loopback API, single-worker jobs, events, and artifact registry |
+| Browser frontend | `pocarchitect/web/` | Accessible source configuration, exact transfer review, recoverable progress, and safe report presentation |
+
+## Local GUI flow
+
+The optional GUI is launched with `pocarchitect gui` after installing the
+`gui` extra. It binds only to a loopback address and creates a random session
+token for each launch. The token is exchanged for an HTTP-only, same-site
+cookie before the interface can call the API.
+
+```text
+Browser form
+  -> prepare source in a worker thread
+  -> return file paths, sizes, redaction count, and cost estimate only
+  -> explicit one-time transfer approval
+  -> queue one analysis job
+  -> stream structured progress events
+  -> register completed report/export artifacts by opaque ID
+```
+
+`AnalysisService.prepare()` retains prompt and source content in backend memory
+and exposes only review metadata. `AnalysisService.execute()` consumes the
+prepared object after explicit approval. The GUI job runner intentionally uses
+one worker so report history and other file-backed state cannot be updated by
+concurrent GUI jobs. The CLI remains the default installation surface; FastAPI
+and Uvicorn are optional dependencies.
+
+File-selection changes call a metadata-only estimate endpoint. The service
+rebuilds the bounded, redacted prompt in memory and returns updated byte, token,
+cost, and redaction counts without exposing source content or contacting the
+provider. The browser stores only the opaque active job identifier in session
+storage so a refresh can recover a queued or running analysis.
+
+The HTTP boundary validates the loopback host and configured port, requires the
+launch cookie for every API route, requires an exact same-origin value for
+mutations, and limits request and preview sizes. Responses add a restrictive
+content security policy, cross-origin isolation headers, disabled browser
+permissions, and no-store caching. Prepared transfers expire after 30 minutes,
+completed jobs are bounded and expire from memory, and the server suppresses
+its implementation-identifying response header.
 
 ## Guided and novice-facing surfaces
 
@@ -155,9 +196,10 @@ service must be supplied through `local` and `--base-url`.
 
 ## Current limitations
 
-- The supported command interface is the CLI; there is no HTTP/API server. The
-  `WorkflowEngine` module is also a supported Python integration API for
-  workflow clients, as documented in the finding-driven workflow guide.
+- The supported automation interface remains the CLI. The optional GUI exposes
+  a launch-scoped, loopback-only HTTP API; it is not a remotely hosted or
+  multi-user server. `WorkflowEngine` is also a supported Python integration API
+  for workflow clients, as documented in the finding-driven workflow guide.
 - Private GitHub authentication is not configured by the project.
 - No clone cache or source-completeness guarantee exists.
 - Provider output and copied commands require operator review.

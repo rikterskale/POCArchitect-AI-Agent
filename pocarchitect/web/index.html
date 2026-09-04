@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#090c12">
+    <meta name="description" content="Secure local architecture analysis workspace for POCArchitect">
+    <title>POCArchitect · Analysis workspace</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to workspace</a>
+    <div class="connection-banner is-hidden" id="connection-banner" role="alert">
+      <span>Connection interrupted.</span>
+      <button type="button" id="retry-connection">Retry connection</button>
+    </div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#analyze" aria-label="POCArchitect analysis workspace">
+          <span class="brand-mark" aria-hidden="true"><i></i><b>P</b></span>
+          <span class="brand-copy"><strong>POCArchitect</strong><small>Analysis workspace</small></span>
+        </a>
+        <nav class="topnav" role="tablist" aria-label="Workspace views">
+          <button class="nav-item is-active" id="tab-analyze" type="button" role="tab" aria-selected="true" aria-controls="view-analyze" data-view="analyze">Analyze</button>
+          <button class="nav-item" id="tab-reports" type="button" role="tab" aria-selected="false" aria-controls="view-reports" tabindex="-1" data-view="reports">Reports <span id="report-count" aria-label="0 reports">0</span></button>
+        </nav>
+        <div class="session-status" id="connection-status" data-state="loading" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span><strong>Connecting</strong><small>Secure local session</small></span>
+        </div>
+      </header>
+
+      <main id="main-content" tabindex="-1">
+        <section class="view is-active" id="view-analyze" role="tabpanel" aria-labelledby="tab-analyze">
+          <div class="workspace-heading">
+            <div>
+              <p class="eyebrow"><span>New analysis</span><i aria-hidden="true"></i> Local-first workflow</p>
+              <h1>Architecture analysis, grounded in your evidence.</h1>
+              <p class="heading-copy">Inspect a repository, review the exact transfer, and create a decision-ready blueprint without losing control of source data.</p>
+            </div>
+            <button class="secondary-action is-hidden" id="new-analysis" type="button"><span aria-hidden="true">＋</span> New analysis</button>
+          </div>
+
+          <div class="workspace-grid">
+            <form class="panel analysis-form" id="analysis-form" novalidate>
+              <div class="panel-header">
+                <div><p class="step-label">Step 1 of 2</p><h2>Analysis configuration</h2></div>
+                <span class="panel-status">Draft</span>
+              </div>
+
+              <fieldset class="form-section" id="source-section">
+                <legend>Source</legend>
+                <div class="segmented-control" role="group" aria-label="Source type">
+                  <button type="button" class="segment is-active" data-source-mode="url" aria-pressed="true"><span aria-hidden="true">↗</span> Repository or URL</button>
+                  <button type="button" class="segment" data-source-mode="local" aria-pressed="false"><span aria-hidden="true">⌂</span> Local directory</button>
+                </div>
+                <label class="field field-wide" for="source">
+                  <span id="source-label">Source URL</span>
+                  <input id="source" name="source" type="text" required autocomplete="off" spellcheck="false" placeholder="https://github.com/owner/repository" aria-describedby="source-hint source-error">
+                  <small id="source-hint">GitHub repositories can be shallow-cloned for grounded analysis.</small>
+                  <small class="field-error is-hidden" id="source-error" role="alert"></small>
+                </label>
+              </fieldset>
+
+              <fieldset class="form-section">
+                <legend>Analysis engine</legend>
+                <div class="field-row">
+                  <label class="field" for="provider">
+                    <span>Provider</span>
+                    <select id="provider" name="provider" aria-describedby="provider-state">
+                      <option value="xai">xAI</option><option value="openai">OpenAI</option><option value="groq">Groq</option><option value="local">Local endpoint</option>
+                    </select>
+                    <small id="provider-state">Checking configuration…</small>
+                  </label>
+                  <label class="field" for="model">
+                    <span>Model</span>
+                    <input id="model" name="model" type="text" autocomplete="off" spellcheck="false">
+                    <small>Provider default is preselected.</small>
+                  </label>
+                </div>
+                <label class="field field-wide is-hidden" id="base-url-field" for="base-url">
+                  <span>Local endpoint</span>
+                  <input id="base-url" name="base_url" type="url" value="http://localhost:11434/v1" spellcheck="false">
+                  <small>Must expose an OpenAI-compatible API.</small>
+                </label>
+                <div class="field-row">
+                  <label class="field" for="risk-level"><span>Risk posture</span><select id="risk-level" name="risk_level"><option>Critical</option><option selected>High</option><option>Medium</option><option>Low</option></select></label>
+                  <label class="field" for="target-os"><span>Target environment</span><input id="target-os" name="target_os" type="text" value="Linux" autocomplete="off"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="form-section">
+                <legend>Evidence policy</legend>
+                <div class="toggle-stack">
+                  <label class="toggle-row" for="ingest"><span><strong>Ground source files</strong><small>Select bounded evidence from the source.</small></span><input id="ingest" type="checkbox" checked><i aria-hidden="true"></i></label>
+                  <label class="toggle-row" for="mitigations"><span><strong>Include mitigations</strong><small>Add defensive guidance to the report.</small></span><input id="mitigations" type="checkbox" checked><i aria-hidden="true"></i></label>
+                </div>
+              </fieldset>
+
+              <details class="advanced-options">
+                <summary><span>Advanced controls</span><small>Output, budget, and enrichment</small></summary>
+                <div class="advanced-grid">
+                  <label class="field" for="report-format"><span>Output format</span><select id="report-format"><option value="markdown">Markdown</option><option value="html">HTML</option><option value="pdf">PDF</option><option value="json">JSON</option></select></label>
+                  <label class="field" for="cost-limit"><span>Maximum input cost</span><div class="input-prefix"><span>$</span><input id="cost-limit" type="number" min="0" step="0.01" placeholder="No limit"></div></label>
+                  <label class="field field-wide" for="output-dir"><span>Output directory</span><input id="output-dir" type="text" spellcheck="false"></label>
+                  <label class="check-row"><input id="vulnerability-scan" type="checkbox"><span><strong>OSV enrichment</strong><small>Check exact dependency versions for known vulnerabilities.</small></span></label>
+                  <label class="check-row"><input id="diff-previous" type="checkbox"><span><strong>Compare with previous</strong><small>Save a diff against the latest matching report.</small></span></label>
+                  <label class="check-row"><input id="scaffold" type="checkbox"><span><strong>Create safe scaffold</strong><small>Generate a blueprint project structure after analysis.</small></span></label>
+                </div>
+              </details>
+
+              <div class="inline-alert is-hidden" id="form-error" role="alert"></div>
+              <button class="primary-action" id="prepare-button" type="submit"><span class="button-label">Prepare transfer review</span><span class="button-icon" aria-hidden="true">→</span><span class="button-spinner" aria-hidden="true"></span></button>
+              <p class="action-note"><span aria-hidden="true">⌁</span> Preparation is local. No provider request is made.</p>
+            </form>
+
+            <section class="panel review-panel" id="review-panel" aria-labelledby="review-title">
+              <div class="panel-header">
+                <div><p class="step-label">Step 2 of 2</p><h2 id="review-title">Transfer review</h2></div>
+                <span class="panel-status" id="review-status">Waiting</span>
+              </div>
+
+              <div class="empty-state" id="review-empty">
+                <div class="evidence-visual" aria-hidden="true"><span class="evidence-node node-one"></span><span class="evidence-node node-two"></span><span class="evidence-node node-three"></span><i></i><b></b></div>
+                <p class="empty-kicker">Transfer boundary</p>
+                <h3>Know what leaves your machine.</h3>
+                <p>Prepare a source to inventory bounded files, redact recognized secrets, and estimate provider input before approval.</p>
+                <div class="empty-features" aria-label="Preparation safeguards"><span>File-level control</span><span>Secret redaction</span><span>Cost estimate</span></div>
+              </div>
+
+              <div class="loading-state is-hidden" id="review-loading" aria-live="polite" aria-busy="true">
+                <div class="loading-orbit" aria-hidden="true"><span></span></div>
+                <p>Inspecting the source locally</p>
+                <small>Inventorying bounded evidence and scanning for recognized secrets…</small>
+                <div class="loading-steps" aria-hidden="true"><i></i><i></i><i></i></div>
+              </div>
+
+              <div class="review-content is-hidden" id="review-content">
+                <div class="review-summary" aria-label="Transfer summary">
+                  <div><small>Selected files</small><strong id="metric-files">0</strong></div><div><small>Transfer size</small><strong id="metric-bytes">0 B</strong></div><div><small>Est. tokens</small><strong id="metric-tokens">0</strong></div><div><small>Est. input</small><strong id="metric-cost">—</strong></div><div><small>Redactions</small><strong id="metric-redactions">0</strong></div>
+                </div>
+                <div class="notice safe-notice" id="cost-notice"><span aria-hidden="true">✓</span><p><strong>No provider call has been made.</strong> The estimate updates when you change the file selection.</p></div>
+                <div class="file-review">
+                  <div class="section-heading"><div><h3>Grounding files</h3><p id="ingestion-label">Bounded source evidence</p></div><button type="button" class="text-button" id="toggle-files">Clear all</button></div>
+                  <div class="selection-status" id="selection-status" aria-live="polite">All files selected</div>
+                  <div class="file-list" id="file-list" role="group" aria-label="Files approved for transfer"></div>
+                </div>
+                <div class="redaction-summary" id="redaction-summary"><span aria-hidden="true">✦</span><p><strong>Redaction scan complete.</strong> <span id="redaction-detail">No recognized secret patterns found.</span></p></div>
+                <label class="approval-check" for="approval"><input id="approval" type="checkbox"><span>I reviewed this transfer and authorize sending the selected, redacted content to <strong id="approval-provider">the provider</strong>.</span></label>
+                <div class="inline-alert is-hidden" id="review-error" role="alert"></div>
+                <button class="primary-action approve-action" id="run-button" type="button" disabled><span class="button-label">Approve and run analysis</span><span class="button-icon" aria-hidden="true">→</span><span class="button-spinner" aria-hidden="true"></span></button>
+                <p class="review-expiry" id="review-expiry">Prepared reviews expire after 30 minutes and can be used once.</p>
+              </div>
+
+              <div class="run-content is-hidden" id="run-content" aria-live="polite">
+                <div class="run-orbit" aria-hidden="true"><span></span><i></i></div>
+                <p class="eyebrow" id="run-state-label">Analysis queued</p><h3 id="run-heading">Building your architecture report.</h3><p class="run-elapsed" id="run-elapsed">Elapsed 00:00</p>
+                <ol class="phase-track" id="phase-track" aria-label="Analysis progress"><li class="phase is-active"><i></i><span>Queued</span></li><li class="phase"><i></i><span>Provider</span></li><li class="phase"><i></i><span>Report</span></li><li class="phase"><i></i><span>Complete</span></li></ol>
+                <div class="event-log" id="event-log" role="log" aria-live="polite" aria-relevant="additions"></div>
+                <div class="run-error-actions is-hidden" id="run-error-actions"><button class="secondary-action" id="restart-after-error" type="button">Return to configuration</button></div>
+              </div>
+
+              <article class="report-content is-hidden" id="report-content">
+                <div class="report-complete-mark" aria-hidden="true">✓</div>
+                <div class="section-heading report-heading"><div><p class="eyebrow">Analysis complete</p><h3 id="report-name">Report</h3></div><div class="report-actions"><button class="secondary-action" id="copy-report" type="button">Copy Markdown</button><a class="primary-link" id="download-report" href="#">Download</a></div></div>
+                <div class="report-meta" id="report-meta"></div><div class="rendered-markdown" id="report-body" tabindex="0"></div>
+              </article>
+            </section>
+
+            <aside class="context-rail" aria-label="Session information">
+              <section class="trust-card"><p class="eyebrow">Transfer policy</p><h2>Explicit approval at every boundary.</h2><ol><li><span>01</span><div><strong>Inspect locally</strong><small>Selection and redaction happen before approval.</small></div></li><li><span>02</span><div><strong>Review precisely</strong><small>File-level controls define the provider payload.</small></div></li><li><span>03</span><div><strong>Authorize once</strong><small>Prepared transfers expire and cannot be replayed.</small></div></li></ol></section>
+              <section class="readiness-card"><div class="rail-heading"><p class="eyebrow">Provider readiness</p><span class="readiness-dot" id="provider-readiness-dot"></span></div><h3 id="provider-readiness-name">Checking configuration</h3><p id="provider-readiness-copy">Confirming the selected provider without exposing credentials.</p></section>
+              <section class="session-card"><div><span class="pulse" aria-hidden="true"></span><strong>Private session</strong></div><p>Bound to this computer and protected by a launch-specific, HTTP-only session.</p><small id="version-label">POCArchitect</small></section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view reports-view" id="view-reports" role="tabpanel" aria-labelledby="tab-reports" hidden>
+          <div class="workspace-heading reports-heading">
+            <div><p class="eyebrow">Report library</p><h1>Analysis history, ready for review.</h1><p class="heading-copy">Open, search, copy, or download recent Markdown reports from your default output directory.</p></div>
+            <button class="secondary-action" id="refresh-reports" type="button"><span aria-hidden="true">↻</span> Refresh</button>
+          </div>
+          <div class="reports-layout">
+            <section class="panel report-list-panel" aria-labelledby="report-list-title">
+              <div class="panel-header compact-header"><div><p class="step-label">Local reports</p><h2 id="report-list-title">Recent analyses</h2></div><span class="panel-status" id="library-count">0</span></div>
+              <label class="search-field" for="report-search"><span aria-hidden="true">⌕</span><input id="report-search" type="search" placeholder="Search reports or sources" autocomplete="off"></label>
+              <div class="report-list" id="report-list" aria-live="polite"></div>
+            </section>
+            <article class="panel report-reader">
+              <div class="empty-state" id="library-empty"><div class="document-visual" aria-hidden="true"><i></i><i></i><i></i></div><h3>Select a report to read it.</h3><p>Recent Markdown reports appear on the left. Your files remain in the configured local reports directory.</p></div>
+              <div class="is-hidden" id="library-report"><div class="section-heading report-heading"><div><p class="eyebrow">Saved report</p><h2 id="library-report-name">Report</h2></div><div class="report-actions"><button class="secondary-action" id="library-copy" type="button">Copy Markdown</button><a class="primary-link" id="library-download" href="#">Download</a></div></div><div class="rendered-markdown library-markdown" id="library-report-body" tabindex="0"></div></div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"><div class="toast is-hidden" id="toast"><span class="toast-icon" aria-hidden="true"></span><span id="toast-message"></span></div></div>
+  </body>
+</html>

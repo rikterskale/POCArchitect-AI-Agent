@@ -31,6 +31,13 @@ a security guarantee by the project:
   key on a command line or in an issue, log, or report.
 - Review the redacted transfer preview before confirming any real provider call.
 - Treat generated reports as unverified model output that requires your review.
+- Keep the optional GUI bound to its built-in loopback address. Do not proxy or
+  expose it as a remote service; its authentication model is launch-scoped and
+  designed for a single local operator.
+- The GUI rejects unexpected host headers and cross-origin mutations, limits
+  API request and report-preview sizes, and applies a restrictive browser
+  policy. These controls harden local use; they do not turn the GUI into a
+  remotely deployable or multi-user service.
 
 These practices reduce operational risk but do not constitute a security-support
 commitment.

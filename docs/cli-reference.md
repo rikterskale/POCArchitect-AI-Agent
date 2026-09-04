@@ -8,17 +8,17 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 
 | Option | Type | Default | Purpose |
 |---|---|---|---|
-| `--url`, `-u` | STR | None | Single PoC URL; public GitHub repositories can be grounded. |
-| `--source` | STR | None | Generic source identifier (GitHub URL, package, image, or download URL). |
+| `--url`, `-u` | TEXT | None | Single PoC URL; public GitHub repositories can be grounded. |
+| `--source` | TEXT | None | Generic source identifier (GitHub URL, package, image, or download URL). |
 | `--path` | DIRECTORY | None | Analyze a local, unpushed source directory. |
 | `--batch`, `-b` | PATH | None | Text file; blank lines and full-line # comments are ignored. |
 | `--provider`, `-p` | xai \| openai \| groq \| local | None | LLM provider (project config is used when omitted). |
-| `--model`, `-m` | STR | None | Model name (default: provider-specific) |
+| `--model`, `-m` | TEXT | None | Model name (default: provider-specific) |
 | `--temperature`, `-t` | FLOAT | None | Provider sampling temperature. |
-| `--base-url` | STR | None | OpenAI-compatible endpoint for --provider local. |
+| `--base-url` | TEXT | None | OpenAI-compatible endpoint for --provider local. |
 | `--output-dir` | PATH | None | Directory where successful reports are written. |
-| `--risk-level` | STR | None | Free-text risk label sent to the provider. |
-| `--target-os` | STR | None | Free-text target environment sent to the provider. |
+| `--risk-level` | TEXT | None | Free-text risk label sent to the provider. |
+| `--target-os` | TEXT | None | Free-text target environment sent to the provider. |
 | `--include-mitigations`, `--no-mitigations` | BOOLEAN | None | Include mitigation instructions in the report (use --no-mitigations to omit). |
 | `--no-ingest` | BOOLEAN | False | Skip GitHub repository grounding. |
 | `--dry-run` | BOOLEAN | False | Show the prompt summary and exit without calling LLM |
@@ -49,7 +49,7 @@ Run environment preflight checks. Example: pocarchitect preflight --offline
 |---|---|---|---|
 | `--offline` | BOOLEAN | False | Check installation without requiring an API key or provider access. |
 | `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
-| `--base-url` | STR | None | OpenAI-compatible local provider endpoint. |
+| `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
 | `--output-dir` | PATH | None | Directory whose report-write access should be checked. |
 | `--format` | text \| json | text | Output mode: text or JSON Lines. |
 | `--no-color` | BOOLEAN | False | Disable ANSI color and style sequences. |
@@ -61,7 +61,7 @@ Diagnose readiness and optionally guide repairs. Example: pocarchitect doctor --
 | Option | Type | Default | Purpose |
 |---|---|---|---|
 | `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
-| `--base-url` | STR | None | OpenAI-compatible local provider endpoint. |
+| `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
 | `--output-dir` | PATH | None | Directory whose report-write access should be checked. |
 | `--offline` | BOOLEAN | False | Skip credentials and endpoint checks; diagnose the local installation only. |
 | `--fix` | BOOLEAN | False | Offer safe repairs for writable output and missing provider credentials. |
@@ -82,6 +82,15 @@ Run the credential-free doctor and demo journey in one command. Example: pocarch
 | Option | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
+
+## Command: `gui`
+
+Launch the protected, local-only browser interface.
+
+| Option | Type | Default | Purpose |
+|---|---|---|---|
+| `--port` | INTEGER RANGE | 8765 | Loopback port for the local GUI. |
+| `--no-open` | BOOLEAN | False | Print the protected launch URL instead of opening a browser. |
 
 ## Command: `batch-status`
 
@@ -122,8 +131,8 @@ Apply one auditable workflow command and persist the resulting state. Example: p
 
 | Option | Type | Default | Purpose |
 |---|---|---|---|
-| `--command` | STR | required | WorkflowEngine command name. |
-| `--payload` | STR | {} | JSON object passed to the command. |
+| `--command` | TEXT | required | WorkflowEngine command name. |
+| `--payload` | TEXT | {} | JSON object passed to the command. |
 | `--state` | PATH | reports/workflow.json | — |
 
 ## Command: `setup`
@@ -239,6 +248,7 @@ Publish a report with the authenticated GitHub CLI and return its URL. Example: 
 | `doctor` | Diagnose readiness and optionally guide repairs. Example: pocarchitect doctor --offline --fix |
 | `demo` | Generate a local demo report without credentials, network, or provider cost. Example: pocarchitect demo |
 | `quickstart` | Run the credential-free doctor and demo journey in one command. Example: pocarchitect quickstart |
+| `gui` | Launch the protected, local-only browser interface. |
 | `batch-status` | Show a concise, machine-readable summary of batch recovery state. Example: pocarchitect batch-status --batch-state reports/batch_progress.json |
 | `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. Example: pocarchitect batch-reset --yes |
 | `workflow-init` | Create a new auditable finding-driven workflow state file. Example: pocarchitect workflow-init --state reports/workflow.json |

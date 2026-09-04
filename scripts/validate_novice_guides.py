@@ -12,6 +12,7 @@ GUIDES = {
     "Linux": ROOT / "docs" / "guides" / "LINUX_NOVICE_USABILITY_GUIDE.md",
 }
 CANONICAL_GUIDE = ROOT / "docs" / "NOVICE_USABILITY_GUIDE.md"
+START_GUIDE = ROOT / "docs" / "START_HERE.md"
 REQUIRED_CANONICAL_HEADINGS = (
     "## 1. What This Guide Helps You Do",
     "## 6. Before You Begin",
@@ -26,6 +27,28 @@ REQUIRED_CANONICAL_HEADINGS = (
 REQUIRED_COMMANDS = (
     "python -m pocarchitect --version",
     "python -m pocarchitect preflight --offline",
+    "--no-ingest --dry-run",
+    "batch-status",
+    "batch-reset",
+)
+REQUIRED_START_HEADINGS = (
+    "# Start Here: POCArchitect",
+    "## The shortest successful path",
+    "## 3. Install Python and Git",
+    "## 5. Create an isolated environment and install",
+    "## 6. Prove the installation works without credentials",
+    "## 7. Configure a provider safely",
+    "## 8. Launch and use the GUI",
+    "## 14. Use POCArchitect safely every day",
+    "## 15. Troubleshoot problems",
+    "## 16. Update, stop, clean up, or uninstall",
+    "## 19. Glossary",
+)
+REQUIRED_START_COMMANDS = (
+    "python -m pip install -e '.[gui]'",
+    "python -m pocarchitect quickstart",
+    "pocarchitect setup",
+    "pocarchitect gui",
     "--no-ingest --dry-run",
     "batch-status",
     "batch-reset",
@@ -96,6 +119,26 @@ def validate_canonical_guide(path: Path) -> list[str]:
     return errors
 
 
+def validate_start_guide(path: Path) -> list[str]:
+    if not path.exists():
+        return [f"Start Here guide is missing: {path}"]
+    text = path.read_text(encoding="utf-8")
+    errors = []
+    for heading in REQUIRED_START_HEADINGS:
+        if heading not in text:
+            errors.append(f"Start Here guide is missing required heading: {heading}")
+    for command in REQUIRED_START_COMMANDS:
+        if command not in text:
+            errors.append(f"Start Here guide is missing required command: {command}")
+    if text.count("**Success check:**") < 5:
+        errors.append("Start Here guide needs success checks for the novice journey")
+    if "### Troubleshooting matrix" not in text:
+        errors.append("Start Here guide is missing its troubleshooting matrix")
+    if "Never expose or reverse-proxy the GUI" not in text:
+        errors.append("Start Here guide is missing the local-only GUI warning")
+    return errors
+
+
 def main() -> int:
     errors = [
         error
@@ -103,6 +146,7 @@ def main() -> int:
         for error in validate_guide(platform, path)
     ]
     errors.extend(validate_canonical_guide(CANONICAL_GUIDE))
+    errors.extend(validate_start_guide(START_GUIDE))
     if errors:
         print("Novice guide validation failed:")
         print("\n".join(f"- {error}" for error in errors))

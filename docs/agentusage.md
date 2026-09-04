@@ -1,6 +1,6 @@
 # POCArchitect Usage Guide
 
-This is a short orientation page. The complete, generated option list is the [CLI Reference](cli-reference.md); begin an installation or first run with the [Novice Usability Guide](NOVICE_USABILITY_GUIDE.md).
+This is a short orientation page. The complete, generated option list is the [CLI Reference](cli-reference.md); begin an installation or first run with [Start Here: POCArchitect](START_HERE.md).
 
 ## Command Line Options
 

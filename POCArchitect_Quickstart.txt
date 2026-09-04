@@ -3,11 +3,15 @@ POCArchitect Quickstart Redirect
 This former quickstart duplicated command and option details that are now
 generated or maintained in canonical documentation. Use:
 
-  docs/NOVICE_USABILITY_GUIDE.md
+  docs/START_HERE.md
 
-The canonical guide contains supported Windows PowerShell and Bash installation
-paths, provider setup, batch recovery, exact success indicators, and
-troubleshooting.
+The recommended Start Here guide contains Windows PowerShell, macOS, and Linux
+installation paths; GUI and terminal workflows; provider setup; batch recovery;
+exact success indicators; and comprehensive troubleshooting.
+
+The validation-oriented canonical reference remains available at:
+
+  docs/NOVICE_USABILITY_GUIDE.md
 
 Safe no-clone, no-provider-call preview from the repository root:
 

@@ -32,3 +32,9 @@ def test_platform_supplements_are_valid_as_concise_deltas():
     for platform, path in validator.GUIDES.items():
         assert validator.validate_guide(platform, path) == []
         assert path.read_text(encoding="utf-8").count("\n## ") < 10
+
+
+def test_start_here_guide_has_the_complete_first_use_contract():
+    validator = load_validator()
+
+    assert validator.validate_start_guide(validator.START_GUIDE) == []

@@ -52,6 +52,7 @@ CLI = [sys.executable, "-m", "pocarchitect"]
 REQUIRED_COMMANDS = {
     "demo",
     "doctor",
+    "gui",
     "preflight",
     "setup",
     "config",
@@ -176,6 +177,14 @@ COVERED_OPTIONS: dict[tuple[str, str], str] = {
         "doctor",
         "--yes",
     ): "Noninteractive safe repair confirmation is covered by CLI diagnostics tests.",
+    (
+        "gui",
+        "--port",
+    ): "Loopback port selection is covered by the GUI launch integration test.",
+    (
+        "gui",
+        "--no-open",
+    ): "The manual protected-launch path is covered by the GUI launch integration test.",
     (
         "init",
         "--force",

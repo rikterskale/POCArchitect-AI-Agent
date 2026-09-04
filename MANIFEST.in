@@ -17,6 +17,9 @@ include pocarchitect/POC_Architect_Prompt.md
 # Recursively include any Markdown or data files inside the package
 recursive-include pocarchitect *.md
 recursive-include pocarchitect *.txt
+recursive-include pocarchitect/web *.html
+recursive-include pocarchitect/web *.css
+recursive-include pocarchitect/web *.js
 recursive-include docs *.md
 recursive-include docs *.py
 recursive-include example_usage *.md

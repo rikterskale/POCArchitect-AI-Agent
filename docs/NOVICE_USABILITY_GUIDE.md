@@ -25,7 +25,13 @@ POCArchitect accepts one URL or a text file of URLs and prepares a Markdown anal
 
 ## 4. What the Project Does Not Do
 
-POCArchitect does not execute retrieved PoC source. It is not an API server, a vulnerability scanner, or a guarantee that an LLM response is accurate. Non-GitHub URLs are accepted but are not cloned for grounding. Private GitHub repository access is not configured by the project by default.
+POCArchitect does not execute retrieved PoC source and does not guarantee that
+an LLM response is accurate. The optional GUI uses a launch-scoped API that is
+bound to the local computer; it is not a remotely hosted or multi-user service.
+Optional OSV enrichment checks exact dependency versions, but POCArchitect is
+not a general-purpose vulnerability scanner. Non-GitHub URLs are accepted but
+are not cloned for grounding. Private GitHub repository access is not
+configured by the project by default.
 
 ## 5. Important Safety, Cost, Data, or Authorization Notes
 
@@ -389,15 +395,18 @@ POCArchitect has no system service or global uninstall step when installed in th
 
 ## 26. Known Limitations and Unsupported Scenarios
 
-The project has no documented API or library interface. It does not provide
-private-GitHub authentication, cloning for non-GitHub URLs, report caching, or a
-public option to disable <code>include_mitigations</code>. Source candidates are
-selected by fixed filename keywords/extensions, files over 250,000 bytes are
-skipped, content is truncated at 7,500 characters, and only the first 25
-matches are included. Cloud responses, live credentials/endpoints, native
-Docker Desktop behavior, WSL/Git Bash, and interactive shell-specific behavior
-remain external or unverified. Clean artifact installation and offline first-day
-behavior are enforced on Linux, Windows, and macOS in CI.
+Supported integration surfaces are the launch-scoped local GUI API and the
+documented <code>WorkflowEngine</code> Python API. The GUI API is intentionally
+not a remotely hosted or multi-user service. The project does not provide
+private-GitHub authentication, cloning for non-GitHub URLs, or report caching.
+Use <code>--no-mitigations</code> when a report should omit mitigation guidance.
+Source candidates are selected by fixed filename keywords/extensions, files
+over 250,000 bytes are skipped, content is truncated at 7,500 characters, and
+only the first 25 matches are included. Cloud responses, live
+credentials/endpoints, native Docker Desktop behavior, WSL/Git Bash, and
+interactive shell-specific behavior remain external or unverified. Clean
+artifact installation and offline first-day behavior are enforced on Linux,
+Windows, and macOS in CI.
 
 ## 27. Collect Diagnostic Information and Report a Problem
 

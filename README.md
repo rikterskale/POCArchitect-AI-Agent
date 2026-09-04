@@ -28,6 +28,9 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 - Local-directory analysis, multi-source comparison, OSV vulnerability enrichment, and analyzer plugins
 - Blueprint-to-scaffold generation, per-repository `.pocarchitect.toml`, example gallery, and typo suggestions
 - Reusable GitHub Action, pre-commit hook, scheduled workflow template, and optional Gist publishing
+- Production-focused local web GUI with accessible navigation, exact transfer
+  re-estimation, resilient live progress, report search/copy/download, and
+  launch-scoped security controls
 
 ## Feature status
 
@@ -44,7 +47,14 @@ It does not execute the retrieved PoC. A report is generated only after a real p
 
 ## Start here
 
-If you are new to terminals, Git, or Python, the canonical onboarding path is the standalone [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md). It includes Windows PowerShell and Bash setup paths, a safe first run that makes no provider call, expected results, and repair steps. The [Command Guide](docs/command-guide.md) is the advanced reference; the platform, Docker, and local-provider guides are supplements.
+**New user? Begin with [Start Here: POCArchitect](docs/START_HERE.md).** It is
+the comprehensive, GUI-first path from installing Python through a safe local
+demo, provider setup, the first authorized report, troubleshooting, updates,
+and cleanup. Every major step includes an expected result and recovery path.
+
+The older [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md) remains the
+validation-oriented CLI reference. The [Command Guide](docs/command-guide.md)
+covers advanced and automated workflows.
 
 After installation, the shortest credential-free proof is:
 
@@ -70,6 +80,18 @@ python -m pip install -e ".[all]"
 python -m pocarchitect doctor --offline
 python -m pocarchitect demo
 ```
+
+To add the optional local GUI:
+
+```bash
+python -m pip install -e ".[gui]"
+pocarchitect gui
+```
+
+The GUI binds only to `127.0.0.1`, opens with a launch-specific session, and
+keeps prepared source content in backend memory. A provider call begins only
+after the transfer review is explicitly approved. Changing the selected files
+recalculates transfer size, token, cost, and redaction metadata before approval.
 
 For a release artifact, download the matching wheel or source distribution from
 the project's release assets and install it in a fresh virtual environment:
@@ -231,6 +253,23 @@ pocarchitect export reports/POCAnalysis_example.md --format pdf
 credential-free local check. The scheduled workflow is safe by default and can be adapted
 to an authenticated provider run when a team wants persisted trend reports.
 
+For the browser interface, install the optional GUI dependencies and launch the
+local workspace:
+
+```bash
+python -m pip install -e ".[gui]"
+pocarchitect gui
+```
+
+Use `pocarchitect gui --no-open` when the environment cannot open a browser;
+the command prints a one-time protected launch URL. The GUI is intentionally
+local-only and does not provide a remotely bindable server mode.
+
+The interface supports keyboard navigation, reduced-motion preferences,
+responsive desktop/mobile layouts, interrupted-progress recovery, and a
+searchable local report library. Active runs are recovered after a page refresh
+for as long as the launch process remains running.
+
 `doctor` checks the installation and selected provider readiness. `demo` starts
 a temporary local OpenAI-compatible endpoint and writes a real Markdown report
 under `reports/demo/`; it requires no credentials, network, or provider spend.
@@ -246,6 +285,7 @@ python scripts/generate_docs.py
 
 ## Documentation
 
+- [Start Here: POCArchitect](docs/START_HERE.md) — recommended zero-friction installation, GUI, first report, safety, and troubleshooting journey.
 - [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md) — installation, safe first use, troubleshooting, cleanup, and update instructions.
 - [Command Guide](docs/command-guide.md) — end-to-end Windows, macOS/Linux, provider, batch, automation, Docker, and development commands.
 - [CLI Reference](docs/cli-reference.md) — generated option and subcommand reference.

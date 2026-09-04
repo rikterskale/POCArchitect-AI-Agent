@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional loopback-only web GUI with one-time transfer approval, structured
+  progress streaming, source-file curation, and safe report browsing.
+- Presentation-neutral prepare/execute analysis service and embedded event
+  capture for non-terminal clients.
+- Vendor-grade GUI design system with accessible tab semantics, responsive
+  layouts, inline recovery states, selection-aware estimates, active-run
+  recovery, report search and copy actions, and hardened local HTTP headers.
+- Comprehensive GUI-first Start Here guide for novice users, including
+  platform-specific installation, credential-free verification, provider
+  setup, transfer approval, everyday workflows, and recovery instructions.
 - Rich dashboard, grounding curation, per-phase timing, dry-run report previews, and post-run summary cards.
 - Local and generic source inputs, project configuration scaffolding, report history/diffs, comparison, architecture diagrams, blueprint scaffolds, and HTML/PDF/JSON export.
 - OSV dependency enrichment, analyzer entry points, example gallery, typo suggestions, guided doctor repairs, Gist publishing, a reusable GitHub Action, pre-commit hook, and scheduled analysis template.

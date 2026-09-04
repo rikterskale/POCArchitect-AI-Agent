@@ -4,6 +4,9 @@ This reference documents POCArchitect 0.2.0. Run commands from the repository
 root and analyze only targets you are authorized to inspect. Never put provider
 credentials on a command line or commit `.env`.
 
+If this is your first installation or provider-backed run, follow
+[Start Here: POCArchitect](START_HERE.md) before using this reference.
+
 ## Quick choices
 
 | Goal | Command |
@@ -15,6 +18,7 @@ credentials on a command line or commit `.env`.
 | Diagnose installation and provider readiness | `python -m pocarchitect --format json --no-color doctor --offline` |
 | Generate a no-cost end-to-end demo report | `python -m pocarchitect --format json --no-color demo` |
 | Run the complete credential-free first-day proof | `python -m pocarchitect quickstart` |
+| Launch the optional local GUI | `python -m pocarchitect gui` |
 | Verify a custom report path | `python -m pocarchitect preflight --offline --output-dir <PATH>` |
 | Safely inspect a prompt | `python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run` |
 | Analyze one authorized URL | `python -m pocarchitect --url <AUTHORIZED_URL> --provider <PROVIDER>` |
@@ -58,6 +62,24 @@ first-run matrix installs release artifacts and runs the offline readiness gate
 on Linux, Windows, and macOS. Interactive shell behavior and paid-provider calls
 remain outside that gate. Native x86_64 is the primary support target; ARM64,
 Apple Silicon, WSL/Git Bash, and Docker Desktop are best-effort host paths.
+
+### Optional local GUI
+
+Install the GUI extra in the active environment, then launch it:
+
+```bash
+python -m pip install -e ".[gui]"
+pocarchitect gui
+```
+
+The command binds to `127.0.0.1` and normally opens the protected workspace in
+the default browser. If automatic opening is unavailable, use
+`pocarchitect gui --no-open` and open the one-time URL printed in the terminal.
+Use `--port <PORT>` to select a different loopback port. Prepared source content
+is not sent to a provider until the transfer review is approved. File selection
+changes are re-estimated locally, and active runs can recover after a page
+refresh while the GUI process remains open. The report library supports local
+search, Markdown preview, copy, and download.
 
 ## Authoritative entry points
 
