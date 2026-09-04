@@ -110,3 +110,40 @@ def test_distribution_validator_main_accepts_valid_archive(
 
     assert validator.main() == 0
     assert "Validated packaged local Markdown" in capsys.readouterr().out
+
+
+def test_distribution_validator_rejects_multiple_roots_and_missing_anchor(tmp_path):
+    validator = load_validator()
+    multiple = tmp_path / "multiple.tar.gz"
+    with tarfile.open(multiple, "w:gz") as archive:
+        write_member(archive, "one/README.md", "# One\n")
+        write_member(archive, "two/README.md", "# Two\n")
+    assert "Expected one" in validator.validate_sdist(multiple)[0]
+
+    archive_path = tmp_path / "anchor.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        write_member(
+            archive,
+            "pkg/README.md",
+            "[bad](docs/page.md#missing)\n[web](https://example.test)\n",
+        )
+        write_member(archive, "pkg/docs/page.md", "# Present\n")
+    assert any(
+        "missing packaged anchor" in error
+        for error in validator.validate_sdist(archive_path)
+    )
+    assert validator.normalize_anchor("Hello, World!") == "hello-world"
+
+
+def test_distribution_validator_main_reports_archive_count_and_errors(
+    tmp_path, monkeypatch, capsys
+):
+    validator = load_validator()
+    monkeypatch.setattr(sys, "argv", ["validate_distribution.py", str(tmp_path)])
+    assert validator.main() == 1
+    assert "Expected exactly one" in capsys.readouterr().out
+
+    broken = tmp_path / "broken.tar.gz"
+    broken.write_bytes(b"bad")
+    assert validator.main() == 1
+    assert "validation failed" in capsys.readouterr().out

@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -11,6 +12,8 @@ from pocarchitect.finding_workflow import (
     WorkflowEngine,
     WorkflowError,
     WorkflowPhase,
+    WorkflowState,
+    STEPS,
 )
 
 
@@ -355,3 +358,77 @@ def test_workflow_save_cleans_temporary_file_after_serialization_error(tmp_path)
 
     assert not path.exists()
     assert list(tmp_path.glob(".workflow.json.*.tmp")) == []
+
+
+def test_finding_and_custom_route_validation_errors():
+    with pytest.raises(WorkflowError, match="title is required"):
+        Finding(title=" ")
+    with pytest.raises(WorkflowError, match="severity"):
+        Finding(title="bad", severity=11)
+    with pytest.raises(WorkflowError, match="Unknown finding status"):
+        Finding(title="bad", status="unknown")
+    with pytest.raises(WorkflowError, match="one or more uniquely"):
+        WorkflowEngine(steps=())
+    with pytest.raises(WorkflowError, match="one or more uniquely"):
+        WorkflowEngine(steps=(STEPS[0], STEPS[0]))
+    with pytest.raises(WorkflowError, match="title and explanation"):
+        WorkflowEngine(steps=(replace(STEPS[0], title=""), STEPS[-1]))
+    with pytest.raises(WorkflowError, match="end with the archive"):
+        WorkflowEngine(steps=STEPS[:-1])
+    with pytest.raises(WorkflowError, match="archived phase"):
+        WorkflowEngine(
+            steps=(*STEPS[:-1], replace(STEPS[-1], phase=WorkflowPhase.REPORTING))
+        )
+    with pytest.raises(WorkflowError, match="current_phase"):
+        WorkflowEngine(WorkflowState(current_phase=WorkflowPhase.REPORTING))
+    with pytest.raises(WorkflowError, match="positioned at archive"):
+        WorkflowEngine(WorkflowState(terminal=True))
+    with pytest.raises(WorkflowError, match="Unknown current workflow step"):
+        WorkflowEngine(WorkflowState(current_step_id="missing"))
+
+
+def test_workflow_public_mutation_and_integrity_error_paths(tmp_path):
+    engine = WorkflowEngine()
+    finding = engine.add_finding(title="one")
+    with pytest.raises(WorkflowError, match="already exists"):
+        engine.add_finding(finding)
+    with pytest.raises(WorkflowError, match="confidence"):
+        engine.enrich_finding(finding.id, confidence=101)
+    with pytest.raises(WorkflowError, match="Decision key"):
+        engine.decide(" ", True)
+    with pytest.raises(WorkflowError, match="Unknown finding"):
+        engine.correlate(finding.id, ["missing"])
+    with pytest.raises(WorkflowError, match="Unknown action"):
+        engine.resolve_action("missing")
+
+    action_id = f"validate:{finding.id}"
+    engine.resolve_action(action_id)
+    engine.resolve_action(action_id)
+    assert engine.state.pending_actions[action_id].status == "done"
+
+    engine.state.completed_steps.append("missing-step")
+    finding_key = finding.id
+    engine.state.findings[finding_key].id = "different"
+    engine.state.findings[finding_key].related_finding_ids = ["missing"]
+    engine.state.pending_actions[action_id].id = "different-action"
+    engine.state.pending_actions[action_id].finding_id = "missing"
+    errors = engine.validate_integrity()
+    assert len(errors) >= 5
+    with pytest.raises(WorkflowError, match="Cannot persist invalid"):
+        engine.save(tmp_path / "invalid.json")
+
+
+def test_workflow_loader_wraps_invalid_json_and_invalid_integrity(tmp_path):
+    broken = tmp_path / "broken.json"
+    broken.write_text("not json", encoding="utf-8")
+    with pytest.raises(WorkflowError, match="Cannot load"):
+        WorkflowEngine.load(broken)
+
+    engine = WorkflowEngine()
+    path = tmp_path / "workflow.json"
+    engine.save(path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["completed_steps"] = ["missing"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(WorkflowError, match="Invalid workflow state"):
+        WorkflowEngine.load(path)

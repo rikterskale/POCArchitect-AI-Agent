@@ -1,6 +1,7 @@
 import importlib.util
 import io
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 
 from rich.console import Console
 
@@ -67,3 +68,64 @@ def test_helper_request_json_uses_standard_library_transport(monkeypatch):
     assert status == 200
     assert payload == {"version": "0.1"}
     assert captured == {"method": "GET", "timeout": 3}
+
+
+def test_helper_check_functions_cover_health_and_failure_responses(monkeypatch):
+    helper = load_helper()
+
+    monkeypatch.setattr(
+        helper, "request_json", lambda *args, **kwargs: (200, {"version": "1.2.3"})
+    )
+    assert helper.check_ollama_running()[0] is True
+    assert helper.check_model_available()[0] is True
+    assert helper.check_openai_compatible_endpoint()[0] is True
+
+    monkeypatch.setattr(helper, "request_json", lambda *args, **kwargs: (503, {}))
+    assert helper.check_ollama_running()[0] is False
+    assert helper.check_model_available()[0] is False
+    assert helper.check_openai_compatible_endpoint()[0] is False
+
+    monkeypatch.setattr(
+        helper,
+        "request_json",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("offline")),
+    )
+    assert "offline" in helper.check_ollama_running()[1]
+    assert "offline" in helper.check_model_available()[1]
+    assert "offline" in helper.check_openai_compatible_endpoint()[1]
+
+
+def test_helper_request_json_translates_http_and_url_errors(monkeypatch):
+    helper = load_helper()
+    monkeypatch.setattr(
+        helper,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            HTTPError("http://local", 404, "missing", {}, None)
+        ),
+    )
+    assert helper.request_json("GET", "/missing", timeout=1) == (404, {})
+
+    monkeypatch.setattr(
+        helper,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(URLError("offline")),
+    )
+    try:
+        helper.request_json("GET", "/missing", timeout=1)
+    except OSError as error:
+        assert "offline" in str(error)
+    else:
+        raise AssertionError("Expected URL errors to become OSError")
+
+
+def test_helper_main_returns_failure_when_any_check_fails():
+    helper = load_helper()
+    helper.console = Console(
+        file=io.StringIO(), force_terminal=False, color_system=None
+    )
+    helper.check_ollama_running = lambda: (True, "ok")
+    helper.check_model_available = lambda: (False, "missing")
+    helper.check_openai_compatible_endpoint = lambda: (True, "ok")
+
+    assert helper.main() == 1

@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate_documentation_commands.py"
@@ -44,3 +45,33 @@ def test_command_validator_main_reports_success_and_failure(
     monkeypatch.setattr(validator, "run_safe_probes", lambda: ["failed probe"])
     assert validator.main() == 1
     assert "failed probe" in capsys.readouterr().out
+
+
+def test_safe_probe_validator_reports_command_and_protocol_failures(monkeypatch):
+    validator = load_validator()
+    monkeypatch.setattr(
+        validator.RUNNER,
+        "invoke",
+        lambda *args, **kwargs: SimpleNamespace(exit_code=1, stdout="failed"),
+    )
+    errors = validator.run_safe_probes()
+    assert any("exited 1" in error for error in errors)
+    assert any("Help probe failed" in error for error in errors)
+    assert any("Non-interactive setup" in error for error in errors)
+    assert any("Safe batch-reset probe failed" in error for error in errors)
+
+
+def test_safe_probe_validator_handles_invalid_json_without_crashing(monkeypatch):
+    validator = load_validator()
+
+    def invoke(app, arguments):
+        if arguments in (["--help"], ["gui", "--help"]):
+            return SimpleNamespace(exit_code=0, stdout="Usage: ok")
+        if arguments[-1] == "setup":
+            return SimpleNamespace(exit_code=2, stdout='{"event": "error"}')
+        return SimpleNamespace(exit_code=0, stdout="{")
+
+    monkeypatch.setattr(validator.RUNNER, "invoke", invoke)
+    errors = validator.run_safe_probes()
+    assert any("Safe probe emitted invalid JSON" in error for error in errors)
+    assert any("batch-reset probe emitted invalid JSON" in error for error in errors)

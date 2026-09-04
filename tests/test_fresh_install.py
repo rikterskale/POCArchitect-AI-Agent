@@ -89,3 +89,14 @@ def test_venv_python_run_clean_environment_and_successful_main(
     assert validator.main() == 0
     assert len(run_calls) == 5
     assert "passed the first-run readiness gate" in capsys.readouterr().out
+
+
+def test_windows_venv_path_and_missing_artifact_parser_error(tmp_path, monkeypatch):
+    validator = load_validator()
+    monkeypatch.setattr(validator.os, "name", "nt")
+    assert validator.venv_python(tmp_path) == tmp_path / "Scripts" / "python.exe"
+
+    monkeypatch.setattr(sys, "argv", ["validate_fresh_install.py", str(tmp_path)])
+    with pytest.raises(SystemExit) as error:
+        validator.main()
+    assert error.value.code == 2

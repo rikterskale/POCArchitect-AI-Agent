@@ -2,6 +2,8 @@ import json
 import subprocess
 from urllib.error import URLError
 
+import pytest
+
 from pocarchitect import preflight
 
 
@@ -82,6 +84,16 @@ def test_check_api_key_accepts_real_env_file_value(tmp_path, monkeypatch):
     ok, msg = preflight.check_api_key()
     assert ok is True
     assert msg == "OK: OPENAI_API_KEY in .env"
+
+
+def test_check_api_key_prefers_selected_provider_environment(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-environment-value")
+
+    assert preflight.check_api_key("openai") == (
+        True,
+        "OK: OPENAI_API_KEY in environment",
+    )
 
 
 def test_offline_preflight_does_not_require_api_key(monkeypatch):
@@ -250,6 +262,20 @@ def test_preflight_helpers_report_dependency_git_prompt_and_output_failures(
     assert "not writable" in message and "denied" in message
 
 
+def test_git_check_reports_unrunnable_executable(monkeypatch):
+    monkeypatch.setattr(preflight.shutil, "which", lambda name: "/usr/bin/git")
+    monkeypatch.setattr(
+        preflight.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+
+    assert preflight.check_git_command() == (
+        False,
+        "FAIL: Git executable is not runnable",
+    )
+
+
 def test_local_endpoint_validation_and_failure_responses(monkeypatch):
     ok, message = preflight.check_local_endpoint("file:///tmp/model")
     assert ok is False and "http(s) URL" in message
@@ -274,3 +300,30 @@ def test_local_endpoint_validation_and_failure_responses(monkeypatch):
     monkeypatch.setattr(preflight, "urlopen", lambda *args, **kwargs: Response())
     ok, message = preflight.check_local_endpoint("http://127.0.0.1:11434/v1")
     assert ok is False and "unexpected response" in message
+
+
+def test_preflight_text_mode_reports_all_core_failures_and_success(monkeypatch):
+    monkeypatch.setattr(preflight.sys, "version_info", (3, 9))
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (False, "missing"))
+    monkeypatch.setattr(preflight, "check_git_command", lambda: (False, "missing"))
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (False, "missing"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (False, "missing"))
+    monkeypatch.setattr(
+        preflight,
+        "check_output_directory_writable",
+        lambda path=None: (False, "denied"),
+    )
+    monkeypatch.setattr(preflight, "check_api_key", lambda provider: (False, "missing"))
+
+    with pytest.raises(SystemExit) as error:
+        preflight.main(provider="openai", output_format="text")
+    assert error.value.code == 1
+
+    monkeypatch.setattr(preflight.sys, "version_info", (3, 14))
+    monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_cli_command", lambda: (True, "ok"))
+    monkeypatch.setattr(preflight, "check_prompt_file", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        preflight, "check_output_directory_writable", lambda path=None: (True, "ok")
+    )
+    preflight.main(require_api_key=False, offline=True, require_git=False)

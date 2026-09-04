@@ -19,7 +19,10 @@ from scripts.release_readiness import (
     all_long_options,
     console_executable_path,
     render_text,
+    run_console,
     run_completion_probe,
+    json_events,
+    pillar_installation,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +72,53 @@ def test_text_renderer_reports_check_details_and_overall_failure():
     assert "ok working" in rendered
     assert "XX broken  (reason)" in rendered
     assert "RESULT: NOT READY" in rendered
+
+
+def test_console_runner_missing_and_present_executable(tmp_path, monkeypatch):
+    executable = tmp_path / "pocarchitect"
+    monkeypatch.setattr(
+        "scripts.release_readiness.console_executable_path", lambda value: executable
+    )
+    missing = run_console(["--version"], tmp_path)
+    assert missing.returncode == 127
+    assert "not found" in missing.stderr
+
+    executable.touch()
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "ok", ""),
+    )
+    assert run_console(["--version"], tmp_path).stdout == "ok"
+
+
+def test_json_event_parser_ignores_blank_and_invalid_lines():
+    assert json_events('\nnot-json\n{"event": "ok"}\n') == [{"event": "ok"}]
+
+
+def test_installation_pillar_records_entry_point_discovery_failure(
+    tmp_path, monkeypatch
+):
+    success = subprocess.CompletedProcess(
+        [], 0, '{"message":"Preflight passed."}\n', ""
+    )
+    monkeypatch.setattr(
+        "scripts.release_readiness.run_cli", lambda *args, **kwargs: success
+    )
+    monkeypatch.setattr(
+        "importlib.metadata.entry_points",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("metadata unavailable")),
+    )
+    monkeypatch.setattr(
+        "scripts.release_readiness.run_completion_probe", lambda work: success
+    )
+
+    pillar = pillar_installation(tmp_path)
+
+    assert any(
+        check.name == "`pocarchitect` console script registered" and not check.passed
+        for check in pillar.checks
+    )
 
 
 @pytest.fixture(scope="module")

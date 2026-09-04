@@ -358,3 +358,171 @@ def test_gui_preview_reports_type_size_encoding_and_missing_file_errors(tmp_path
         assert (
             client.get(f"/api/artifacts/{artifact_ids['missing']}").status_code == 404
         )
+
+
+def test_gui_rejects_empty_token_invalid_length_and_unlaunched_index():
+    import pytest
+
+    with pytest.raises(ValueError, match="session token"):
+        create_app(session_token="")
+
+    app = create_app(session_token="token", port=8765)
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        assert client.get("/").status_code == 401
+        response = client.post(
+            "/api/preparations",
+            content=b"{}",
+            headers={"Content-Length": "invalid"},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Invalid content length"
+
+
+def test_gui_missing_event_stream_and_download_are_404(tmp_path):
+    with authenticated_client(tmp_path) as client:
+        assert client.get("/api/runs/missing/events").status_code == 404
+        assert client.get("/api/artifacts/missing/download").status_code == 404
+
+
+def test_gui_runtime_records_expected_and_unexpected_worker_failures(tmp_path):
+    from pocarchitect import gui
+
+    class FailingService(AnalysisService):
+        def __init__(self, error):
+            self.error = error
+
+        def execute(self, *args, **kwargs):
+            raise self.error
+
+    prepared = AnalysisService().prepare(
+        AnalysisRequest(
+            source="https://example.test/source",
+            provider="local",
+            no_ingest=True,
+            output_dir=str(tmp_path),
+        )
+    )
+
+    for error, expected in (
+        (AnalysisServiceError("expected failure"), "expected failure"),
+        (RuntimeError("unexpected failure"), "failed unexpectedly"),
+    ):
+        runtime = GuiRuntime(FailingService(error))
+        job = gui.GuiJob(id=f"job-{len(runtime._jobs)}")
+        runtime._jobs[job.id] = job
+        runtime._execute(job.id, prepared, None)
+        snapshot = runtime.snapshot(job.id)
+        assert snapshot["status"] == "failed"
+        assert expected in snapshot["error"]
+        runtime.close()
+
+
+def test_gui_runtime_purges_expired_jobs_and_handles_missing_artifact_stats(
+    tmp_path, monkeypatch
+):
+    from pocarchitect import gui
+
+    runtime = GuiRuntime(StubAnalysisService())
+    expired = gui.GuiJob(
+        id="expired",
+        status="completed",
+        updated_at=(datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+    )
+    runtime._jobs[expired.id] = expired
+    runtime._purge_jobs()
+    assert expired.id not in runtime._jobs
+
+    path = tmp_path / "report.md"
+    path.write_text("# report\n", encoding="utf-8")
+    runtime._register_artifact(path)
+    monkeypatch.setattr(gui, "MAX_RETAINED_ARTIFACTS", 0)
+    monkeypatch.setattr(
+        gui.Path,
+        "stat",
+        lambda self: (_ for _ in ()).throw(FileNotFoundError(self)),
+    )
+    runtime._purge_artifacts()
+    assert runtime._artifacts == {}
+    runtime.close()
+
+
+def test_gui_report_preview_handles_file_disappearing_during_read(
+    tmp_path, monkeypatch
+):
+    from pocarchitect import gui
+
+    runtime = GuiRuntime(StubAnalysisService())
+    report = tmp_path / "report.md"
+    report.write_text("# report\n", encoding="utf-8")
+    artifact_id = runtime._register_artifact(report)
+    original_read_text = gui.Path.read_text
+
+    def disappear(path, *args, **kwargs):
+        if path == report:
+            raise FileNotFoundError(path)
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(gui.Path, "read_text", disappear)
+    app = create_app(session_token="token", port=8765, runtime=runtime)
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        client.get("/?token=token", follow_redirects=True)
+        response = client.get(f"/api/artifacts/{artifact_id}")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Report is unavailable"
+
+
+def test_gui_estimate_missing_preparation_is_conflict(tmp_path):
+    with authenticated_client(tmp_path) as client:
+        response = client.post(
+            "/api/preparations/missing/estimate",
+            json={"selected_files": []},
+            headers={"Origin": "http://127.0.0.1:8765"},
+        )
+        assert response.status_code == 409
+
+
+def test_gui_demo_worker_records_expected_and_unexpected_failures():
+    from pocarchitect import gui
+
+    class FailingPrepareService(AnalysisService):
+        def __init__(self, error):
+            self.error = error
+
+        def prepare(self, *args, **kwargs):
+            raise self.error
+
+    for error, expected in (
+        (AnalysisServiceError("expected demo failure"), "expected demo failure"),
+        (RuntimeError("unexpected demo failure"), "failed unexpectedly"),
+    ):
+        runtime = GuiRuntime(FailingPrepareService(error))
+        job = gui.GuiJob(id="demo")
+        runtime._jobs[job.id] = job
+        runtime._execute_demo(job.id)
+        assert runtime.snapshot(job.id)["status"] == "failed"
+        assert expected in runtime.snapshot(job.id)["error"]
+        runtime.close()
+
+
+def test_gui_runtime_bounds_terminal_jobs_and_ignores_unreadable_reports(
+    tmp_path, monkeypatch
+):
+    from pocarchitect import gui
+
+    runtime = GuiRuntime(StubAnalysisService())
+    job = gui.GuiJob(id="retained", status="completed")
+    runtime._jobs[job.id] = job
+    monkeypatch.setattr(gui, "MAX_RETAINED_JOBS", 0)
+    runtime._purge_jobs()
+    assert runtime._jobs == {}
+
+    report = tmp_path / "POCAnalysis_report.md"
+    report.write_text("# report\n", encoding="utf-8")
+    runtime._session_reports.add(report)
+    monkeypatch.setattr(
+        gui,
+        "read_report_metadata",
+        lambda path: (_ for _ in ()).throw(PermissionError("denied")),
+    )
+    assert runtime.reports() == []
+    runtime.close()

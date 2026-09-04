@@ -993,3 +993,380 @@ def test_setup_reports_safe_dry_run_failure(monkeypatch):
         event["event"] == "setup_dry_run_failed" and "exit code 7" in event["message"]
         for event in events
     )
+
+
+def test_cli_helper_error_and_platform_paths(tmp_path, monkeypatch):
+    original_platform = cli.sys.platform
+    monkeypatch.setattr(cli.sys, "platform", "win32")
+    monkeypatch.setattr(cli.typer_rich_utils, "FORCE_TERMINAL", True)
+    cli.configure_platform_help()
+    assert cli.typer_rich_utils.FORCE_TERMINAL is False
+
+    calls = []
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        cli.subprocess, "run", lambda command, **kwargs: calls.append(command)
+    )
+    assert cli.open_in_default_viewer(tmp_path / "report.md") is True
+    assert calls[-1][0] == "open"
+    monkeypatch.setattr(cli.sys, "platform", "linux")
+    assert cli.open_in_default_viewer(tmp_path / "report.md") is True
+    assert calls[-1][0] == "xdg-open"
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("unavailable")),
+    )
+    assert cli.open_in_default_viewer(tmp_path / "report.md") is False
+    monkeypatch.setattr(cli.sys, "platform", original_platform)
+
+    assert "timed out" in cli.friendly_error_message(
+        subprocess.TimeoutExpired(["tool"], 1)
+    )
+    assert "required file" in cli.friendly_error_message(FileNotFoundError())
+    assert "Git failed" in cli.friendly_error_message(
+        subprocess.CalledProcessError(1, ["git"])
+    )
+    assert "credential" in cli.friendly_error_message(RuntimeError("401 unauthorized"))
+    assert "rate limit" in cli.friendly_error_message(RuntimeError("429 rate limit"))
+    assert "without a diagnostic" in cli.friendly_error_message(RuntimeError(""))
+
+
+def test_cli_prompt_load_failure_and_output_reconfigure_errors(monkeypatch):
+    class BrokenResource:
+        def __truediv__(self, name):
+            return self
+
+        def read_text(self, **kwargs):
+            raise OSError("missing prompt")
+
+    events = []
+    monkeypatch.setattr(cli, "files", lambda package: BrokenResource())
+    with cli.capture_events(events.append):
+        with pytest.raises(typer.Exit) as error:
+            cli.load_prompt()
+    assert error.value.exit_code == 1
+    assert events[-1]["event"] == "error"
+
+    class Stream:
+        def reconfigure(self, **kwargs):
+            raise OSError("unsupported")
+
+    monkeypatch.setattr(cli.sys, "stdout", Stream())
+    monkeypatch.setattr(cli.sys, "stderr", Stream())
+    cli.configure_output("json", True)
+    assert cli.output_format == "json" and cli.no_color_state is True
+
+
+def test_cli_confirmation_interactive_cancel_and_accept(monkeypatch):
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
+    with pytest.raises(typer.Exit) as error:
+        cli.confirm_ingestion("content", "local", "unknown", False)
+    assert error.value.exit_code == 0
+
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: True)
+    assert cli.confirm_ingestion("content", "local", "unknown", False) == "content"
+    private_key = "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----"
+    assert "private-key material" in cli.detect_sensitive_input(private_key)
+
+
+def test_cli_batch_and_recovery_error_paths(tmp_path, monkeypatch):
+    common = dict(
+        provider="local",
+        api_key=None,
+        model="model",
+        temperature=0.2,
+        base_url=None,
+        output_dir=tmp_path,
+        risk_level="High",
+        target_os="Linux",
+        include_mitigations=True,
+        no_ingest=True,
+    )
+    with pytest.raises(typer.Exit) as missing:
+        cli.process_batch_file(batch_path=tmp_path / "missing.txt", **common)
+    assert missing.value.exit_code == 2
+
+    empty = tmp_path / "empty.txt"
+    empty.write_text("# comments only\n", encoding="utf-8")
+    with pytest.raises(typer.Exit) as no_urls:
+        cli.process_batch_file(batch_path=empty, **common)
+    assert no_urls.value.exit_code == 2
+
+    corrupt = tmp_path / "corrupt.json"
+    corrupt.write_text("bad json", encoding="utf-8")
+    batch = tmp_path / "batch.txt"
+    batch.write_text("https://example.test/item\n", encoding="utf-8")
+    with pytest.raises(typer.Exit) as bad_state:
+        cli.process_batch_file(batch_path=batch, state_path=corrupt, **common)
+    assert bad_state.value.exit_code == 2
+
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    result = RUNNER.invoke(cli.app, ["batch-reset", "--batch-state", str(corrupt)])
+    assert result.exit_code == 2
+    result = RUNNER.invoke(
+        cli.app,
+        ["batch-reset", "--batch-state", str(tmp_path / "absent.json"), "--yes"],
+    )
+    assert result.exit_code == 0 and "nothing was reset" in result.stdout
+
+
+def test_cli_auxiliary_failure_and_json_paths(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert RUNNER.invoke(cli.app, ["--format", "json", "explore"]).exit_code == 0
+    assert RUNNER.invoke(cli.app, ["models"]).exit_code == 0
+    assert RUNNER.invoke(cli.app, ["config"]).exit_code == 0
+
+    existing = tmp_path / "workflow.json"
+    assert (
+        RUNNER.invoke(cli.app, ["workflow-init", "--state", str(existing)]).exit_code
+        == 0
+    )
+    assert (
+        RUNNER.invoke(cli.app, ["workflow-init", "--state", str(existing)]).exit_code
+        == 2
+    )
+    assert (
+        RUNNER.invoke(
+            cli.app, ["workflow-status", "--state", str(tmp_path / "none")]
+        ).exit_code
+        == 2
+    )
+
+    assert RUNNER.invoke(cli.app, ["compare", "only-one"]).exit_code == 2
+    monkeypatch.setattr(
+        cli,
+        "scan_path",
+        lambda path: (_ for _ in ()).throw(ValueError("bad response")),
+    )
+    assert RUNNER.invoke(cli.app, ["vulnerabilities", str(tmp_path)]).exit_code == 1
+
+    report = tmp_path / "report.md"
+    report.write_text("# report\n", encoding="utf-8")
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    assert RUNNER.invoke(cli.app, ["publish", str(report)]).exit_code == 2
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/gh")
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired(args[0], 30)
+        ),
+    )
+    assert RUNNER.invoke(cli.app, ["publish", str(report)]).exit_code == 1
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("cannot execute")),
+    )
+    assert RUNNER.invoke(cli.app, ["publish", str(report)]).exit_code == 1
+
+
+def test_cli_main_project_config_and_input_validation(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config = tmp_path / ".pocarchitect.toml"
+    config.write_text('[defaults]\nprovider = "invalid"\n', encoding="utf-8")
+    assert (
+        RUNNER.invoke(cli.app, ["--url", "example.test/x", "--dry-run"]).exit_code == 2
+    )
+
+    config.write_text('[defaults]\nreport_format = "docx"\n', encoding="utf-8")
+    assert (
+        RUNNER.invoke(cli.app, ["--url", "example.test/x", "--dry-run"]).exit_code == 2
+    )
+
+    config.write_text('[defaults]\noutput_dir = "nested/reports"\n', encoding="utf-8")
+    captured = {}
+    monkeypatch.setattr(
+        cli, "process_single_url", lambda **kwargs: captured.update(kwargs)
+    )
+    result = RUNNER.invoke(cli.app, ["--source", "https://example.test/x", "--dry-run"])
+    assert result.exit_code == 0
+    assert captured["output_dir"] == tmp_path / "nested/reports"
+
+    local = tmp_path / "source"
+    local.mkdir()
+    result = RUNNER.invoke(cli.app, ["--path", str(local), "--dry-run"])
+    assert result.exit_code == 0 and captured["local_path"] == local
+
+    assert (
+        RUNNER.invoke(cli.app, ["--url", "x", "--source", "y", "--dry-run"]).exit_code
+        == 2
+    )
+    assert RUNNER.invoke(cli.app, ["--dry-run"]).exit_code == 2
+    assert (
+        RUNNER.invoke(
+            cli.app, ["--url", "https://github.com/owner", "--dry-run"]
+        ).exit_code
+        == 2
+    )
+
+
+def test_cli_suggests_commands_and_resolves_default_batch_state(tmp_path, monkeypatch):
+    command = typer.main.get_command(cli.app)
+    with pytest.raises(cli.click.UsageError, match="Did you mean 'models'"):
+        command.resolve_command(cli.click.Context(command), ["modles"])
+
+    expected = tmp_path / "reports" / "batch_progress.json"
+    expected.parent.mkdir()
+    expected.write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert (
+        cli.resolve_batch_state_path(cli.DEFAULT_BATCH_STATE) == cli.DEFAULT_BATCH_STATE
+    )
+
+
+def test_cli_windows_viewer_and_gui_browser_timer(tmp_path, monkeypatch):
+    starts = []
+    original_platform = cli.sys.platform
+    monkeypatch.setattr(cli.sys, "platform", "win32")
+    monkeypatch.setattr(
+        cli.os, "startfile", lambda path: starts.append(path), raising=False
+    )
+    assert cli.open_in_default_viewer(tmp_path / "report.md") is True
+    assert starts
+    monkeypatch.setattr(cli.sys, "platform", original_platform)
+
+    class Timer:
+        daemon = False
+
+        def __init__(self, delay, callback, args):
+            self.args = args
+
+        def start(self):
+            starts.append(self.args[0])
+
+    monkeypatch.setattr(cli.threading, "Timer", Timer)
+    monkeypatch.setattr("pocarchitect.gui.create_app", lambda **kwargs: object())
+    monkeypatch.setattr("uvicorn.run", lambda *args, **kwargs: None)
+    result = RUNNER.invoke(cli.app, ["gui", "--port", "9124"])
+    assert result.exit_code == 0
+    assert any(str(value).startswith("http://127.0.0.1:9124/") for value in starts)
+
+
+def test_cli_curation_interactive_validation(monkeypatch):
+    files = [("one.py", "one", 3), ("two.py", "two", 3)]
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    with pytest.raises(typer.Exit) as noninteractive:
+        cli.curate_grounding_files(files, True)
+    assert noninteractive.value.exit_code == 2
+
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: "")
+    assert cli.curate_grounding_files(files, True) == files
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: "bad")
+    with pytest.raises(typer.Exit):
+        cli.curate_grounding_files(files, True)
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: "3")
+    with pytest.raises(typer.Exit):
+        cli.curate_grounding_files(files, True)
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: "2")
+    assert cli.curate_grounding_files(files, True) == [files[0]]
+
+
+def test_cli_grounding_missing_directory_and_bounded_failure(tmp_path, monkeypatch):
+    missing = tmp_path / "missing"
+    result = cli.build_grounding_context("local", local_path=missing)
+    assert result.ingestion == "url-only-ingestion-failed"
+
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "MAX_REPOSITORY_FILES_SCANNED", 0)
+    result = cli.build_grounding_context("local", local_path=source)
+    assert result.ingestion == "url-only-ingestion-failed"
+
+
+def test_cli_provider_variants_empty_response_and_unsupported(monkeypatch):
+    clients = []
+
+    class Completions:
+        def __init__(self, content):
+            self.content = content
+
+        def create(self, **kwargs):
+            message = type("Message", (), {"content": self.content})()
+            choice = type("Choice", (), {"message": message})()
+            return type("Response", (), {"choices": [choice]})()
+
+    class Client:
+        def __init__(self, content, **kwargs):
+            self.chat = type("Chat", (), {"completions": Completions(content)})()
+            self.kwargs = kwargs
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    content = {"value": " result "}
+
+    def factory(**kwargs):
+        client = Client(content["value"], **kwargs)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr(cli, "OpenAI", factory)
+    for provider in ("local", "xai", "openai", "groq"):
+        assert (
+            cli.get_llm_response(provider, None, "model", 0.2, None, "s", "u")
+            == "result"
+        )
+    assert all(client.closed for client in clients)
+    assert clients[1].kwargs["base_url"] == "https://api.x.ai/v1"
+    assert clients[3].kwargs["base_url"] == "https://api.groq.com/openai/v1"
+
+    content["value"] = None
+    with pytest.raises(typer.Exit):
+        cli.get_llm_response("local", None, "model", 0.2, None, "s", "u")
+    with pytest.raises(typer.Exit):
+        cli.get_llm_response("unsupported", None, "model", 0.2, None, "s", "u")
+
+
+def test_process_single_url_optional_outputs_and_text_summary(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "run_plugins", lambda *args: ["plugin evidence"])
+    monkeypatch.setattr(cli, "extract_dependencies", lambda text: [{"name": "demo"}])
+    monkeypatch.setattr(cli, "query_osv", lambda packages: [{"id": "OSV-1"}])
+    output = tmp_path / "reports"
+    first = cli.process_single_url(
+        url="https://example.test/source",
+        provider="local",
+        api_key=None,
+        model="model",
+        temperature=0.2,
+        base_url=None,
+        output_dir=output,
+        risk_level="High",
+        target_os="Linux",
+        include_mitigations=True,
+        no_ingest=True,
+        dry_run=False,
+        verbose=False,
+        response_override="# First",
+        report_format="json",
+        scaffold_output=tmp_path / "blueprint",
+        vulnerability_scan=True,
+    )
+    monkeypatch.setattr(cli, "find_previous_report", lambda *args: first)
+    second = cli.process_single_url(
+        url="https://example.test/source",
+        provider="local",
+        api_key=None,
+        model="model",
+        temperature=0.2,
+        base_url=None,
+        output_dir=output,
+        risk_level="High",
+        target_os="Linux",
+        include_mitigations=True,
+        no_ingest=True,
+        dry_run=False,
+        verbose=False,
+        response_override="# Second",
+        diff_previous=True,
+        show_dashboard=True,
+    )
+
+    assert first.with_suffix(".json").is_file()
+    assert (tmp_path / "blueprint").is_dir()
+    assert second.with_suffix(".diff").is_file()

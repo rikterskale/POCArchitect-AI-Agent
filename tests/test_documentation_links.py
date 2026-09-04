@@ -63,3 +63,35 @@ def test_link_validator_handles_nested_parentheses_and_ignores_code(tmp_path):
     )
 
     assert validator.validate_file(source) == []
+
+
+def test_link_validator_handles_images_missing_targets_and_anchors(tmp_path):
+    validator = load_validator()
+    validator.ROOT = tmp_path
+    page = tmp_path / "page.md"
+    page.write_text("# Present\n", encoding="utf-8")
+    source = tmp_path / "source.md"
+    source.write_text(
+        "![image](missing.png)\n[anchor](page.md#absent)\n[local](#absent)\n",
+        encoding="utf-8",
+    )
+
+    assert validator.link_targets(source.read_text(encoding="utf-8")) == [
+        "missing.png",
+        "page.md#absent",
+        "#absent",
+    ]
+    errors = validator.validate_file(source)
+    assert any("missing link target" in error for error in errors)
+    assert sum("missing anchor" in error for error in errors) == 2
+
+
+def test_link_validator_main_reports_errors(tmp_path, monkeypatch, capsys):
+    validator = load_validator()
+    source = tmp_path / "source.md"
+    source.write_text("[missing](none.md)\n", encoding="utf-8")
+    validator.ROOT = tmp_path
+    monkeypatch.setattr(validator, "markdown_files", lambda: [source])
+
+    assert validator.main() == 1
+    assert "validation failed" in capsys.readouterr().out

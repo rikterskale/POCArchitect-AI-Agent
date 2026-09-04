@@ -60,8 +60,10 @@ def query_osv(
         result = json.loads(response.read().decode("utf-8"))
     if not isinstance(result, dict) or not isinstance(result.get("results"), list):
         raise ValueError("OSV returned an invalid batch response")
+    if len(result["results"]) != len(packages):
+        raise ValueError("OSV returned a result count that does not match the request")
     findings: list[dict[str, Any]] = []
-    for package, item in zip(packages, result["results"], strict=False):
+    for package, item in zip(packages, result["results"], strict=True):
         if not isinstance(item, dict) or not isinstance(item.get("vulns", []), list):
             raise ValueError("OSV returned an invalid package result")
         for vulnerability in item.get("vulns", []):
@@ -88,11 +90,15 @@ def scan_path(path: Path) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
         "cargo.toml",
     }
     for candidate in path.rglob("*"):
-        if (
-            candidate.is_file()
-            and candidate.name.lower() in names
-            and candidate.stat().st_size <= 1_000_000
-        ):
-            chunks.append(candidate.read_text(encoding="utf-8", errors="ignore"))
+        try:
+            if (
+                candidate.is_file()
+                and candidate.name.lower() in names
+                and candidate.stat().st_size <= 1_000_000
+            ):
+                chunks.append(candidate.read_text(encoding="utf-8", errors="ignore"))
+        except OSError:
+            # A disappearing or unreadable file must not abort the bounded scan.
+            continue
     packages = extract_dependencies("\n".join(chunks))
     return packages, query_osv(packages)

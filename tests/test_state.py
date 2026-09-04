@@ -91,3 +91,24 @@ def test_state_writer_times_out_on_existing_lock(tmp_path, monkeypatch):
 
     with pytest.raises(state.BatchStateError, match="Timed out waiting"):
         state.write_state(path, state.empty_state())
+
+
+def test_state_writer_waits_for_lock_and_reset_missing_is_noop(tmp_path, monkeypatch):
+    path = tmp_path / "batch.json"
+    attempts = 0
+    original_open = state.os.open
+
+    def delayed_open(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise FileExistsError
+        return original_open(*args, **kwargs)
+
+    monkeypatch.setattr(state.os, "open", delayed_open)
+    monkeypatch.setattr(state.time, "sleep", lambda seconds: None)
+
+    state.write_state(path, state.empty_state())
+
+    assert attempts >= 2
+    assert state.reset_state(tmp_path / "missing.json") is None

@@ -245,3 +245,120 @@ def test_service_rejects_prepared_prompt_above_safe_limit(tmp_path, monkeypatch)
                 output_dir=str(tmp_path),
             )
         )
+
+
+def test_service_translates_invalid_source_and_preparation_exit(tmp_path, monkeypatch):
+    service = AnalysisService()
+    with pytest.raises(AnalysisServiceError, match="Invalid source"):
+        service.normalize_request(
+            AnalysisRequest(source="https://github.com/owner", provider="local")
+        )
+
+    monkeypatch.setattr(
+        cli, "load_prompt", lambda: (_ for _ in ()).throw(__import__("typer").Exit(7))
+    )
+    with pytest.raises(AnalysisServiceError, match="exit code 7"):
+        service.prepare(
+            AnalysisRequest(
+                source="https://example.test/advisory",
+                provider="local",
+                no_ingest=True,
+                output_dir=str(tmp_path),
+            )
+        )
+
+
+def test_service_selection_rejects_unknown_and_oversized_content(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    service = AnalysisService()
+    prepared = service.prepare(
+        AnalysisRequest(
+            source=str(source),
+            local_path=str(source),
+            provider="local",
+            output_dir=str(tmp_path / "reports"),
+        )
+    )
+
+    with pytest.raises(AnalysisServiceError, match="Unknown grounding file"):
+        service.estimate_selection(prepared, ["missing.py"])
+
+    monkeypatch.setattr("pocarchitect.service.MAX_PROMPT_CHARACTERS", 10)
+    with pytest.raises(AnalysisServiceError, match="Selected files exceed"):
+        service.estimate_selection(prepared, None)
+    with pytest.raises(AnalysisServiceError, match="Selected files exceed"):
+        service.execute(prepared, response_override="# Result")
+
+
+def test_service_translates_provider_and_report_write_failures(tmp_path, monkeypatch):
+    service = AnalysisService()
+    prepared = service.prepare(
+        AnalysisRequest(
+            source="https://example.test/advisory",
+            provider="local",
+            no_ingest=True,
+            output_dir=str(tmp_path),
+        )
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "get_llm_response",
+        lambda **kwargs: (_ for _ in ()).throw(__import__("typer").Exit(3)),
+    )
+    with pytest.raises(AnalysisServiceError, match="exit code 3"):
+        service.execute(prepared)
+
+    monkeypatch.setattr(
+        cli,
+        "get_llm_response",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("provider broke")),
+    )
+    with pytest.raises(AnalysisServiceError, match="provider broke"):
+        service.execute(prepared)
+
+    monkeypatch.setattr(
+        cli,
+        "save_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError("denied")),
+    )
+    with pytest.raises(AnalysisServiceError, match="Could not write.*denied"):
+        service.execute(prepared, response_override="# Result")
+
+
+def test_service_enforces_cost_limit_and_writes_previous_diff(tmp_path, monkeypatch):
+    output = tmp_path / "reports"
+    service = AnalysisService()
+    limited = service.prepare(
+        AnalysisRequest(
+            source="https://example.test/advisory",
+            provider="openai",
+            no_ingest=True,
+            output_dir=str(output),
+            max_estimated_cost=0,
+        )
+    )
+    with pytest.raises(AnalysisServiceError, match="exceeds the configured"):
+        service.execute(limited, response_override="# Result")
+
+    request = AnalysisRequest(
+        source="https://example.test/advisory",
+        provider="local",
+        no_ingest=True,
+        output_dir=str(output),
+        diff_previous=True,
+    )
+    prepared = service.prepare(request)
+    first = service.execute(prepared, response_override="# First")
+    monkeypatch.setattr(
+        "pocarchitect.features.find_previous_report", lambda *args: first.report_path
+    )
+    events = []
+    second = service.execute(
+        prepared, event_sink=events.append, response_override="# Second"
+    )
+
+    assert second.report_path.with_suffix(".diff").is_file()
+    assert any(event["event"] == "report_diff" for event in events)

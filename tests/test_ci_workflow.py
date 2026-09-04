@@ -72,3 +72,19 @@ def test_ci_validator_main_reports_success_and_failure(monkeypatch, capsys):
     monkeypatch.setattr(validator, "validate", lambda: ["broken"])
     assert validator.main() == 1
     assert "broken" in capsys.readouterr().out
+
+
+def test_ci_validator_reports_missing_workflow_and_retired_mutator(tmp_path):
+    validator = load_validator()
+    assert validator.validate(tmp_path) == [
+        f"Missing canonical workflow: {validator.WORKFLOW}"
+    ]
+
+    workflow = tmp_path / validator.WORKFLOW
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("jobs: {}\n", encoding="utf-8")
+    retired = tmp_path / validator.RETIRED_MUTATORS[0]
+    retired.parent.mkdir(parents=True, exist_ok=True)
+    retired.touch()
+
+    assert any("Retired mutating" in error for error in validator.validate(tmp_path))

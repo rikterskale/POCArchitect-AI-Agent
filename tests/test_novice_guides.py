@@ -68,3 +68,23 @@ def test_canonical_and_start_guides_report_missing_contracts(tmp_path):
     assert any("success checks" in error for error in start_errors)
     assert any("troubleshooting matrix" in error for error in start_errors)
     assert any("local-only GUI warning" in error for error in start_errors)
+
+
+def test_guide_validators_and_main_report_missing_files(tmp_path, monkeypatch, capsys):
+    validator = load_validator()
+    missing = tmp_path / "missing.md"
+    assert validator.validate_guide("Linux", missing) == [
+        f"Linux: guide is missing: {missing}"
+    ]
+    assert validator.validate_canonical_guide(missing) == [
+        f"Canonical guide is missing: {missing}"
+    ]
+    assert validator.validate_start_guide(missing) == [
+        f"Start Here guide is missing: {missing}"
+    ]
+    monkeypatch.setattr(validator, "GUIDES", {"Linux": missing})
+    monkeypatch.setattr(validator, "CANONICAL_GUIDE", missing)
+    monkeypatch.setattr(validator, "START_GUIDE", missing)
+
+    assert validator.main() == 1
+    assert "validation failed" in capsys.readouterr().out

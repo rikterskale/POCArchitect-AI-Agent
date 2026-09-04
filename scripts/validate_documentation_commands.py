@@ -240,9 +240,15 @@ def run_safe_probes() -> list[str]:
             if reset.exit_code != 0:
                 errors.append(f"Safe batch-reset probe failed: {reset.stdout.strip()}")
             else:
-                payload = json.loads(reset.stdout)
-                if payload.get("event") != "batch_reset":
-                    errors.append("Safe batch-reset probe emitted the wrong event")
+                try:
+                    payload = json.loads(reset.stdout)
+                except json.JSONDecodeError as error:
+                    errors.append(
+                        f"Safe batch-reset probe emitted invalid JSON: {error}"
+                    )
+                else:
+                    if payload.get("event") != "batch_reset":
+                        errors.append("Safe batch-reset probe emitted the wrong event")
         finally:
             os.chdir(original_cwd)
             cli.default_output_dir = original_default_output

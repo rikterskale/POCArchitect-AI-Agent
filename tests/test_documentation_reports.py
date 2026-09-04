@@ -111,3 +111,55 @@ def test_evidence_fingerprint_changes_when_only_citation_coordinates_change(
     assert validator.evidence_fingerprint(
         tmp_path, first_line
     ) != validator.evidence_fingerprint(tmp_path, second_line)
+
+
+def test_citation_validator_reports_absent_citation_and_file(tmp_path):
+    validator = load_validator()
+    rows = {
+        "DOC-001": ("Closed", "no citation"),
+        "DOC-002": ("Closed", "`missing.md:1`"),
+    }
+
+    errors, paths = validator.validate_citations(tmp_path, rows)
+
+    assert any("no path:line citation" in error for error in errors)
+    assert any("does not exist" in error for error in errors)
+    assert paths == {Path("missing.md")}
+
+
+def test_report_validator_reports_missing_artifacts_and_main_status(
+    tmp_path, monkeypatch, capsys
+):
+    validator = load_validator()
+    errors = validator.validate(tmp_path)
+    assert len(errors) == 5
+    assert all("artifact is missing" in error for error in errors)
+
+    monkeypatch.setattr(validator, "validate", lambda: ["broken"])
+    assert validator.main() == 1
+    assert "broken" in capsys.readouterr().out
+    monkeypatch.setattr(validator, "validate", lambda: [])
+    assert validator.main() == 0
+    assert "fingerprint are valid" in capsys.readouterr().out
+
+
+def test_behavioral_contract_validator_reports_each_high_impact_mismatch(tmp_path):
+    validator = load_validator()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "pocarchitect").mkdir()
+    (tmp_path / "docs" / "architecture.md").write_text(
+        "there is no api server or library api\n", encoding="utf-8"
+    )
+    (tmp_path / "pocarchitect" / "cli.py").write_text("missing", encoding="utf-8")
+    (tmp_path / "README.md").write_text(
+        "| Docker Desktop/Linux Docker |\n", encoding="utf-8"
+    )
+    (tmp_path / "docs" / "DOCUMENTATION_GAP_ANALYSIS.md").write_text(
+        "# no closure\n", encoding="utf-8"
+    )
+
+    errors = validator.validate_behavioral_contracts(tmp_path)
+
+    assert len(errors) >= 6
+    assert any("Python integration API" in error for error in errors)
+    assert any("separate Linux Docker" in error for error in errors)

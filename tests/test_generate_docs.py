@@ -64,3 +64,14 @@ def test_write_or_check_and_main_cover_write_current_and_stale_paths(
     (tmp_path / "docs" / "cli-reference.md").write_text("stale", encoding="utf-8")
     assert generator.main() == 1
     assert "Generated documentation is stale" in capsys.readouterr().out
+
+
+def test_option_rows_ignores_hidden_and_unknown_parameters():
+    generator = load_generator_module()
+    command = generator.click.Command(
+        "demo",
+        params=[generator.click.Option(["--hidden"], hidden=True)],
+    )
+    command.params.append(object())
+
+    assert generator.option_rows(command) == []
