@@ -15,7 +15,7 @@ def extract_dependencies(text: str) -> list[dict[str, str]]:
     """Extract conservative package coordinates from common manifest snippets."""
     packages: set[tuple[str, str, str]] = set()
     for name, version in re.findall(
-        r"(?m)^\s*([A-Za-z0-9_.-]+)\s*(?:==|~=|>=|<=)\s*([A-Za-z0-9_.+-]+)", text
+        r"(?m)^\s*([A-Za-z0-9_.-]+)\s*==\s*([A-Za-z0-9_.+-]+)\s*(?:#.*)?$", text
     ):
         packages.add(("PyPI", name, version))
     # package.json-style exact versions only; ranges are intentionally omitted.
@@ -58,9 +58,15 @@ def query_osv(
         request, timeout=timeout
     ) as response:  # nosec B310 - fixed HTTPS OSV endpoint
         result = json.loads(response.read().decode("utf-8"))
+    if not isinstance(result, dict) or not isinstance(result.get("results"), list):
+        raise ValueError("OSV returned an invalid batch response")
     findings: list[dict[str, Any]] = []
-    for package, item in zip(packages, result.get("results", []), strict=False):
+    for package, item in zip(packages, result["results"], strict=False):
+        if not isinstance(item, dict) or not isinstance(item.get("vulns", []), list):
+            raise ValueError("OSV returned an invalid package result")
         for vulnerability in item.get("vulns", []):
+            if not isinstance(vulnerability, dict):
+                raise ValueError("OSV returned an invalid vulnerability record")
             findings.append(
                 {
                     **package,

@@ -38,3 +38,33 @@ def test_start_here_guide_has_the_complete_first_use_contract():
     validator = load_validator()
 
     assert validator.validate_start_guide(validator.START_GUIDE) == []
+
+
+def test_platform_guide_reports_each_missing_contract_item(tmp_path):
+    validator = load_validator()
+    guide = tmp_path / "linux.md"
+    guide.write_text("# Incomplete\n", encoding="utf-8")
+
+    errors = validator.validate_guide("Linux", guide)
+
+    assert any("validation status" in error for error in errors)
+    assert any("canonical-guide link" in error for error in errors)
+    assert any("command ledger" in error for error in errors)
+    assert any("required platform delta" in error for error in errors)
+    assert any("at least five" in error for error in errors)
+
+
+def test_canonical_and_start_guides_report_missing_contracts(tmp_path):
+    validator = load_validator()
+    guide = tmp_path / "guide.md"
+    guide.write_text("# Incomplete\n", encoding="utf-8")
+
+    canonical_errors = validator.validate_canonical_guide(guide)
+    start_errors = validator.validate_start_guide(guide)
+
+    assert any("required heading" in error for error in canonical_errors)
+    assert any("required command" in error for error in canonical_errors)
+    assert any("safe example URL" in error for error in canonical_errors)
+    assert any("success checks" in error for error in start_errors)
+    assert any("troubleshooting matrix" in error for error in start_errors)
+    assert any("local-only GUI warning" in error for error in start_errors)

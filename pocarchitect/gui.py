@@ -43,6 +43,7 @@ SESSION_COOKIE = "pocarchitect_gui_session"
 PREPARATION_TTL_SECONDS = 30 * 60
 JOB_TTL_SECONDS = 24 * 60 * 60
 MAX_RETAINED_JOBS = 100
+MAX_RETAINED_ARTIFACTS = 2 * MAX_RETAINED_JOBS + 40
 MAX_API_BODY_BYTES = 65_536
 MAX_REPORT_PREVIEW_BYTES = 2 * 1024 * 1024
 LOGGER = logging.getLogger(__name__)
@@ -281,6 +282,29 @@ class GuiRuntime:
         )
         for job in terminal[MAX_RETAINED_JOBS:]:
             self._jobs.pop(job.id, None)
+        self._purge_artifacts()
+
+    def _purge_artifacts(self) -> None:
+        """Bound in-memory report indexes without deleting operator artifacts."""
+        if len(self._artifacts) <= MAX_RETAINED_ARTIFACTS:
+            return
+        ranked: list[tuple[float, str, Path]] = []
+        for artifact_id, path in self._artifacts.items():
+            try:
+                modified = path.stat().st_mtime
+            except OSError:
+                modified = 0.0
+            ranked.append((modified, artifact_id, path))
+        retained = {
+            artifact_id
+            for _, artifact_id, _ in sorted(ranked, reverse=True)[
+                :MAX_RETAINED_ARTIFACTS
+            ]
+        }
+        for _, artifact_id, path in ranked:
+            if artifact_id not in retained:
+                self._artifacts.pop(artifact_id, None)
+                self._artifact_ids.pop(path, None)
 
     def _execute(
         self,
@@ -352,6 +376,13 @@ class GuiRuntime:
                 else self._register_artifact(result.export_path)
             )
             self._session_reports.add(result.report_path.resolve())
+            if len(self._session_reports) > MAX_RETAINED_JOBS:
+                ranked_reports = sorted(
+                    self._session_reports,
+                    key=lambda path: path.stat().st_mtime if path.exists() else 0.0,
+                    reverse=True,
+                )
+                self._session_reports = set(ranked_reports[:MAX_RETAINED_JOBS])
             job = self._jobs[job_id]
             job.status = "completed"
             job.updated_at = _now()

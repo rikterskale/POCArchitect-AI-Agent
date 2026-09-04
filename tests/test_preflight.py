@@ -1,5 +1,6 @@
 import json
 import subprocess
+from urllib.error import URLError
 
 from pocarchitect import preflight
 
@@ -7,7 +8,7 @@ from pocarchitect import preflight
 def test_check_cli_command_uses_module_entrypoint_first(monkeypatch):
     calls = []
 
-    def fake_run(cmd, capture_output, check):
+    def fake_run(cmd, capture_output, check, timeout):
         calls.append(cmd)
         if cmd[:3] == [preflight.sys.executable, "-m", "pocarchitect"]:
             return subprocess.CompletedProcess(cmd, 0)
@@ -24,7 +25,7 @@ def test_check_cli_command_uses_module_entrypoint_first(monkeypatch):
 def test_check_cli_command_falls_back_to_cli_binary(monkeypatch):
     calls = []
 
-    def fake_run(cmd, capture_output, check):
+    def fake_run(cmd, capture_output, check, timeout):
         calls.append(cmd)
         if cmd[0] == "pocarchitect":
             return subprocess.CompletedProcess(cmd, 0)
@@ -39,12 +40,24 @@ def test_check_cli_command_falls_back_to_cli_binary(monkeypatch):
 
 
 def test_check_cli_command_reports_not_found(monkeypatch):
-    def fake_run(cmd, capture_output, check):
+    def fake_run(cmd, capture_output, check, timeout):
         raise subprocess.CalledProcessError(1, cmd)
 
     monkeypatch.setattr(preflight.subprocess, "run", fake_run)
 
     ok, msg = preflight.check_cli_command()
+    assert ok is False
+    assert msg == "FAIL: Not found"
+
+
+def test_check_cli_command_treats_timeout_as_unavailable(monkeypatch):
+    def fake_run(cmd, capture_output, check, timeout):
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(preflight.subprocess, "run", fake_run)
+
+    ok, msg = preflight.check_cli_command()
+
     assert ok is False
     assert msg == "FAIL: Not found"
 
@@ -173,6 +186,17 @@ def test_output_directory_check_uses_explicit_path(tmp_path):
     assert not (output_dir / ".write_test").exists()
 
 
+def test_output_directory_check_preserves_existing_files(tmp_path):
+    marker = tmp_path / ".write_test"
+    marker.write_text("operator data", encoding="utf-8")
+
+    ok, _ = preflight.check_output_directory_writable(tmp_path)
+
+    assert ok is True
+    assert marker.read_text(encoding="utf-8") == "operator data"
+    assert list(tmp_path.glob(".pocarchitect-write-test-*")) == []
+
+
 def test_preflight_passes_output_directory_to_check(tmp_path, monkeypatch):
     checked = []
     monkeypatch.setattr(preflight, "check_dependency", lambda name: (True, "ok"))
@@ -194,3 +218,59 @@ def test_preflight_passes_output_directory_to_check(tmp_path, monkeypatch):
     )
 
     assert checked == [tmp_path]
+
+
+def test_preflight_helpers_report_dependency_git_prompt_and_output_failures(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        preflight.importlib,
+        "import_module",
+        lambda name: (_ for _ in ()).throw(ImportError(name)),
+    )
+    assert preflight.check_dependency("missing") == (False, "FAIL: Missing")
+
+    monkeypatch.setattr(preflight.shutil, "which", lambda name: None)
+    assert preflight.check_git_command() == (
+        False,
+        "FAIL: Git executable not found",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(preflight, "__file__", str(tmp_path / "preflight.py"))
+    assert preflight.check_prompt_file() == (False, "FAIL: Prompt file missing")
+
+    monkeypatch.setattr(
+        preflight.tempfile,
+        "mkstemp",
+        lambda **kwargs: (_ for _ in ()).throw(PermissionError("denied")),
+    )
+    ok, message = preflight.check_output_directory_writable(tmp_path / "reports")
+    assert ok is False
+    assert "not writable" in message and "denied" in message
+
+
+def test_local_endpoint_validation_and_failure_responses(monkeypatch):
+    ok, message = preflight.check_local_endpoint("file:///tmp/model")
+    assert ok is False and "http(s) URL" in message
+
+    monkeypatch.setattr(
+        preflight,
+        "urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(URLError("offline")),
+    )
+    ok, message = preflight.check_local_endpoint("http://127.0.0.1:11434/v1")
+    assert ok is False and "offline" in message
+
+    class Response:
+        status = 503
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    monkeypatch.setattr(preflight, "urlopen", lambda *args, **kwargs: Response())
+    ok, message = preflight.check_local_endpoint("http://127.0.0.1:11434/v1")
+    assert ok is False and "unexpected response" in message

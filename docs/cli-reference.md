@@ -6,7 +6,7 @@ Generated directly from Typer/Click command metadata by `python scripts/generate
 
 POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--url`, `-u` | TEXT | None | Single PoC URL; public GitHub repositories can be grounded. |
 | `--source` | TEXT | None | Generic source identifier (GitHub URL, package, image, or download URL). |
@@ -45,7 +45,7 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 
 Run environment preflight checks. Example: pocarchitect preflight --offline
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--offline` | BOOLEAN | False | Check installation without requiring an API key or provider access. |
 | `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
@@ -58,7 +58,7 @@ Run environment preflight checks. Example: pocarchitect preflight --offline
 
 Diagnose readiness and optionally guide repairs. Example: pocarchitect doctor --offline --fix
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--provider`, `-p` | xai \| openai \| groq \| local | xai | Provider whose readiness to check. |
 | `--base-url` | TEXT | None | OpenAI-compatible local provider endpoint. |
@@ -71,7 +71,7 @@ Diagnose readiness and optionally guide repairs. Example: pocarchitect doctor --
 
 Generate a local demo report without credentials, network, or provider cost. Example: pocarchitect demo
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
 
@@ -79,7 +79,7 @@ Generate a local demo report without credentials, network, or provider cost. Exa
 
 Run the credential-free doctor and demo journey in one command. Example: pocarchitect quickstart
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
 
@@ -87,7 +87,7 @@ Run the credential-free doctor and demo journey in one command. Example: pocarch
 
 Launch the protected, local-only browser interface.
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--port` | INTEGER RANGE | 8765 | Loopback port for the local GUI. |
 | `--no-open` | BOOLEAN | False | Print the protected launch URL instead of opening a browser. |
@@ -96,7 +96,7 @@ Launch the protected, local-only browser interface.
 
 Show a concise, machine-readable summary of batch recovery state. Example: pocarchitect batch-status --batch-state reports/batch_progress.json
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--batch-state` | PATH | reports/batch_progress.json | Batch ledger to inspect. |
 
@@ -104,7 +104,7 @@ Show a concise, machine-readable summary of batch recovery state. Example: pocar
 
 Reset a ledger by moving its prior contents to a timestamped backup. Example: pocarchitect batch-reset --yes
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--batch-state` | PATH | reports/batch_progress.json | Batch ledger to reset. |
 | `--yes` | BOOLEAN | False | Confirm the recoverable reset without an interactive prompt. |
@@ -113,7 +113,7 @@ Reset a ledger by moving its prior contents to a timestamped backup. Example: po
 
 Create a new auditable finding-driven workflow state file. Example: pocarchitect workflow-init --state reports/workflow.json
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--state` | PATH | reports/workflow.json | — |
 
@@ -121,7 +121,7 @@ Create a new auditable finding-driven workflow state file. Example: pocarchitect
 
 Show the current workflow read model and recommendations. Example: pocarchitect workflow-status --state reports/workflow.json
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--state` | PATH | reports/workflow.json | — |
 
@@ -129,7 +129,7 @@ Show the current workflow read model and recommendations. Example: pocarchitect 
 
 Apply one auditable workflow command and persist the resulting state. Example: pocarchitect workflow-apply --command confirm_scope --payload '{}'
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--command` | TEXT | required | WorkflowEngine command name. |
 | `--payload` | TEXT | {} | JSON object passed to the command. |
@@ -139,7 +139,7 @@ Apply one auditable workflow command and persist the resulting state. Example: p
 
 Interactive first-run wizard: choose a provider, store a key, verify readiness. Example: pocarchitect setup
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
 
@@ -147,7 +147,7 @@ Interactive first-run wizard: choose a provider, store a key, verify readiness. 
 
 Show effective settings and where each value comes from (keys masked). Example: pocarchitect config
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
 
@@ -155,7 +155,7 @@ Show effective settings and where each value comes from (keys masked). Example: 
 
 Show provider defaults and practical model alternatives. Example: pocarchitect models
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
 
@@ -163,7 +163,7 @@ Show provider defaults and practical model alternatives. Example: pocarchitect m
 
 Create .pocarchitect.toml defaults for the current repository. Example: pocarchitect init
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--force` | BOOLEAN | False | Replace an existing project config. |
 
@@ -171,7 +171,7 @@ Create .pocarchitect.toml defaults for the current repository. Example: pocarchi
 
 Browse curated examples and optionally run the local demo. Example: pocarchitect explore --run
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--run` | BOOLEAN | False | Generate the credential-free demo report. |
 
@@ -179,7 +179,7 @@ Browse curated examples and optionally run the local demo. Example: pocarchitect
 
 Show saved report versions and risk-analysis history. Example: pocarchitect history --output-dir reports
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--output-dir` | PATH | None | — |
 
@@ -187,23 +187,26 @@ Show saved report versions and risk-analysis history. Example: pocarchitect hist
 
 Compare two generated reports. Example: pocarchitect diff reports/old.md reports/new.md
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
+| `<previous>` | FILE | required | — |
+| `<current>` | FILE | required | — |
 | `--output` | PATH | None | — |
 
 ## Command: `export`
 
 Export a Markdown report as HTML or structured JSON. Example: pocarchitect export reports/report.md --format html
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
+| `<report>` | FILE | required | — |
 | `--format` | markdown \| html \| pdf \| json | html | — |
 
 ## Command: `scaffold`
 
 Generate a safe project skeleton from a completed report. Example: pocarchitect scaffold --report reports/report.md --output blueprint
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `--report` | FILE | required | — |
 | `--output` | PATH | poc-blueprint | — |
@@ -212,15 +215,16 @@ Generate a safe project skeleton from a completed report. Example: pocarchitect 
 
 Compare candidate PoCs using bounded, provider-free source inspection. Example: pocarchitect compare ./candidate-a ./candidate-b
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
+| `<sources>` | TEXT | required | Two or more URLs or local directories. |
 | `--output` | PATH | None | Optional Markdown matrix path. |
 
 ## Command: `plugins`
 
 List registered analyzer plugins. Example: pocarchitect plugins
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | — | — | — | No options |
 
@@ -228,16 +232,17 @@ List registered analyzer plugins. Example: pocarchitect plugins
 
 Cross-reference exact dependency versions with the OSV database. Example: pocarchitect vulnerabilities .
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| — | — | — | No options |
+| `<path>` | DIRECTORY | . | — |
 
 ## Command: `publish`
 
 Publish a report with the authenticated GitHub CLI and return its URL. Example: pocarchitect publish reports/report.md
 
-| Option | Type | Default | Purpose |
+| Parameter | Type | Default | Purpose |
 |---|---|---|---|
+| `<report>` | FILE | required | — |
 | `--public` | BOOLEAN | False | Create a public rather than secret Gist. |
 
 ## Commands

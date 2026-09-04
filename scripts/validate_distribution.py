@@ -19,7 +19,11 @@ def normalize_anchor(value: str) -> str:
 
 def validate_sdist(path: Path) -> list[str]:
     errors: list[str] = []
-    with tarfile.open(path, "r:gz") as archive:
+    try:
+        archive = tarfile.open(path, "r:gz")
+    except (OSError, tarfile.TarError) as error:
+        return [f"Could not read source distribution `{path}`: {error}"]
+    with archive:
         members = {
             PurePosixPath(member.name): member
             for member in archive.getmembers()
@@ -49,7 +53,10 @@ def validate_sdist(path: Path) -> list[str]:
             if extracted is None:
                 errors.append(f"Could not read `{root}/{member}`")
                 continue
-            markdown_text[member] = extracted.read().decode("utf-8")
+            try:
+                markdown_text[member] = extracted.read().decode("utf-8")
+            except UnicodeDecodeError:
+                errors.append(f"Packaged Markdown is not UTF-8: `{root}/{member}`")
 
         for source, text in markdown_text.items():
             for raw_target in MARKDOWN_LINK.findall(text):

@@ -409,6 +409,8 @@ def update_history(output_dir: Path, report_path: Path) -> Path:
         )
     except (OSError, json.JSONDecodeError):
         data = {"version": 1, "reports": []}
+    if not isinstance(data, dict):
+        data = {"version": 1, "reports": []}
     metadata = read_report_metadata(report_path)
     reports = data.setdefault("reports", [])
     if not isinstance(reports, list):
@@ -555,7 +557,9 @@ def create_scaffold(report_path: Path, destination: Path) -> list[Path]:
 class AnalyzerPlugin(Protocol):
     name: str
 
-    def analyze(self, source: str, grounding: str) -> str: ...
+    def analyze(self, source: str, grounding: str) -> str:
+        """Return analyzer output for the supplied source and grounding context."""
+        raise TypeError("AnalyzerPlugin is a protocol contract")
 
 
 _PLUGINS: dict[str, AnalyzerPlugin] = {}
@@ -604,7 +608,10 @@ def history_rows(output_dir: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     try:
-        return list(json.loads(path.read_text(encoding="utf-8")).get("reports", []))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("reports"), list):
+            return []
+        return [row for row in data["reports"] if isinstance(row, dict)]
     except (OSError, json.JSONDecodeError, TypeError):
         return []
 

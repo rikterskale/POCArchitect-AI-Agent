@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess  # nosec B404 - controlled diagnostic subprocesses are required by preflight
 import sys
+import tempfile
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import urlparse
@@ -134,9 +135,11 @@ def check_output_directory_writable(
     out_dir = output_dir or default_output_dir()
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
-        test_file = out_dir / ".write_test"
-        test_file.touch()
-        test_file.unlink()
+        descriptor, test_name = tempfile.mkstemp(
+            prefix=".pocarchitect-write-test-", dir=out_dir
+        )
+        os.close(descriptor)
+        Path(test_name).unlink()
         return True, f"OK: {out_dir} writable"
     except OSError as error:
         return (
@@ -153,9 +156,11 @@ def check_cli_command() -> tuple[bool, str]:
     for cmd in candidates:
         try:
             # nosec B603, B607 - fixed module/CLI diagnostic commands
-            subprocess.run(cmd, capture_output=True, check=True)  # nosec B603, B607
+            subprocess.run(  # nosec B603, B607
+                cmd, capture_output=True, check=True, timeout=10
+            )
             return True, f"OK: Available via: {' '.join(cmd[:3])}".strip()
-        except (OSError, subprocess.CalledProcessError):
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
             continue
     return False, "FAIL: Not found"
 

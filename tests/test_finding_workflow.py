@@ -343,3 +343,15 @@ def test_workflow_loader_rejects_unknown_schema(tmp_path):
     path.write_text(json.dumps({"version": 1}), encoding="utf-8")
     with pytest.raises(WorkflowError, match="Unsupported workflow schema"):
         WorkflowEngine.load(path)
+
+
+def test_workflow_save_cleans_temporary_file_after_serialization_error(tmp_path):
+    engine = WorkflowEngine()
+    engine.state.metadata["not-json"] = object()
+    path = tmp_path / "workflow.json"
+
+    with pytest.raises(TypeError):
+        engine.save(path)
+
+    assert not path.exists()
+    assert list(tmp_path.glob(".workflow.json.*.tmp")) == []

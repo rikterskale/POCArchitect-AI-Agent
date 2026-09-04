@@ -74,37 +74,41 @@ def main() -> int:
         parser.error(str(error))
 
     env = clean_environment()
-    with tempfile.TemporaryDirectory() as temporary:
-        scratch = Path(temporary)
-        venv_dir = scratch / "venv"
-        work_dir = scratch / "first-run"
-        work_dir.mkdir()
+    try:
+        with tempfile.TemporaryDirectory() as temporary:
+            scratch = Path(temporary)
+            venv_dir = scratch / "venv"
+            work_dir = scratch / "first-run"
+            work_dir.mkdir()
 
-        run([sys.executable, "-m", "venv", str(venv_dir)], cwd=scratch, env=env)
-        python = venv_python(venv_dir)
-        run(
-            [str(python), "-m", "pip", "install", str(artifact)],
-            cwd=work_dir,
-            env=env,
-        )
-        run([str(python), "-m", "pip", "check"], cwd=work_dir, env=env)
+            run([sys.executable, "-m", "venv", str(venv_dir)], cwd=scratch, env=env)
+            python = venv_python(venv_dir)
+            run(
+                [str(python), "-m", "pip", "install", str(artifact)],
+                cwd=work_dir,
+                env=env,
+            )
+            run([str(python), "-m", "pip", "check"], cwd=work_dir, env=env)
 
-        probe = (
-            "from pathlib import Path; import pocarchitect; "
-            "print(Path(pocarchitect.__file__).resolve())"
-        )
-        run([str(python), "-c", probe], cwd=work_dir, env=env)
-        run(
-            [
-                str(python),
-                str(READINESS_GATE),
-                "--format",
-                "text",
-                "--require-console-script",
-            ],
-            cwd=work_dir,
-            env=env,
-        )
+            probe = (
+                "from pathlib import Path; import pocarchitect; "
+                "print(Path(pocarchitect.__file__).resolve())"
+            )
+            run([str(python), "-c", probe], cwd=work_dir, env=env)
+            run(
+                [
+                    str(python),
+                    str(READINESS_GATE),
+                    "--format",
+                    "text",
+                    "--require-console-script",
+                ],
+                cwd=work_dir,
+                env=env,
+            )
+    except (OSError, subprocess.CalledProcessError) as error:
+        print(f"Clean {args.artifact} install failed: {error}")
+        return 1
 
     print(f"Clean {args.artifact} install passed the first-run readiness gate.")
     return 0

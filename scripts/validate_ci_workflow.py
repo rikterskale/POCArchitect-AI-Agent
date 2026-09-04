@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = Path(".github/workflows/ci.yml")
 RETIRED_MUTATORS = (
@@ -12,16 +14,18 @@ RETIRED_MUTATORS = (
     Path("scripts/apply_ci_fixes.template.py"),
     Path("scripts/repair_apply_ci_fixes.py"),
 )
-REQUIRED_SNIPPETS = (
-    "  quality:",
-    "  test:",
-    "  security:",
-    "  docker:",
-    "  package:",
-    "  release-readiness:",
-    "  build:",
+REQUIRED_JOBS = {
+    "quality",
+    "test",
+    "windows-test",
+    "security",
+    "docker",
+    "package",
+    "release-readiness",
+    "build",
+}
+REQUIRED_RUN_COMMANDS = (
     "ruff check --output-format=github .",
-    "ruff format --check .",
     "black --check --diff .",
     "mypy pocarchitect tests",
     "python scripts/generate_docs.py --check",
@@ -32,19 +36,14 @@ REQUIRED_SNIPPETS = (
     "python scripts/validate_ci_workflow.py",
     "python scripts/validate_fresh_install.py dist --artifact",
     "pytest --cov=pocarchitect --cov-report=xml",
+    "pytest -q tests/test_cli.py::test_windows_help_uses_plain_renderer_for_redirected_output",
+    "python -m playwright install --with-deps chromium",
     "pip-audit",
     "docker build -t pocarchitect:test .",
     "python -m build",
     "python scripts/validate_distribution.py dist",
-    "uses: actions/upload-artifact@v4",
-    "uses: actions/download-artifact@v4",
-    "os: windows-latest",
-    "os: macos-latest",
-    'python-version: "3.10"',
-    'python-version: "3.13"',
-    "artifact: wheel",
-    "artifact: sdist",
 )
+REQUIRED_ACTIONS = {"actions/upload-artifact@v4", "actions/download-artifact@v4"}
 
 
 def validate(root: Path = ROOT) -> list[str]:
@@ -53,10 +52,36 @@ def validate(root: Path = ROOT) -> list[str]:
     if not workflow.exists():
         return [f"Missing canonical workflow: {WORKFLOW}"]
 
-    text = workflow.read_text(encoding="utf-8")
-    for snippet in REQUIRED_SNIPPETS:
-        if snippet not in text:
-            errors.append(f"Canonical workflow is missing `{snippet}`")
+    try:
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        return [f"Canonical workflow is not valid YAML: {error}"]
+    if not isinstance(document, dict) or not isinstance(document.get("jobs"), dict):
+        return ["Canonical workflow must define a jobs mapping"]
+
+    jobs = document["jobs"]
+    for job in sorted(REQUIRED_JOBS - set(jobs)):
+        errors.append(f"Canonical workflow is missing job `{job}`")
+
+    steps = [
+        step
+        for job in jobs.values()
+        if isinstance(job, dict) and isinstance(job.get("steps"), list)
+        for step in job["steps"]
+        if isinstance(step, dict)
+    ]
+    run_text = "\n".join(str(step.get("run", "")) for step in steps)
+    actions = {str(step["uses"]) for step in steps if "uses" in step}
+    for command in REQUIRED_RUN_COMMANDS:
+        if command not in run_text:
+            errors.append(f"Canonical workflow is missing run command `{command}`")
+    for action in sorted(REQUIRED_ACTIONS - actions):
+        errors.append(f"Canonical workflow is missing action `{action}`")
+
+    serialized = repr(document)
+    for value in ("windows-latest", "macos-latest", "3.10", "3.13", "wheel", "sdist"):
+        if value not in serialized:
+            errors.append(f"Canonical workflow is missing matrix value `{value}`")
     for retired in RETIRED_MUTATORS:
         if (root / retired).exists():
             errors.append(
@@ -72,8 +97,8 @@ def main() -> int:
         print("\n".join(f"- {error}" for error in errors))
         return 1
     print(
-        "Canonical CI workflow invariants are present; this structural check "
-        "does not establish hosted-job success."
+        "Canonical CI workflow is valid YAML and required jobs, commands, actions, "
+        "and matrix values are present; this does not establish hosted-job success."
     )
     return 0
 

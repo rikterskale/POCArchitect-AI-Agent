@@ -79,11 +79,9 @@ MOCK_MODEL = "mock-provider-model-x7"
 MOCK_TEMPERATURE = 0.73
 MOCK_MARKER = "POCARCHITECT_MOCK_REPORT_MARKER_7f3a9d"
 
-# Every long option a new user can pass must be *functionally* exercised by this
-# gate (covered) or explicitly, and narrowly, waived with a stated reason. The
-# coverage check in Pillar 3 reads the live CLI metadata and fails if a new
-# option ships without landing in one of these sets — that is what makes
-# "all options, no exceptions" enforceable rather than aspirational.
+# Every long option must have an explicit evidence owner in this gate or the
+# repository test suite. This ledger is an inventory control; behavioral proof
+# remains in the named executable checks and tests rather than membership here.
 COVERED_OPTIONS: dict[tuple[str, str], str] = {
     ("root", "--version"): "`--version` is run and asserted in Pillar 1.",
     (
@@ -349,7 +347,7 @@ class _MockProviderHandler(BaseHTTPRequestHandler):
     requests: ClassVar[list[dict]] = []
 
     def log_message(self, *args: object) -> None:
-        pass
+        return None
 
     def _send(self, code: int, obj: dict) -> None:
         body = json.dumps(obj).encode("utf-8")
@@ -649,15 +647,13 @@ def pillar_features(work: Path) -> Pillar:
         and any(event.get("event") == "report_saved" for event in quickstart_events),
     )
 
-    # "No exceptions" made enforceable: every long option the CLI exposes must be
-    # functionally covered by this gate or explicitly waived. A newly shipped
-    # option that is neither trips this check until it is validated.
+    # Inventory control: a new option must identify its executable evidence owner.
     options = all_long_options()
     accounted = set(COVERED_OPTIONS) | set(WAIVED_OPTIONS)
     uncovered = sorted(options - accounted)
     stale = sorted(accounted - options)
     p.record(
-        "Every CLI option is covered by the gate (no exceptions)",
+        "Every CLI option has a gate or test-suite evidence owner",
         not uncovered and not stale,
         (f"uncovered: {uncovered}; " if uncovered else "")
         + (f"stale entries: {stale}" if stale else "")

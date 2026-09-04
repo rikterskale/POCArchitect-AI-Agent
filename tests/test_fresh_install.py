@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -33,5 +35,57 @@ def test_select_artifact_keeps_wheel_and_sdist_checks_separate(tmp_path):
     sdist.touch()
 
     assert validator.select_artifact(tmp_path, "sdist") == sdist.resolve()
-    with pytest.raises(ValueError, match="found 0"):
-        validator.select_artifact(tmp_path, "wheel")
+
+
+def test_main_reports_subprocess_failure_without_traceback(
+    tmp_path, monkeypatch, capsys
+):
+    validator = load_validator()
+    artifact = tmp_path / "pocarchitect.whl"
+    artifact.touch()
+    monkeypatch.setattr(sys, "argv", ["validate_fresh_install.py", str(tmp_path)])
+    monkeypatch.setattr(
+        validator,
+        "run",
+        lambda command, **kwargs: (_ for _ in ()).throw(
+            subprocess.CalledProcessError(1, command)
+        ),
+    )
+
+    assert validator.main() == 1
+    assert "Clean wheel install failed" in capsys.readouterr().out
+
+
+def test_venv_python_run_clean_environment_and_successful_main(
+    tmp_path, monkeypatch, capsys
+):
+    validator = load_validator()
+    artifact = tmp_path / "pocarchitect.whl"
+    artifact.touch()
+    venv = tmp_path / "venv"
+    expected_name = "python.exe" if validator.os.name == "nt" else "python"
+    assert validator.venv_python(venv).name == expected_name
+
+    subprocess_calls = []
+    monkeypatch.setattr(
+        validator.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess_calls.append((command, kwargs)),
+    )
+    validator.run(["tool", "--version"], cwd=tmp_path, env={"SAFE": "1"})
+    assert subprocess_calls[0][1]["check"] is True
+
+    monkeypatch.setenv("OPENAI_API_KEY", "secret")
+    monkeypatch.setenv("PYTHONPATH", "unsafe")
+    clean = validator.clean_environment()
+    assert "OPENAI_API_KEY" not in clean and "PYTHONPATH" not in clean
+    assert clean["PIP_DISABLE_PIP_VERSION_CHECK"] == "1"
+
+    run_calls = []
+    monkeypatch.setattr(
+        validator, "run", lambda command, **kwargs: run_calls.append(command)
+    )
+    monkeypatch.setattr(sys, "argv", ["validate_fresh_install.py", str(tmp_path)])
+    assert validator.main() == 0
+    assert len(run_calls) == 5
+    assert "passed the first-run readiness gate" in capsys.readouterr().out

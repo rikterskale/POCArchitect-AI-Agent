@@ -67,23 +67,23 @@ def write_state(path: Path, state: dict[str, Any]) -> None:
             if time.monotonic() >= deadline:
                 raise BatchStateError(f"Timed out waiting for state lock: {path}")
             time.sleep(0.05)
-    encoded = json.dumps(state, indent=2, sort_keys=True) + "\n"
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        dir=path.parent,
-        delete=False,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-    ) as temporary:
-        temporary.write(encoded)
-        temporary_path = Path(temporary.name)
+    temporary_path: Path | None = None
     try:
+        encoded = json.dumps(state, indent=2, sort_keys=True) + "\n"
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            delete=False,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(encoded)
         os.replace(temporary_path, path)
-    except OSError:
-        temporary_path.unlink(missing_ok=True)
-        raise
     finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
         os.close(lock_fd)
         lock_path.unlink(missing_ok=True)
 

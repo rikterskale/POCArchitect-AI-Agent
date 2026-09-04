@@ -911,22 +911,24 @@ class WorkflowEngine:
             for key, value in self.state.findings.items()
         }
         path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            delete=False,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-        ) as tmp:
-            json.dump(payload, tmp, indent=2, sort_keys=True)
-            tmp.write("\n")
-            temporary = Path(tmp.name)
+        temporary: Path | None = None
         try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=path.parent,
+                delete=False,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+            ) as tmp:
+                temporary = Path(tmp.name)
+                json.dump(payload, tmp, indent=2, sort_keys=True)
+                tmp.write("\n")
             os.replace(temporary, path)
-        except OSError:
-            temporary.unlink(missing_ok=True)
-            raise
+            temporary = None
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     @classmethod
     def load(cls, path: Path | str) -> WorkflowEngine:

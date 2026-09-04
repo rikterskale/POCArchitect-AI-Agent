@@ -116,7 +116,7 @@ class AnalysisResult:
 
 
 def _discard_event(_: dict[str, object]) -> None:
-    pass
+    return None
 
 
 def _emit(sink: EventSink, event: str, message: str, **details: object) -> None:

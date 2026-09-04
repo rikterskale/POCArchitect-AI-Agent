@@ -1,6 +1,8 @@
 import re
 import time
 import webbrowser
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from importlib.resources import files
 
 import uvicorn
@@ -9,7 +11,7 @@ from typer.testing import CliRunner
 
 from pocarchitect import cli
 from pocarchitect.gui import GuiRuntime, create_app
-from pocarchitect.service import AnalysisService
+from pocarchitect.service import AnalysisRequest, AnalysisService, AnalysisServiceError
 
 
 class StubAnalysisService(AnalysisService):
@@ -168,6 +170,15 @@ def test_gui_prepare_approve_run_and_download(tmp_path):
         download = client.get(f"/api/artifacts/{result['report_artifact_id']}/download")
         assert download.status_code == 200
         assert b"# GUI report" in download.content
+        preview = client.get(f"/api/artifacts/{result['report_artifact_id']}")
+        assert preview.status_code == 200
+        assert preview.json()["content"].startswith("# GUI report")
+
+        stream = client.get(
+            f"/api/runs/{job_id}/events", headers={"Last-Event-ID": "not-a-number"}
+        )
+        assert stream.status_code == 200
+        assert '"type": "finished"' in stream.text
 
         library = client.get("/api/reports").json()["reports"]
         assert any(
@@ -180,6 +191,8 @@ def test_gui_prepare_approve_run_and_download(tmp_path):
             headers={"Origin": "http://127.0.0.1:8765"},
         )
         assert reused.status_code == 409
+        assert client.get("/api/runs/missing").status_code == 404
+        assert client.get("/api/artifacts/missing").status_code == 404
 
 
 def test_gui_demo_reaches_a_report_without_source_provider_or_credential(
@@ -258,3 +271,78 @@ def test_gui_cli_uses_selected_loopback_port_without_opening_browser(monkeypatch
         }
     ]
     assert "http://127.0.0.1:9123/?token=" in result.stdout
+
+
+def test_gui_expires_preparations_and_bounds_artifact_registry(tmp_path):
+    runtime = GuiRuntime(StubAnalysisService())
+    payload = type(
+        "Payload",
+        (),
+        {
+            "to_request": lambda self: AnalysisRequest(
+                source="https://example.test/poc",
+                provider="local",
+                no_ingest=True,
+                output_dir=str(tmp_path),
+            )
+        },
+    )()
+    view = runtime.prepare(payload)
+    prepared = runtime._prepared[view["preparation_id"]]
+    runtime._prepared[prepared.id] = replace(
+        prepared,
+        created_at=(datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+    )
+
+    try:
+        runtime.estimate(prepared.id, None)
+    except AnalysisServiceError as error:
+        assert "expired" in str(error)
+    else:
+        raise AssertionError("Expected an expired preparation to be rejected")
+
+    from pocarchitect import gui
+
+    for index in range(gui.MAX_RETAINED_ARTIFACTS + 5):
+        path = tmp_path / f"artifact-{index}.md"
+        path.write_text("# report\n", encoding="utf-8")
+        runtime._register_artifact(path)
+    runtime._purge_jobs()
+    assert len(runtime._artifacts) == gui.MAX_RETAINED_ARTIFACTS
+    runtime.close()
+
+
+def test_gui_preview_reports_type_size_encoding_and_missing_file_errors(tmp_path):
+    from pocarchitect import gui
+
+    runtime = GuiRuntime(StubAnalysisService())
+    app = create_app(session_token="token", port=8765, runtime=runtime)
+    non_markdown = tmp_path / "report.json"
+    oversized = tmp_path / "large.md"
+    invalid = tmp_path / "invalid.md"
+    missing = tmp_path / "missing.md"
+    non_markdown.write_text("{}", encoding="utf-8")
+    oversized.write_bytes(b"x" * (gui.MAX_REPORT_PREVIEW_BYTES + 1))
+    invalid.write_bytes(b"\xff")
+    missing.write_text("# gone\n", encoding="utf-8")
+    artifact_ids = {
+        name: runtime._register_artifact(path)
+        for name, path in {
+            "type": non_markdown,
+            "size": oversized,
+            "encoding": invalid,
+            "missing": missing,
+        }.items()
+    }
+    missing.unlink()
+
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        assert client.get("/?token=token", follow_redirects=True).status_code == 200
+        assert client.get(f"/api/artifacts/{artifact_ids['type']}").status_code == 415
+        assert client.get(f"/api/artifacts/{artifact_ids['size']}").status_code == 413
+        assert (
+            client.get(f"/api/artifacts/{artifact_ids['encoding']}").status_code == 415
+        )
+        assert (
+            client.get(f"/api/artifacts/{artifact_ids['missing']}").status_code == 404
+        )

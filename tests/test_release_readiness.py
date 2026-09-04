@@ -14,8 +14,11 @@ import pytest
 
 from scripts.release_readiness import (
     COVERED_OPTIONS,
+    Check,
+    Pillar,
     all_long_options,
     console_executable_path,
+    render_text,
     run_completion_probe,
 )
 
@@ -54,6 +57,18 @@ def test_completion_probe_does_not_require_parent_shell(tmp_path, monkeypatch):
 
     assert result.returncode == 0, result.stderr
     assert "_completion" in result.stdout
+
+
+def test_text_renderer_reports_check_details_and_overall_failure():
+    pillar = Pillar("example", "Example")
+    pillar.checks = [Check("working", True), Check("broken", False, "reason")]
+
+    rendered = render_text([pillar])
+
+    assert "[FAIL] Example" in rendered
+    assert "ok working" in rendered
+    assert "XX broken  (reason)" in rendered
+    assert "RESULT: NOT READY" in rendered
 
 
 @pytest.fixture(scope="module")

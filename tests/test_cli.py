@@ -16,7 +16,6 @@ from pocarchitect import cli
 RUNNER = CliRunner()
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows Rich help regression")
 def test_windows_help_uses_plain_renderer_for_redirected_output():
     result = subprocess.run(
         [sys.executable, "-m", "pocarchitect", "--help"],
@@ -29,7 +28,8 @@ def test_windows_help_uses_plain_renderer_for_redirected_output():
 
     assert result.returncode == 0
     assert "Usage: python -m pocarchitect" in result.stdout
-    assert cli.app.rich_markup_mode is None
+    expected_markup = None if sys.platform.startswith("win") else "rich"
+    assert cli.app.rich_markup_mode == expected_markup
 
 
 def test_normalize_github_repo_url_supports_common_variants():
@@ -727,3 +727,220 @@ def test_corrupt_batch_state_is_preserved_until_explicit_reset(tmp_path):
     assert reset.exit_code == 0
     assert not state_path.exists()
     assert list(tmp_path.glob("batch_progress.reset-*.json.bak"))
+
+
+def test_main_forwards_batch_feature_options(tmp_path, monkeypatch):
+    batch = tmp_path / "batch.txt"
+    batch.write_text("https://example.test/poc\n", encoding="utf-8")
+    captured = {}
+    monkeypatch.setattr(
+        cli, "process_batch_file", lambda **kwargs: captured.update(kwargs)
+    )
+
+    result = RUNNER.invoke(
+        cli.app,
+        [
+            "--batch",
+            str(batch),
+            "--dry-run",
+            "--curate",
+            "--dashboard",
+            "--diff",
+            "--scaffold",
+            "--scaffold-output",
+            str(tmp_path / "scaffolds"),
+            "--vuln-scan",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert captured["curate"] is True
+    assert captured["show_dashboard"] is True
+    assert captured["diff_previous"] is True
+    assert captured["scaffold"] is True
+    assert captured["scaffold_output"] == tmp_path / "scaffolds"
+    assert captured["vulnerability_scan"] is True
+
+
+def test_batch_applies_feature_options_per_item(tmp_path, monkeypatch):
+    batch = tmp_path / "batch.txt"
+    batch.write_text("https://example.test/one\n", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(
+        cli, "process_single_url", lambda **kwargs: calls.append(kwargs)
+    )
+
+    cli.process_batch_file(
+        batch_path=batch,
+        provider="local",
+        api_key=None,
+        model="model",
+        temperature=0.2,
+        base_url=None,
+        output_dir=tmp_path / "reports",
+        risk_level="High",
+        target_os="Linux",
+        include_mitigations=True,
+        no_ingest=True,
+        curate=True,
+        show_dashboard=True,
+        diff_previous=True,
+        scaffold=True,
+        scaffold_output=tmp_path / "scaffolds",
+        vulnerability_scan=True,
+    )
+
+    assert calls[0]["curate"] is True
+    assert calls[0]["show_dashboard"] is True
+    assert calls[0]["diff_previous"] is True
+    assert calls[0]["vulnerability_scan"] is True
+    assert calls[0]["scaffold_output"] == (
+        tmp_path / "scaffolds" / "https-example-test-one-blueprint"
+    )
+
+
+def test_workflow_cli_round_trip_and_invalid_payload(tmp_path):
+    state_path = tmp_path / "workflow.json"
+    created = RUNNER.invoke(cli.app, ["workflow-init", "--state", str(state_path)])
+    status = RUNNER.invoke(cli.app, ["workflow-status", "--state", str(state_path)])
+    applied = RUNNER.invoke(
+        cli.app,
+        [
+            "workflow-apply",
+            "--state",
+            str(state_path),
+            "--command",
+            "decide",
+            "--payload",
+            '{"key":"scope_defined","value":true}',
+        ],
+    )
+    invalid = RUNNER.invoke(
+        cli.app,
+        [
+            "workflow-apply",
+            "--state",
+            str(state_path),
+            "--command",
+            "decide",
+            "--payload",
+            "[]",
+        ],
+    )
+
+    assert created.exit_code == status.exit_code == applied.exit_code == 0
+    assert invalid.exit_code == 2
+    assert "payload must be a JSON object" in invalid.stdout
+
+
+def test_auxiliary_cli_commands_cover_success_and_error_paths(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert RUNNER.invoke(cli.app, ["init"]).exit_code == 0
+    assert RUNNER.invoke(cli.app, ["init"]).exit_code == 2
+    assert RUNNER.invoke(cli.app, ["init", "--force"]).exit_code == 0
+
+    demo_calls = []
+    monkeypatch.setattr(cli, "demo", lambda: demo_calls.append(True))
+    assert RUNNER.invoke(cli.app, ["explore", "--run"]).exit_code == 0
+    assert demo_calls == [True]
+
+    report_a = tmp_path / "old.md"
+    report_b = tmp_path / "new.md"
+    report_a.write_text("# Old\n", encoding="utf-8")
+    report_b.write_text("# New\n", encoding="utf-8")
+    diff_path = tmp_path / "nested" / "report.diff"
+    assert (
+        RUNNER.invoke(
+            cli.app,
+            ["diff", str(report_a), str(report_b), "--output", str(diff_path)],
+        ).exit_code
+        == 0
+    )
+    assert diff_path.is_file()
+    assert (
+        RUNNER.invoke(cli.app, ["export", str(report_b), "--format", "json"]).exit_code
+        == 0
+    )
+    assert (
+        RUNNER.invoke(
+            cli.app,
+            [
+                "scaffold",
+                "--report",
+                str(report_b),
+                "--output",
+                str(tmp_path / "blueprint"),
+            ],
+        ).exit_code
+        == 0
+    )
+    assert (
+        RUNNER.invoke(cli.app, ["history", "--output-dir", str(tmp_path)]).exit_code
+        == 0
+    )
+
+
+def test_compare_plugins_vulnerabilities_and_publish_commands(tmp_path, monkeypatch):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "app.py").write_text("print(1)\n", encoding="utf-8")
+    (second / "app.js").write_text("console.log(1)\n", encoding="utf-8")
+    comparison = tmp_path / "nested" / "comparison.md"
+    compared = RUNNER.invoke(
+        cli.app,
+        ["compare", str(first), str(second), "--output", str(comparison)],
+    )
+    assert compared.exit_code == 0 and comparison.is_file()
+
+    monkeypatch.setattr(cli, "registered_plugins", lambda: ["example"])
+    assert "example" in RUNNER.invoke(cli.app, ["plugins"]).stdout
+
+    monkeypatch.setattr(cli, "scan_path", lambda path: ([{"name": "pkg"}], []))
+    assert RUNNER.invoke(cli.app, ["vulnerabilities", str(tmp_path)]).exit_code == 0
+
+    report = tmp_path / "report.md"
+    report.write_text("# Report\n", encoding="utf-8")
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/gh")
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, "https://gist.test/1\n", ""
+        ),
+    )
+    published = RUNNER.invoke(cli.app, ["publish", str(report), "--public"])
+    assert published.exit_code == 0
+    assert "https://gist.test/1" in published.stdout
+
+    def fail_publish(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, args[0], stderr="authentication failed")
+
+    monkeypatch.setattr(cli.subprocess, "run", fail_publish)
+    failed = RUNNER.invoke(cli.app, ["publish", str(report)])
+    assert failed.exit_code == 1
+    assert "authentication failed" in failed.stdout
+    assert "ingesting" not in failed.stdout
+
+
+def test_setup_reports_safe_dry_run_failure(monkeypatch):
+    answers = iter(("local", "http://127.0.0.1:11434/v1"))
+    events = []
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: next(answers))
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: True)
+    monkeypatch.setattr(cli, "run_preflight", lambda **kwargs: None)
+    monkeypatch.setattr(
+        cli,
+        "process_single_url",
+        lambda **kwargs: (_ for _ in ()).throw(typer.Exit(7)),
+    )
+
+    with cli.capture_events(events.append):
+        cli.setup()
+
+    assert any(
+        event["event"] == "setup_dry_run_failed" and "exit code 7" in event["message"]
+        for event in events
+    )

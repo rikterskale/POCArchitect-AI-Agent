@@ -36,3 +36,30 @@ def test_link_validator_includes_prompt_and_both_documentation_reports():
     assert "pocarchitect/POC_Architect_Prompt.md" in paths
     assert "docs/DOCUMENTATION_GAP_ANALYSIS.md" in paths
     assert "docs/DOCUMENTATION_REVIEW_REPORT.md" in paths
+
+
+def test_link_validator_rejects_targets_outside_repository(tmp_path):
+    validator = load_validator()
+    root = validator.ROOT
+    page = root / "docs" / "escape-test.md"
+    page.write_text("[escape](/etc/passwd)\n", encoding="utf-8")
+    try:
+        errors = validator.validate_file(page)
+    finally:
+        page.unlink()
+
+    assert any("escapes repository" in error for error in errors)
+
+
+def test_link_validator_handles_nested_parentheses_and_ignores_code(tmp_path):
+    validator = load_validator()
+    validator.ROOT = tmp_path
+    destination = tmp_path / "target (draft).md"
+    destination.write_text("# Real heading\n", encoding="utf-8")
+    source = tmp_path / "source.md"
+    source.write_text(
+        "[valid](target%20(draft).md#real-heading)\n" "`[not-a-link](missing.md)`\n",
+        encoding="utf-8",
+    )
+
+    assert validator.validate_file(source) == []

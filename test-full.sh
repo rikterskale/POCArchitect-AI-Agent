@@ -20,8 +20,16 @@ if [ ! -f "$REAL_BATCH_FILE" ]; then
 fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+else
+  echo "Python executable not found (tried python and python3)."
+  exit 2
+fi
 canonical_path() {
-  python -c 'import os, sys; print(os.path.normcase(os.path.realpath(os.path.abspath(sys.argv[1]))))' "$1"
+  "$PYTHON_BIN" -c 'import os, sys; print(os.path.normcase(os.path.realpath(os.path.abspath(sys.argv[1]))))' "$1"
 }
 
 REAL_BATCH_PATH="$(canonical_path "$REAL_BATCH_FILE")"

@@ -3,13 +3,15 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from urllib.parse import unquote
 
+import re
+from markdown_it import MarkdownIt
+
 ROOT = Path(__file__).resolve().parents[1]
 DOC_DIRECTORIES = (ROOT / "docs", ROOT / "example_usage", ROOT / "pocarchitect")
-MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+MARKDOWN = MarkdownIt("commonmark")
 
 
 def markdown_files() -> list[Path]:
@@ -33,16 +35,37 @@ def anchors(path: Path) -> set[str]:
     }
 
 
+def link_targets(text: str) -> list[str]:
+    """Return CommonMark link and image targets, including nested parentheses."""
+    targets: list[str] = []
+    for token in MARKDOWN.parse(text):
+        for child in token.children or []:
+            if child.type == "link_open":
+                target = child.attrGet("href")
+            elif child.type == "image":
+                target = child.attrGet("src")
+            else:
+                continue
+            if target is not None:
+                targets.append(target)
+    return targets
+
+
 def validate_file(path: Path) -> list[str]:
     errors = []
     text = path.read_text(encoding="utf-8")
-    for raw_target in MARKDOWN_LINK.findall(text):
+    for raw_target in link_targets(text):
         target = raw_target.split(maxsplit=1)[0].strip("<>")
         if not target or target.startswith(("http://", "https://", "mailto:")):
             continue
         location, separator, anchor = unquote(target).partition("#")
         destination = path if not location else (path.parent / location).resolve()
-        if not destination.exists():
+        if not destination.is_relative_to(ROOT):
+            errors.append(
+                f"{path.relative_to(ROOT)}: link target escapes repository `{raw_target}`"
+            )
+            continue
+        if not destination.is_file():
             errors.append(
                 f"{path.relative_to(ROOT)}: missing link target `{raw_target}`"
             )

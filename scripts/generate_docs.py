@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 import click
-from typer.core import TyperOption
+from typer.core import TyperArgument, TyperOption
 from typer.main import get_command
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +27,7 @@ def markdown_cell(value: object) -> str:
     return " ".join(text.replace("|", "\\|").split()) or "—"
 
 
-def option_type(option: click.Option) -> str:
+def option_type(option: click.Parameter) -> str:
     if isinstance(option.type, click.Choice) or hasattr(option.type, "choices"):
         return markdown_cell(" | ".join(str(choice) for choice in option.type.choices))
     return option.type.name.upper()
@@ -36,15 +36,20 @@ def option_type(option: click.Option) -> str:
 def option_rows(command: click.Command) -> list[str]:
     rows = []
     for parameter in command.params:
-        if not isinstance(parameter, (click.Option, TyperOption)) or parameter.hidden:
+        if isinstance(parameter, (click.Option, TyperOption)):
+            if parameter.hidden:
+                continue
+            label = ", ".join(
+                f"`{flag}`" for flag in (*parameter.opts, *parameter.secondary_opts)
+            )
+        elif isinstance(parameter, (click.Argument, TyperArgument)):
+            label = f"`<{parameter.human_readable_name.lower()}>`"
+        else:
             continue
-        flags = ", ".join(
-            f"`{flag}`" for flag in (*parameter.opts, *parameter.secondary_opts)
-        )
         default = "required" if parameter.required else markdown_cell(parameter.default)
         rows.append(
-            f"| {flags} | {option_type(parameter)} | {default} | "
-            f"{markdown_cell(parameter.help or '')} |"
+            f"| {label} | {option_type(parameter)} | {default} | "
+            f"{markdown_cell(getattr(parameter, 'help', '') or '')} |"
         )
     return rows
 
@@ -55,7 +60,7 @@ def command_section(title: str, command: click.Command) -> str:
     table = "\n".join(rows) if rows else "| — | — | — | No options |"
     return (
         f"## {title}\n\n{description}\n\n"
-        "| Option | Type | Default | Purpose |\n"
+        "| Parameter | Type | Default | Purpose |\n"
         "|---|---|---|---|\n"
         f"{table}"
     )

@@ -187,7 +187,7 @@ def configure_output(format_name: str, no_color: bool) -> None:
             try:
                 reconfigure(encoding="utf-8")
             except (ValueError, OSError):
-                pass
+                continue
     console = Console(no_color=no_color)
 
 
@@ -346,7 +346,7 @@ class _DemoProviderHandler(BaseHTTPRequestHandler):
     """Minimal OpenAI-compatible endpoint used by the credential-free demo."""
 
     def log_message(self, *_args: object) -> None:
-        pass
+        return None
 
     def _send(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -1691,6 +1691,12 @@ def process_batch_file(
     dry_run_full: bool = False,
     max_estimated_cost: float | None = None,
     report_format: str = "markdown",
+    curate: bool = False,
+    show_dashboard: bool = False,
+    diff_previous: bool = False,
+    scaffold: bool = False,
+    scaffold_output: Path | None = None,
+    vulnerability_scan: bool = False,
 ):
     """Read URLs from a text file and process each one sequentially."""
     if not batch_path.exists():
@@ -1788,6 +1794,15 @@ def process_batch_file(
                     show_spinner=False,
                     max_estimated_cost=max_estimated_cost,
                     report_format=report_format,
+                    curate=curate,
+                    show_dashboard=show_dashboard,
+                    diff_previous=diff_previous,
+                    scaffold_output=(
+                        (scaffold_output or output_dir) / f"{slugify(url)}-blueprint"
+                        if scaffold
+                        else None
+                    ),
+                    vulnerability_scan=vulnerability_scan,
                 )
                 success_count += 1
                 state.setdefault("items", {})[url] = {
@@ -2154,8 +2169,11 @@ def setup() -> None:
                 verbose=False,
                 confirmed=True,
             )
-        except typer.Exit:
-            pass
+        except typer.Exit as error:
+            emit(
+                "setup_dry_run_failed",
+                f"Safe dry-run did not complete (exit code {error.exit_code}).",
+            )
 
     console.print(
         "\n[bold green]Setup complete.[/bold green] Next, try a real run, e.g.:\n"
@@ -2372,6 +2390,7 @@ def diff_command(
     """
     content = report_diff(previous, current)
     if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
             content + ("\n" if content else "No content changes.\n"), encoding="utf-8"
         )
@@ -2470,19 +2489,19 @@ def compare_command(
         )
     if output_format == "json":
         emit("comparison", "Candidate comparison complete.", candidates=rows)
-        return
-    table = Table(title="PoC comparison matrix")
-    for name in ("Source", "Files", "Technology", "Complexity", "Maintainability"):
-        table.add_column(name, style="cyan" if name == "Source" else None)
-    for row in rows:
-        table.add_row(
-            str(row["source"]),
-            str(row["files"]),
-            str(row["technology"]),
-            str(row["complexity"]),
-            str(row["maintainability"]),
-        )
-    console.print(table)
+    else:
+        table = Table(title="PoC comparison matrix")
+        for name in ("Source", "Files", "Technology", "Complexity", "Maintainability"):
+            table.add_column(name, style="cyan" if name == "Source" else None)
+        for row in rows:
+            table.add_row(
+                str(row["source"]),
+                str(row["files"]),
+                str(row["technology"]),
+                str(row["complexity"]),
+                str(row["maintainability"]),
+            )
+        console.print(table)
     if output is not None:
         lines = [
             "# PoC comparison\n",
@@ -2505,7 +2524,11 @@ def plugins_command() -> None:
     Example: pocarchitect plugins
     """
     names = registered_plugins()
-    emit("plugins", f"Registered analyzer plugins: {len(names)}", plugins=names)
+    rendered = "\n".join(f"- {name}" for name in names)
+    message = f"Registered analyzer plugins: {len(names)}"
+    if rendered:
+        message = f"{message}\n{rendered}"
+    emit("plugins", message, plugins=names)
 
 
 @app.command("vulnerabilities")
@@ -2561,7 +2584,16 @@ def publish_command(
         completed = subprocess.run(
             command, check=True, capture_output=True, text=True, timeout=30
         )  # nosec B603 - fixed gh executable and operator-selected report
-    except (OSError, subprocess.SubprocessError) as error:
+    except subprocess.TimeoutExpired:
+        emit("error", "Publishing timed out. Check GitHub CLI connectivity and retry.")
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as error:
+        detail, _, _ = redact_sensitive_input(
+            (error.stderr or error.stdout or "GitHub CLI returned an error").strip()
+        )
+        emit("error", f"Publishing failed: {detail}")
+        raise typer.Exit(1)
+    except OSError as error:
         emit("error", f"Publishing failed: {friendly_error_message(error)}")
         raise typer.Exit(1)
     url = completed.stdout.strip()
@@ -2855,6 +2887,12 @@ def main(
             dry_run_full=full,
             max_estimated_cost=max_estimated_cost,
             report_format=report_format,
+            curate=curate,
+            show_dashboard=dashboard,
+            diff_previous=diff_previous,
+            scaffold=scaffold,
+            scaffold_output=scaffold_output,
+            vulnerability_scan=vulnerability_scan,
         )
     else:
         emit("error", "Provide --url, --source, --path, or --batch")

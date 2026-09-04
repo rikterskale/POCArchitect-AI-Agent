@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate_ci_workflow.py"
@@ -31,4 +32,43 @@ def test_ci_validator_detects_a_missing_required_control(tmp_path):
 
     errors = validator.validate(tmp_path)
 
-    assert any("quality:" in error for error in errors)
+    assert any("jobs mapping" in error for error in errors)
+
+
+def test_ci_validator_rejects_malformed_yaml(tmp_path):
+    validator = load_validator()
+    workflow = tmp_path / validator.WORKFLOW
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("jobs: [unterminated\n", encoding="utf-8")
+
+    errors = validator.validate(tmp_path)
+
+    assert any("not valid YAML" in error for error in errors)
+
+
+def test_ci_validator_does_not_count_commented_controls(tmp_path):
+    validator = load_validator()
+    workflow = tmp_path / validator.WORKFLOW
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  quality:\n    runs-on: ubuntu-latest\n    steps:\n"
+        "      # - run: ruff check --output-format=github .\n"
+        "      - run: echo safe\n",
+        encoding="utf-8",
+    )
+
+    errors = validator.validate(tmp_path)
+
+    assert any("Ruff" not in error and "ruff check" in error for error in errors)
+
+
+def test_ci_validator_main_reports_success_and_failure(monkeypatch, capsys):
+    validator = load_validator()
+    monkeypatch.setattr(sys, "argv", ["validate_ci_workflow.py"])
+    monkeypatch.setattr(validator, "validate", lambda: [])
+    assert validator.main() == 0
+    assert "Canonical CI workflow is valid YAML" in capsys.readouterr().out
+
+    monkeypatch.setattr(validator, "validate", lambda: ["broken"])
+    assert validator.main() == 1
+    assert "broken" in capsys.readouterr().out
