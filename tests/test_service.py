@@ -180,6 +180,25 @@ def test_service_rejects_missing_local_directory(tmp_path):
         )
 
 
+def test_service_reports_ingestion_failure_before_preparation(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "build_grounding_context",
+        lambda *args, **kwargs: cli.GroundingResult(
+            "WARNING: Ingestion failed.", "url-only-ingestion-failed"
+        ),
+    )
+
+    with pytest.raises(AnalysisServiceError, match="Source ingestion failed"):
+        AnalysisService().prepare(
+            AnalysisRequest(
+                source="https://github.com/example/missing",
+                provider="local",
+                output_dir=str(tmp_path),
+            )
+        )
+
+
 def test_service_optional_outputs_and_vulnerability_failure(tmp_path, monkeypatch):
     source = tmp_path / "source"
     source.mkdir()

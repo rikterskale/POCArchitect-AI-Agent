@@ -238,6 +238,47 @@ def test_cost_limit_aborts_before_provider_call(tmp_path, monkeypatch):
     assert called == []
 
 
+def test_ingestion_failure_exits_before_provider_call(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "load_prompt", lambda: "system prompt")
+    monkeypatch.setattr(
+        cli,
+        "build_grounding_context",
+        lambda *args, **kwargs: cli.GroundingResult(
+            "WARNING: Ingestion failed.", "url-only-ingestion-failed"
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "get_llm_response",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("provider must not be called")
+        ),
+    )
+    events = []
+
+    with cli.capture_events(events.append), pytest.raises(typer.Exit) as error:
+        cli.process_single_url(
+            url="https://github.com/example/missing",
+            provider="openai",
+            api_key="unused",
+            model="gpt-4o",
+            temperature=0.2,
+            base_url=None,
+            output_dir=tmp_path,
+            risk_level="High",
+            target_os="Linux",
+            include_mitigations=True,
+            no_ingest=False,
+        )
+
+    assert error.value.exit_code == 2
+    assert any(
+        event["event"] == "error"
+        and "Source ingestion failed; no provider call was made" in event["message"]
+        for event in events
+    )
+
+
 def test_models_command_reports_defaults():
     result = RUNNER.invoke(cli.app, ["--format", "json", "models"])
 
@@ -915,12 +956,20 @@ def test_compare_plugins_vulnerabilities_and_publish_commands(tmp_path, monkeypa
     assert "https://gist.test/1" in published.stdout
 
     def fail_publish(*args, **kwargs):
-        raise subprocess.CalledProcessError(1, args[0], stderr="authentication failed")
+        raise subprocess.CalledProcessError(
+            1,
+            args[0],
+            stderr=(
+                "authentication failed: " "OPENAI_API_KEY=sk-test-1234567890abcdef"
+            ),
+        )
 
     monkeypatch.setattr(cli.subprocess, "run", fail_publish)
     failed = RUNNER.invoke(cli.app, ["publish", str(report)])
     assert failed.exit_code == 1
     assert "authentication failed" in failed.stdout
+    assert "sk-test-1234567890abcdef" not in failed.stdout
+    assert "[REDACTED]" in failed.stdout
     assert "ingesting" not in failed.stdout
 
 

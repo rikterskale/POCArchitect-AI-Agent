@@ -2,6 +2,7 @@ import socket
 import threading
 import time
 from contextlib import contextmanager
+from pathlib import Path
 
 import uvicorn
 from playwright.sync_api import sync_playwright
@@ -64,6 +65,11 @@ def test_browser_form_validation_demo_recovery_and_report_library(
         assert (
             page.locator("#download-report").get_attribute("href").endswith("/download")
         )
+        assert page.get_by_role("button", name="Copy Markdown").is_visible()
+        with page.expect_download() as download_info:
+            page.locator("#download-report").click()
+        downloaded = Path(download_info.value.path()).read_text(encoding="utf-8")
+        assert "# POCArchitect Demo Report" in downloaded
 
         active_job = page.evaluate("sessionStorage.getItem('pocarchitect.activeJob')")
         assert active_job is None
@@ -76,4 +82,60 @@ def test_browser_form_validation_demo_recovery_and_report_library(
             "POCArchitect Demo Report"
             in page.locator("#library-report-body").text_content()
         )
+
+        page.reload()
+        page.locator("#connection-status").get_by_text("Ready").wait_for()
+        assert page.evaluate("sessionStorage.getItem('pocarchitect.activeJob')") is None
+        page.locator("#tab-reports").click()
+        page.locator("#report-list button").first.wait_for()
+        page.locator("#report-list button").first.click()
+        page.locator("#library-report:not(.is-hidden)").wait_for()
+        page.locator("#library-report-body").get_by_text(
+            "POCArchitect Demo Report", exact=False
+        ).wait_for()
+        assert (
+            "POCArchitect Demo Report"
+            in page.locator("#library-report-body").text_content()
+        )
+        browser.close()
+
+
+def test_browser_connection_interruption_and_retry(tmp_path, monkeypatch):
+    with live_gui(tmp_path, monkeypatch) as launch_url, sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.route("**/api/bootstrap", lambda route: route.abort())
+        page.goto(launch_url)
+
+        banner = page.locator("#connection-banner")
+        banner.get_by_text("Connection interrupted.").wait_for()
+        assert banner.get_by_role("button", name="Retry connection").is_visible()
+
+        page.unroute("**/api/bootstrap")
+        banner.get_by_role("button", name="Retry connection").click()
+        page.locator("#connection-status").get_by_text("Ready").wait_for()
+        assert banner.is_hidden()
+        browser.close()
+
+
+def test_browser_blocks_unconfigured_provider(tmp_path, monkeypatch):
+    for variable in ("XAI_API_KEY", "OPENAI_API_KEY", "GROQ_API_KEY"):
+        monkeypatch.delenv(variable, raising=False)
+
+    with live_gui(tmp_path, monkeypatch) as launch_url, sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(launch_url)
+        page.locator("#connection-status").get_by_text("Ready").wait_for()
+
+        page.locator("#provider-readiness-name").get_by_text(
+            "needs configuration", exact=False
+        ).wait_for()
+        page.locator("#source").fill("https://example.com/advisory")
+        page.locator("#prepare-button").click()
+        page.locator("#review-content:not(.is-hidden)").wait_for()
+        page.locator("#approval").check()
+
+        assert page.locator("#run-button").is_disabled()
+        assert page.get_by_role("button", name="Copy setup command").is_visible()
         browser.close()

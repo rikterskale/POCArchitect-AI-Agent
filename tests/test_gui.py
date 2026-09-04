@@ -120,6 +120,18 @@ def test_gui_rejects_oversized_api_payload(tmp_path):
     assert response.json()["detail"] == "Request is too large"
 
 
+def test_gui_rejects_invalid_source_with_actionable_detail(tmp_path):
+    with authenticated_client(tmp_path) as client:
+        response = client.post(
+            "/api/preparations",
+            json={"source": "", "provider": "local"},
+            headers={"Origin": "http://127.0.0.1:8765"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "A source URL or local directory is required"
+
+
 def test_gui_prepare_approve_run_and_download(tmp_path):
     with authenticated_client(tmp_path) as client:
         prepared = client.post(
