@@ -61,9 +61,10 @@ test, and artifact check passes and durable JSON evidence is written.
 ## Start here
 
 **New user? Begin with [Start Here: POCArchitect](docs/START_HERE.md).** It is
-the comprehensive, GUI-first path from installing Python through a safe local
-demo, provider setup, the first authorized report, troubleshooting, updates,
-and cleanup. Every major step includes an expected result and recovery path.
+the novice-first path from installing Python, Git, and Docker through a safe
+local demo, the first evidence-backed VERIFIED PoC, finding remediation,
+troubleshooting, updates, and cleanup. Every major step includes an expected
+result and recovery path.
 
 The older [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md) remains the
 validation-oriented CLI reference. The [Command Guide](docs/command-guide.md)
@@ -338,7 +339,8 @@ python scripts/generate_docs.py
 
 ## Documentation
 
-- [Start Here: POCArchitect](docs/START_HERE.md) — recommended zero-friction installation, GUI, first report, safety, and troubleshooting journey.
+- [Start Here: POCArchitect](docs/START_HERE.md) — novice-first installation,
+  GUI, VERIFIED PoC, remediation, safety, and troubleshooting journey.
 - [Novice Usability Guide](docs/NOVICE_USABILITY_GUIDE.md) — installation, safe first use, troubleshooting, cleanup, and update instructions.
 - [Command Guide](docs/command-guide.md) — end-to-end Windows, macOS/Linux, provider, batch, automation, Docker, and development commands.
 - [CLI Reference](docs/cli-reference.md) — generated option and subcommand reference.

@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardened verification with length-framed source digests, immutable image-ID
   execution, full artifact-path symlink checks, and incomplete draft contracts
   for manually configured toolchains.
+- Rebuilt the Start Here guide as a shorter novice-first journey covering
+  installation, the complete VERIFIED-PoC gate, finding remediation,
+  troubleshooting, updates, evidence retention, and safe support escalation.
 
 ## [0.3.0] - 2026-09-05
 

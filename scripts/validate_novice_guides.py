@@ -34,21 +34,27 @@ REQUIRED_COMMANDS = (
 REQUIRED_START_HEADINGS = (
     "# Start Here: POCArchitect",
     "## The shortest successful path",
-    "## 3. Install Python and Git",
-    "## 5. Create an isolated environment and install",
-    "## 6. Prove the installation works without credentials",
-    "## 7. Configure a provider safely",
-    "## 8. Launch and use the GUI",
-    "## 14. Use POCArchitect safely every day",
-    "## 15. Troubleshoot problems",
-    "## 16. Update, stop, clean up, or uninstall",
-    "## 19. Glossary",
+    "## 1. Know the finish line",
+    "## 2. Install prerequisites",
+    "## 3. Install POCArchitect",
+    "## 4. Prove the installation works",
+    "## 5. Create your first VERIFIED PoC",
+    "## 6. Use POCArchitect day to day",
+    "## 7. Remediate a finding safely",
+    "## 8. Troubleshoot and repair",
+    "## 9. Update, back up, or uninstall",
+    "## 10. Use the cheat sheet and glossary",
 )
 REQUIRED_START_COMMANDS = (
     "python -m pip install -e '.[gui]'",
     "python -m pocarchitect quickstart",
+    "docker info",
+    "docker pull python:3.12-slim",
     "pocarchitect setup",
     "pocarchitect gui",
+    "--curate --scaffold --scaffold-output poc-blueprint",
+    "pocarchitect verify init",
+    "pocarchitect verify run ./poc-blueprint",
     "--no-ingest --dry-run",
     "batch-status",
     "batch-reset",
@@ -130,12 +136,20 @@ def validate_start_guide(path: Path) -> list[str]:
     for command in REQUIRED_START_COMMANDS:
         if command not in text:
             errors.append(f"Start Here guide is missing required command: {command}")
-    if text.count("**Success check:**") < 5:
+    if text.count("**Success check:**") < 8:
         errors.append("Start Here guide needs success checks for the novice journey")
     if "### Troubleshooting matrix" not in text:
         errors.append("Start Here guide is missing its troubleshooting matrix")
     if "Never expose or reverse-proxy the GUI" not in text:
         errors.append("Start Here guide is missing the local-only GUI warning")
+    if "working PoC only after `verify run` reports **VERIFIED**" not in text:
+        errors.append("Start Here guide is missing the working-PoC evidence boundary")
+    if "Remediate a finding safely" not in text:
+        errors.append("Start Here guide is missing the issue-remediation workflow")
+    if len(text.splitlines()) > 800:
+        errors.append("Start Here guide is too long for the novice-first journey")
+    if len(re.findall(r"^```", text, flags=re.MULTILINE)) % 2:
+        errors.append("Start Here guide contains an unbalanced fenced code block")
     return errors
 
 

@@ -1,203 +1,167 @@
 # Start Here: POCArchitect
 
-This is the recommended first-use guide for POCArchitect. Follow it from top to
-bottom and you will install the application, prove that it works without using
-a credential, open the graphical interface, and create a safe example report.
-Provider setup is needed only when you are ready to create a real authorized
-analysis report.
+This guide is for people who have never used POCArchitect, Python virtual
+environments, or AI-provider APIs. Follow it in order. Every important step has
+a **Success check** and a direct recovery path.
 
-You do not need prior Python, Git, AI-provider, or command-line experience.
-When Windows and macOS/Linux use different commands, both are shown. Run only
-the commands for your operating system.
+POCArchitect reviews an authorized proof-of-concept (PoC) source, creates a
+security report and candidate implementation, and can prove that the reviewed
+implementation works inside a controlled Docker sandbox.
 
 > [!IMPORTANT]
-> POCArchitect is security tooling. Analyze only systems and source code you
-> own or have explicit permission to assess. The application never executes
-> retrieved proof-of-concept code, but a real analysis can send selected,
-> redacted source content to the model provider you choose.
+> Use POCArchitect only on source and systems you own or have explicit written
+> permission to assess. A generated report or scaffold is a candidate. It is a
+> working PoC only after `verify run` reports **VERIFIED** and writes evidence.
 
 ## The shortest successful path
 
-If Python and Git are already installed, this is the shortest credential-free
-path to a finished report:
+If Python, Git, and Docker are already installed:
 
-1. Open a terminal in the POCArchitect folder.
-2. Create and activate a virtual environment.
-3. Install POCArchitect with the GUI dependencies.
-4. Run the credential-free quickstart.
-5. Launch the GUI.
-6. Select **Create credential-free demo**.
+1. Clone this repository.
+2. Create and activate `.venv`.
+3. Install POCArchitect.
+4. Run `python -m pocarchitect quickstart`.
+5. Run `pocarchitect gui` and create the credential-free demo.
+6. Configure one model provider with `pocarchitect setup`.
+7. Analyze one authorized source and create its scaffold.
+8. Review the generated code, tests, authorization, and Docker image.
+9. Run `pocarchitect verify run PATH_TO_SCAFFOLD`.
+10. Call the result a working PoC only when the final status is **VERIFIED**.
 
-The exact commands and success checks are provided below. Do not skip the
-credential-free quickstart; it catches most installation problems before a
-real source or provider is involved. When you are ready for a real analysis,
-configure one provider, select **Recheck** in the open GUI, enter an authorized
-source, and review the transfer before approving it.
+The rest of this guide supplies the exact commands and fixes.
 
 ## Contents
 
-1. [Understand what will happen](#1-understand-what-will-happen)
-2. [Choose the GUI or terminal](#2-choose-the-gui-or-terminal)
-3. [Install Python and Git](#3-install-python-and-git)
-4. [Get the POCArchitect files](#4-get-the-pocarchitect-files)
-5. [Create an isolated environment and install](#5-create-an-isolated-environment-and-install)
-6. [Prove the installation works without credentials](#6-prove-the-installation-works-without-credentials)
-7. [Configure a provider safely](#7-configure-a-provider-safely)
-8. [Launch and use the GUI](#8-launch-and-use-the-gui)
-9. [Create a report from the terminal](#9-create-a-report-from-the-terminal)
-10. [Understand grounding, redaction, cost, and approval](#10-understand-grounding-redaction-cost-and-approval)
-11. [Work with reports](#11-work-with-reports)
-12. [Analyze multiple sources](#12-analyze-multiple-sources)
-13. [Set reusable project defaults](#13-set-reusable-project-defaults)
-14. [Use POCArchitect safely every day](#14-use-pocarchitect-safely-every-day)
-15. [Troubleshoot problems](#15-troubleshoot-problems)
-16. [Update, stop, clean up, or uninstall](#16-update-stop-clean-up-or-uninstall)
-17. [Collect safe diagnostic information](#17-collect-safe-diagnostic-information)
-18. [Command cheat sheet](#18-command-cheat-sheet)
-19. [Glossary](#19-glossary)
+1. [Know the finish line](#1-know-the-finish-line)
+2. [Install prerequisites](#2-install-prerequisites)
+3. [Install POCArchitect](#3-install-pocarchitect)
+4. [Prove the installation works](#4-prove-the-installation-works)
+5. [Create your first VERIFIED PoC](#5-create-your-first-verified-poc)
+6. [Use POCArchitect day to day](#6-use-pocarchitect-day-to-day)
+7. [Remediate a finding safely](#7-remediate-a-finding-safely)
+8. [Troubleshoot and repair](#8-troubleshoot-and-repair)
+9. [Update, back up, or uninstall](#9-update-back-up-or-uninstall)
+10. [Use the cheat sheet and glossary](#10-use-the-cheat-sheet-and-glossary)
 
-## 1. Understand what will happen
+## 1. Know the finish line
 
-POCArchitect turns an authorized source into a structured architecture and risk
-analysis report. A source can be:
+POCArchitect separates analysis from execution:
 
-- a public GitHub repository;
-- a local directory you are authorized to read;
-- a package or container-image identifier;
-- a download or advisory URL; or
-- a text file containing several sources for batch processing.
+```text
+Authorized source
+      ↓
+Report + candidate implementation
+      ↓
+Human review + explicit test contract
+      ↓
+Locked-down Docker build and test
+      ↓
+VERIFIED status + retained JSON evidence
+```
 
-For a public GitHub repository or local directory, POCArchitect can select a
-bounded set of relevant text files as grounding. Before a provider call, it
-redacts recognized secret patterns and presents transfer metadata for review.
-The GUI lets you include or exclude individual files. A report is written only
-after a provider returns a successful response.
+These labels have precise meanings:
 
-POCArchitect does **not**:
+| Label | Meaning |
+|---|---|
+| Report | AI-assisted analysis. Review it; it can be incomplete or wrong. |
+| Candidate | Generated implementation files that have not passed the verification gate. |
+| VERIFIED PoC | A reviewed candidate whose declared build, tests, artifacts, and sandbox cleanup all passed. |
 
-- execute the source or proof-of-concept code;
-- prove that generated findings are correct;
-- provide private GitHub authentication automatically;
-- upload reports unless you explicitly run a publishing command;
-- expose the GUI to other computers; or
-- make a provider call during `quickstart`, `demo`, an offline preflight, or a
-  dry run.
+Analysis may send selected, redacted source text to the model provider you
+approve. Analysis does not execute retrieved repository code. Execution occurs
+only when you separately approve `pocarchitect verify run`.
 
-### What can cost money?
+The verifier has no network, uses a read-only source snapshot and root
+filesystem, runs as a non-root user, drops Linux capabilities, applies resource
+and timeout limits, and removes its container afterward. Docker containers still
+share the host kernel. Use a disposable VM or an equivalently isolated runner
+for code outside your organization's container-risk tolerance.
 
-Installation, offline checks, the local demo, source comparison, and dry runs
-do not make a billable model request. A real cloud-provider analysis may incur
-charges under your provider account. The transfer review includes an estimated
-input cost when pricing is known. You can set a maximum with the GUI or the
-`--max-estimated-cost` terminal option.
+**Success check:** You understand that “generated” is not “working”; only a
+successful verification record supports the working-PoC claim.
 
-### What data can leave the computer?
+## 2. Install prerequisites
 
-Only a real approved provider run can send data to an external model provider.
-The provider request can contain the source identifier, selected and redacted
-grounding content, your risk posture and target environment, and the packaged
-analysis instructions. Read the transfer review and remove files you do not
-want to send. Redaction reduces risk but is not a substitute for your review.
+For the smoothest path, use Python 3.12. The project supports Python 3.10
+through 3.14.
 
-## 2. Choose the GUI or terminal
+| Requirement | Why it is needed | Official setup |
+|---|---|---|
+| Python 3.10–3.14 | Runs POCArchitect | [Python downloads](https://www.python.org/downloads/) |
+| Git | Downloads POCArchitect and grounds public GitHub repositories | [Git downloads](https://git-scm.com/downloads) |
+| Docker | Runs the controlled working-PoC verifier | [Docker Desktop](https://docs.docker.com/desktop/) or [Docker Engine](https://docs.docker.com/engine/install/) |
+| Modern browser | Opens the optional local GUI | Use a supported current browser from your organization |
 
-Most first-time users should use the **GUI**. It provides guided configuration,
-provider-readiness feedback, file-by-file transfer controls, cost estimates,
-live progress, and a searchable report library.
+You can create reports without Docker. Docker is required before a candidate
+can receive VERIFIED status.
 
-Use the **terminal** when you need batch processing, automation, machine-readable
-JSON output, or every advanced option. Both interfaces use the same underlying
-analysis service and safety boundary.
+### Windows
 
-This guide installs both. You can switch between them at any time.
-
-## 3. Install Python and Git
-
-You need:
-
-- Python 3.10 or newer;
-- Git for downloading the repository and grounding public GitHub sources;
-- a modern web browser for the GUI; and
-- internet access during installation and for cloud-provider or public GitHub
-  operations.
-
-Python and Git are available from their official download pages:
-
-- [Python downloads](https://www.python.org/downloads/)
-- [Git downloads](https://git-scm.com/downloads)
-
-You do not need administrator access after those applications are installed.
-
-### Windows check
-
-Open **Windows Terminal**, choose **PowerShell**, and run:
+Install Python, Git, and Docker Desktop. Start Docker Desktop, then open
+**Windows Terminal** and choose **PowerShell**:
 
 ```powershell
 py --version
 git --version
+docker version
+docker info
 ```
 
-Successful output resembles:
+If a command is not recognized, finish that application's installer, close the
+terminal, open a new one, and retry.
 
-```text
-Python 3.12.x
-git version 2.x.x
-```
+### macOS
 
-Your exact versions can differ. Python must be at least 3.10.
-
-If `py` is not recognized, install Python from the official installer and
-enable its launcher or PATH option. If `git` is not recognized, install Git.
-Close and reopen Windows Terminal after either installation, then repeat the
-checks.
-
-### macOS or Linux check
-
-Open **Terminal** and run:
+Install Python, Git, and Docker Desktop. Start Docker Desktop, then open
+**Terminal**:
 
 ```bash
 python3 --version
 git --version
+docker version
+docker info
 ```
 
-Successful output resembles:
+### Linux
 
-```text
-Python 3.12.x
-git version 2.x.x
-```
-
-If Python is missing or older than 3.10, install a current Python release. If
-Git is missing, install it using the official installer or your operating
-system's package manager. Open a new terminal and repeat the checks.
-
-On Debian or Ubuntu, the typical prerequisite command is:
+Install Python, its virtual-environment package, Git, and Docker Engine using
+the instructions for your distribution. On Debian or Ubuntu, the Python and Git
+prerequisites are commonly installed with:
 
 ```bash
 sudo apt update
 sudo apt install python3 python3-venv python3-pip git
 ```
 
-On Fedora, the typical command is:
+Install Docker from the official Docker Engine guide, start it, and run:
 
 ```bash
-sudo dnf install python3 python3-pip git
+python3 --version
+git --version
+docker version
+docker info
 ```
 
-These system commands install prerequisites only. Do not use `sudo` for the
-POCArchitect installation later in this guide.
+Do not use `sudo pip`. If Docker reports a permission error, follow Docker's
+documented Linux post-installation guidance or ask your administrator. Access
+to the Docker daemon is security-sensitive and should follow your organization's
+policy.
 
-## 4. Get the POCArchitect files
+**Success check:** Python reports 3.10–3.14, Git reports a version, and
+`docker info` ends without a daemon or permission error.
 
-### Recommended: clone with Git
+## 3. Install POCArchitect
 
-In a folder where you keep projects, run the commands for your system.
+### 3.1 Get the files
+
+Open a terminal in a folder where you keep projects.
 
 Windows PowerShell:
 
 ```powershell
 git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 Set-Location .\POCArchitect-AI-Agent
+Get-ChildItem README.md, pyproject.toml
 ```
 
 macOS or Linux:
@@ -205,44 +169,20 @@ macOS or Linux:
 ```bash
 git clone https://github.com/rikterskale/POCArchitect-AI-Agent.git
 cd POCArchitect-AI-Agent
-```
-
-### Alternative: download a ZIP
-
-If you cannot use Git, download the repository ZIP, extract it to a folder you
-own, and open a terminal in that extracted folder. ZIP installations work, but
-you must download a new ZIP to update later; `git pull` will not work.
-
-### Confirm that you are in the correct folder
-
-Windows PowerShell:
-
-```powershell
-Get-ChildItem README.md, pyproject.toml
-```
-
-macOS or Linux:
-
-```bash
 ls README.md pyproject.toml
 ```
 
-**Success check:** both filenames are printed. All commands in the rest of this
-guide must be run from this folder unless a section explicitly says otherwise.
+If Git is unavailable, download the repository ZIP from GitHub, extract it to a
+folder you own, and open a terminal in that folder. A ZIP install works, but it
+cannot be updated with `git pull`.
 
-If the files are not found, locate the extracted or cloned
-`POCArchitect-AI-Agent` folder and enter it with `Set-Location` on PowerShell or
-`cd` on macOS/Linux.
+**Success check:** both `README.md` and `pyproject.toml` are listed.
 
-## 5. Create an isolated environment and install
+### 3.2 Create an isolated Python environment
 
-A virtual environment keeps POCArchitect's Python packages separate from the
-rest of your computer. The environment used here is a folder named `.venv`
-inside the repository.
+The `.venv` folder keeps POCArchitect's packages separate from system Python.
 
-### Windows PowerShell
-
-Run:
+Windows PowerShell:
 
 ```powershell
 py -m venv .venv
@@ -251,19 +191,14 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[gui]"
 ```
 
-If PowerShell says script execution is disabled, allow activation for this
-terminal only, then retry it:
+If PowerShell blocks activation, allow it for this terminal only:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
-The policy change ends when you close that terminal.
-
-### macOS or Linux
-
-Run:
+macOS or Linux:
 
 ```bash
 python3 -m venv .venv
@@ -272,744 +207,452 @@ python -m pip install --upgrade pip
 python -m pip install -e '.[gui]'
 ```
 
-### Confirm that the environment is active
-
-Many terminals show `(.venv)` at the start of the prompt. You can also check
-the Python path.
-
-Windows PowerShell:
-
-```powershell
-Get-Command python
-```
-
-macOS or Linux:
-
-```bash
-which python
-```
-
-**Success check:** the printed path is inside this repository's `.venv` folder.
-Then verify POCArchitect:
+Confirm the installed command:
 
 ```text
 python -m pocarchitect --version
+python -m pocarchitect preflight --offline --format json --no-color
 ```
 
-Expected output starts with `POCArchitect v`.
+**Success check:** the version starts with `POCArchitect v`, and every offline
+preflight row passes.
 
 > [!TIP]
-> Every time you open a new terminal, return to the repository folder and
-> activate `.venv` again. You install only once, but you activate once per
-> terminal session.
+> Install once, but activate `.venv` in each new terminal. Use
+> `.\.venv\Scripts\Activate.ps1` on Windows or `. .venv/bin/activate` on
+> macOS/Linux.
 
-To activate again later:
+## 4. Prove the installation works
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-```bash
-. .venv/bin/activate
-```
-
-## 6. Prove the installation works without credentials
-
-Run the complete credential-free first-day check:
+Run the complete credential-free check:
 
 ```text
 python -m pocarchitect quickstart
 ```
 
-This command:
+Quickstart diagnoses the installation and creates a deterministic demonstration
+report under `reports/demo/`. It does not need a provider key, contact a model
+provider, start a server, or incur provider cost.
 
-1. checks the local installation and report directory;
-2. uses no cloud credential;
-3. uses a deterministic offline response without starting a server;
-4. creates a real demonstration report under `reports/demo/`; and
-5. makes no network request and incurs no provider cost.
-
-**Success check:** the diagnosis passes and a report path under `reports/demo/`
-is printed. Open that Markdown file in a text editor to confirm that a report
-was created.
-
-This verifies the command-line installation. After you launch the GUI, its
-**Create credential-free demo** action gives you a second, one-click check of
-the complete browser-to-report experience. Neither path needs provider setup.
-
-If you want to run the two parts separately:
+The same checks can be run separately:
 
 ```text
 python -m pocarchitect doctor --offline
 python -m pocarchitect demo
 ```
 
-For a safe prompt preview that creates no report and contacts no source or
-provider, run:
+**Success check:** quickstart reports success and prints the path to a Markdown
+file under `reports/demo/`.
+
+### Try the local GUI
 
 ```text
-python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color
+pocarchitect gui --help
+pocarchitect gui
 ```
 
-The `example/poc` URL is intentionally a placeholder. `--no-ingest` prevents a
-clone attempt, and `--dry-run` stops before any provider call.
+Your browser should open a protected workspace on `127.0.0.1`. Select **Create
+credential-free demo**. If the browser does not open, stop the command with
+`Ctrl+C`, run `pocarchitect gui --no-open`, and paste the complete one-time URL
+into your browser.
 
-For the same safe check as machine-readable JSON Lines, run:
+Never expose or reverse-proxy the GUI. It is a loopback-only workspace for one
+local operator. Do not share its launch URL or token.
+
+**Success check:** the GUI shows **Ready**, the demo completes, and its report
+appears in **Reports**.
+
+### Try a safe terminal preview
 
 ```text
 python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --format json --no-color
 ```
 
-If any command fails, do not configure a real provider yet. Go to
-[Troubleshoot problems](#15-troubleshoot-problems), fix the installation, and
-repeat `quickstart` until it succeeds.
+The placeholder URL is intentional. This command does not clone a repository,
+call a provider, or create a real analysis report.
 
-## 7. Configure a provider safely
+## 5. Create your first VERIFIED PoC
 
-An analysis of a real source needs either a cloud provider or a running local
-OpenAI-compatible endpoint. You need only one.
+This journey has four gates. Do not skip the review gate.
 
-> [!TIP]
-> Provider setup is optional for the credential-free GUI demo. To see the
-> finished experience first, skip to [Launch and use the GUI](#8-launch-and-use-the-gui),
-> create the demo, and return here only when you want to analyze a real source.
+### 5.1 Configure one provider
 
-| Choice | What you need | Credential name |
-|---|---|---|
-| xAI | An xAI account and API key | `XAI_API_KEY` |
-| OpenAI | An OpenAI API account and key | `OPENAI_API_KEY` |
-| Groq | A Groq API account and key | `GROQ_API_KEY` |
-| Local endpoint | A running OpenAI-compatible service and model | No cloud key |
-
-Provider subscriptions and chat-product subscriptions do not necessarily
-include API usage. Obtain the credential from the provider's API console and
-review that provider's pricing and data-handling terms before a real run.
-
-### Recommended: use the guided setup
-
-If the GUI is already running, leave it open. Open a second terminal in the
-repository folder, activate `.venv`, and run:
+Run the interactive setup wizard:
 
 ```text
 pocarchitect setup
 ```
 
-The wizard asks you to:
+Choose xAI, OpenAI, Groq, or a local OpenAI-compatible endpoint. Cloud keys are
+stored in the repository's ignored `.env` file and are never intentionally
+printed. Only these exact cloud variable names are recognized:
 
-1. choose `xai`, `openai`, `groq`, or `local`;
-2. paste the matching cloud key using hidden input, or enter a local endpoint;
-3. run readiness checks; and
-4. optionally run another safe dry run.
+- `XAI_API_KEY`
+- `OPENAI_API_KEY`
+- `GROQ_API_KEY`
 
-For a cloud provider, the key is written to `.env` in the current repository
-folder and is not printed. For a local provider, the wizard checks the endpoint
-but does not manage or start the local service.
-
-Return to the GUI and select **Recheck** in the **Provider readiness** card. A
-newly added key becomes available immediately. If setup replaces a key that the
-GUI process had already loaded, restart the GUI before using the replacement.
-
-After setup, view the effective configuration with masked credentials:
+Check the result without exposing the key:
 
 ```text
 pocarchitect config
-```
-
-### Manual cloud-provider setup
-
-Use this path if you prefer to edit the configuration yourself.
-
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-notepad .env
-```
-
-macOS:
-
-```bash
-cp .env.example .env
-open -e .env
-```
-
-Linux:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Replace only the placeholder for the provider you will use. For example:
-
-```text
-OPENAI_API_KEY=replace_this_with_your_real_key
-```
-
-Do not add quotes unless the provider's key itself requires them. Save the
-file, close the editor, and verify that Git ignores it:
-
-```text
+pocarchitect preflight --provider openai
 git check-ignore .env
 ```
 
-**Success check:** Git prints `.env`. Never run `git add -f .env`, paste a key
-into a terminal command, place it in a screenshot, or include it in an issue.
-
-Verify the selected cloud provider without printing the key:
-
-```text
-pocarchitect preflight --provider openai
-```
-
-Replace `openai` with `xai` or `groq` when appropriate.
-
-### Local provider setup
-
-POCArchitect's default local endpoint is:
-
-```text
-http://localhost:11434/v1
-```
-
-Your local service must already be running and expose an OpenAI-compatible API.
-It must also have the model you select. Check the endpoint with:
+Replace `openai` with the provider you selected. For a local provider, use:
 
 ```text
 pocarchitect preflight --provider local --base-url http://localhost:11434/v1
 ```
 
-This confirms the endpoint's model-list response. It does not prove that a
-specific model can complete the full report prompt. See the
-[local-provider guide](ollama-setup-guide.md) for the Ollama-oriented setup and
-troubleshooting path.
+**Success check:** preflight reports that the selected provider is ready, and
+`git check-ignore .env` prints `.env` for a cloud-provider setup.
 
-## 8. Launch and use the GUI
+> [!CAUTION]
+> Never commit `.env`, paste a key into a command, include a key in a screenshot,
+> or attach `.env` to an issue. Provider API usage can cost money. Review the
+> transfer estimate and the provider's current pricing and data policy.
+
+### 5.2 Analyze an authorized source and create a scaffold
+
+The GUI is easiest:
+
+1. Start `pocarchitect gui`.
+2. Enter an authorized public GitHub repository or local directory.
+3. Select the configured provider.
+4. Keep **Ground source files** enabled.
+5. Enable **Create safe scaffold** under **Advanced controls**.
+6. Select **Prepare transfer review**.
+7. Review every filename, redaction count, and estimated cost.
+8. Remove anything that should not leave the computer.
+9. Confirm authorization and select **Approve and run analysis**.
+
+The equivalent terminal command for a public repository is:
+
+```text
+pocarchitect --url https://github.com/OWNER/REPOSITORY --provider openai --curate --scaffold --scaffold-output poc-blueprint
+```
+
+Replace `OWNER/REPOSITORY` and `openai`. For a private local checkout:
+
+```text
+pocarchitect --path ./authorized-source --provider openai --curate --scaffold --scaffold-output poc-blueprint
+```
+
+The terminal shows a transfer preview and asks before contacting the provider.
+Do not use `--yes` until an automated workflow has an equivalent approval gate.
+
+**Success check:** POCArchitect prints both the report and scaffold paths. The
+terminal example creates `poc-blueprint/.pocarchitect/poc-verification.json`;
+the GUI uses the source name in its scaffold path.
+
+### 5.3 Review the candidate
+
+Open the printed scaffold path in your editor. The terminal examples call this
+folder `poc-blueprint`. Before execution:
+
+1. Read every generated file.
+2. Confirm dependencies are declared and intentionally pinned where practical.
+3. Remove unrelated or unsafe behavior.
+4. Replace placeholder tests with meaningful acceptance tests.
+5. Make the test assert observable PoC behavior in an isolated local fixture.
+6. Keep secrets, live credentials, and public targets out of the candidate.
+7. Review `.pocarchitect/poc-verification.json`.
+
+The contract starts as `draft`. Set a concise `authorization`, verify the
+`image`, `build_commands`, `test_commands`, and `required_artifacts`, then set
+`implementation_status` to `ready`. A ready contract must have at least one
+explicit test command.
+
+If you are creating a contract for an existing implementation instead, run:
+
+```text
+pocarchitect verify init ./authorized-poc --authorization "Ticket SEC-123; isolated lab"
+```
+
+This also creates a draft. See the focused [Working PoC Verification
+Guide](verification-guide.md) for non-Python toolchains and the complete schema.
+
+### 5.4 Prepare the reviewed Docker image
+
+POCArchitect never pulls a verification image automatically. Pull and review
+the exact image declared in the contract. For a Python 3.12 candidate, the
+default example is:
+
+```text
+docker pull python:3.12-slim
+docker image inspect python:3.12-slim
+```
+
+Use the contract's actual image for another toolchain. For durable evidence,
+prefer a reviewed digest instead of a mutable tag. The verifier resolves the
+local image to an immutable ID and starts Docker with that ID.
+
+**Success check:** `docker image inspect` returns image metadata without an
+error.
+
+### 5.5 Run the verification gate
+
+From the POCArchitect repository folder, replace `./poc-blueprint` if the GUI
+printed a different scaffold path:
+
+```text
+pocarchitect verify run ./poc-blueprint
+```
+
+Read the confirmation and approve only the reviewed, authorized candidate. In
+non-interactive CI, `--yes` is required because no prompt can be displayed:
+
+```text
+pocarchitect verify run ./poc-blueprint --yes
+```
+
+Interpret the result literally:
+
+| Result | Meaning | Next action |
+|---|---|---|
+| `VERIFIED` / exit 0 | Every declared step and cleanup passed | Retain the JSON evidence with the assessment record |
+| `NOT VERIFIED` / exit 1 | A build, test, artifact, or cleanup step failed | Open the evidence, fix the named step, and run again |
+| Verification error / exit 2 | Contract, authorization, Docker, confirmation, or input was not ready | Correct the configuration; no working claim was made |
+
+Evidence is private, collision-safe JSON under `reports/` unless you selected
+another `--evidence` path. A changed source, contract, or image requires a new
+verification.
+
+**Success check:** the final event says **VERIFIED**, all step counts match, and
+the evidence file exists. That is the working PoC.
+
+## 6. Use POCArchitect day to day
 
 ### Start the GUI
-
-With `.venv` active and from the repository folder, run:
 
 ```text
 pocarchitect gui
 ```
 
-The terminal remains occupied while the GUI runs. Your default browser should
-open automatically.
+Stop it with `Ctrl+C`. It does not install a background service.
 
-**Success check:** the browser shows POCArchitect with a **Ready** and **Secure
-local session** indicator. The terminal shows the local address but no request
-log noise.
-
-Do not close the terminal while using the GUI. Press `Ctrl+C` in that terminal
-when you are finished.
-
-### If the browser does not open
-
-Stop the command with `Ctrl+C`, then run:
+### Analyze a local directory
 
 ```text
-pocarchitect gui --no-open
+pocarchitect --path ./authorized-source --provider openai --curate
 ```
 
-Copy the complete one-time launch URL printed in the terminal, including the
-`?token=...` part, and paste it into your browser. Do not share that URL.
-
-If port 8765 is already in use, choose another port:
-
-```text
-pocarchitect gui --port 8876
-```
-
-### See the finish line without setup
-
-Before entering any configuration, select **Create credential-free demo** in
-the initial **Transfer review** panel. POCArchitect creates and opens a
-deterministic local example report without reading a source, contacting a
-provider, using a credential, running plugins, or incurring cost.
-
-This proves the browser-to-report path and places the example under
-`reports/demo/`, where it is also available from **Reports**. Select **New
-analysis** from the completed demo when you are ready to enter an authorized
-source. A real analysis still requires the normal transfer review and explicit
-approval.
-
-### Configure the analysis
-
-The left panel is **Analysis configuration**.
-
-1. Choose **Repository or source** for a GitHub repository, package, image, or
-   advisory URL. Choose **Local directory** for a folder already on this
-   computer.
-2. Enter the source. Accepted examples include `owner/repository`,
-   `pypi:package`, `docker:image`, and an HTTP(S) URL.
-3. Choose the configured provider.
-4. Review the model. For a local provider, the model name must exist on the
-   local service.
-5. Choose the risk posture and target environment.
-6. Keep **Ground source files** enabled when you want bounded evidence from a
-   public GitHub repository or local directory.
-7. Keep **Include mitigations** enabled when the report should include defensive
-   guidance.
-
-The provider-readiness card on the right reports whether a cloud credential is
-present. It never displays the credential value. The GUI preselects the default
-provider when it is ready; otherwise it preselects the first configured cloud
-provider. If no cloud provider is configured, it keeps the default visible and
-offers the exact setup command.
-
-If you add a previously missing key to `.env` while the GUI is open, select
-**Recheck** in the provider-readiness card. The new key becomes available without
-a restart. If you replace the value of a key that was already loaded, restart
-the GUI so the original process environment cannot silently change underneath
-an active session.
-
-### Optional advanced controls
-
-Open **Advanced controls** only when needed:
-
-- **Output format** also exports Markdown, HTML, PDF, or JSON.
-- **Maximum input cost** blocks the run if its estimated input cost is higher.
-- **Output directory** changes where the report is written.
-- **OSV enrichment** queries public vulnerability records for exact dependency
-  versions discovered in the selected text.
-- **Compare with previous** saves a diff against the latest matching report.
-- **Create safe scaffold** materializes a candidate implementation and draft
-  verification contract from the report.
-
-Network enrichment can take additional time. Start with the defaults for your
-first report.
-
-### Prepare the transfer review
-
-Select **Prepare transfer review**.
-
-At this point POCArchitect may read or clone the source, but it has **not** made
-a model-provider call. The configuration locks so the review always matches
-the prepared request.
-
-If you need to change an entry, select **Edit configuration**. Your form values
-remain in place, and the prepared review is discarded so you can prepare a new
-one that matches the revised settings.
-
-The transfer review shows:
-
-- the selected file count;
-- total selected file size;
-- estimated input tokens and cost;
-- recognized secret-pattern redactions; and
-- the exact bounded files proposed for transfer.
-
-Uncheck any file that should not leave the computer. Size, token, cost, and
-redaction metadata are recalculated locally after each change. A prepared
-review expires after 30 minutes and can be approved only once.
-
-If preparation reports that ingestion failed, fix the URL, Git, permissions,
-or network problem. No provider call is made after a grounding failure. If you
-intentionally want URL-only context, start a new analysis and disable **Ground
-source files**.
-
-### Approve and run
-
-Only after the transfer looks correct:
-
-1. Read the authorization statement.
-2. Select its checkbox.
-3. Select **Approve and run analysis**.
-
-The progress view shows the queue, provider, report-writing, and completion
-phases. If the page refreshes, the GUI recovers the active run while the same
-terminal process remains open. Do not submit the same source repeatedly while
-a run is active.
-
-### Review and save the result
-
-After completion you can:
-
-- read the safely rendered report;
-- copy the Markdown;
-- download the selected export format; or
-- open **Reports** to search recent Markdown reports.
-
-The report library includes Markdown reports in the default output directory,
-credential-free reports under `reports/demo/`, and reports written to a custom
-output directory during the current GUI session.
-
-Generated model output can be wrong or incomplete. Review claims, commands,
-and mitigations before acting on them.
-
-## 9. Create a report from the terminal
-
-The GUI is recommended for the first run, but the equivalent terminal workflow
-is useful for repeatable commands.
-
-### Public GitHub repository
-
-Replace `OWNER/REPOSITORY` with an authorized public repository:
-
-```text
-pocarchitect --url https://github.com/OWNER/REPOSITORY --provider openai --curate
-```
-
-`--curate` lets you exclude selected file numbers before the transfer preview.
-Replace `openai` with the provider you configured.
-
-### Local directory
-
-Windows example:
-
-```powershell
-pocarchitect --path "C:\Users\YourName\source-project" --provider openai --curate
-```
-
-macOS or Linux example:
-
-```bash
-pocarchitect --path "/home/yourname/source-project" --provider openai --curate
-```
-
-Use a real path that you are authorized to read.
-
-### URL-only analysis
-
-For a non-GitHub URL, package identifier, container image, or an intentional
-URL-only GitHub analysis:
-
-```text
-pocarchitect --source pypi:example-package --provider openai --no-ingest
-```
-
-### Preview before a real run
-
-Add `--dry-run` to preview the request without contacting the provider:
+### Preview without a provider call
 
 ```text
 pocarchitect --url https://github.com/OWNER/REPOSITORY --provider openai --no-ingest --dry-run
 ```
 
-Use `--full` with `--dry-run` to print the entire provider-facing prompt. Treat
-that output as potentially sensitive when real local context is included.
+Add `--full` only when you are prepared to handle the full provider-facing
+prompt as potentially sensitive output.
 
-### Limit estimated input cost
+### Work with reports
 
-This example blocks the provider call if the known estimated input cost exceeds
-ten US cents:
-
-```text
-pocarchitect --url https://github.com/OWNER/REPOSITORY --provider openai --max-estimated-cost 0.10
-```
-
-### What to expect in the terminal
-
-A real grounded command performs preflight, selects files, shows a redacted
-preview, and asks for confirmation. Enter `y` only when the source, provider,
-and transfer are authorized. The `--yes` option bypasses confirmation; do not
-use it until you have already reviewed and approved an automated workflow.
-
-On success, the command prints the absolute report path. On failure, it exits
-without creating a successful report and prints a corrective message.
-
-## 10. Understand grounding, redaction, cost, and approval
-
-### Grounding limits
-
-Grounding is intentionally bounded. POCArchitect:
-
-- scans at most 20,000 files;
-- stops if the scanned source exceeds 5,000,000 bytes;
-- skips individual files larger than 250,000 bytes;
-- selects at most 25 matching files;
-- truncates selected file content after 7,500 characters per file; and
-- stops if selected grounding exceeds 180,000 characters.
-
-It ignores common dependency and environment folders such as `.git`, `.venv`,
-`node_modules`, and `__pycache__`, and it does not follow directory symlinks.
-
-### Redaction
-
-POCArchitect recognizes common API-key, token, password, bearer-token,
-private-key, and cloud-credential patterns and replaces their values before the
-provider request. The review reports categories and match counts, not secret
-values.
-
-Pattern matching cannot recognize every sensitive value. Do not store secrets
-in source when avoidable, and always review selected filenames and metadata.
-
-### Approval boundary
-
-Preparation and approval are separate operations. In the GUI, the prepared
-content remains in backend memory, expires, and is consumed after one approval.
-In the terminal, an interactive confirmation is required unless `--yes` was
-explicitly provided.
-
-### Cost estimate
-
-The estimate covers input tokens when the selected model has known pricing. It
-is approximate and may not include provider-specific billing details, output
-tokens, taxes, minimum charges, or later pricing changes. An unavailable
-estimate is not the same as a free request.
-
-## 11. Work with reports
-
-Reports are written to `reports/` by default. A report filename begins with
-`POCAnalysis_` and includes a source slug and UTC timestamp. The Markdown front
-matter records the source, provider, model, time, ingestion result, selected
-file count, and response hash.
-
-### List report history
+Replace the sample filenames before commands that read an existing report:
 
 ```text
 pocarchitect history --output-dir reports
-```
-
-### Compare two reports
-
-```text
 pocarchitect diff reports/older-report.md reports/newer-report.md
-```
-
-Replace both filenames with real reports. Add `--output reports/change.diff`
-to save the comparison.
-
-### Export a Markdown report
-
-```text
 pocarchitect export reports/your-report.md --format html
-```
-
-Available formats are `markdown`, `html`, `pdf`, and `json`. Replace the sample
-filename before running the command.
-
-### Create a safe scaffold
-
-```text
 pocarchitect scaffold --report reports/your-report.md --output blueprint
-```
-
-The scaffold materializes strictly named files from the report's
-`Implementation Bundle` when present and creates a draft verification contract.
-Generated code is still only a candidate. Inspect every file, add meaningful
-acceptance tests, document the approved lab scope, and use the separate
-`pocarchitect verify run` gate before calling it working. Follow the
-[Working PoC Verification Guide](verification-guide.md) for the complete
-contract and sandbox workflow.
-
-### Keep or back up reports
-
-Reports may contain sensitive source-derived information even after redaction.
-Store them according to your organization's data-handling policy. Back up any
-reports you need before deleting the repository or report directory.
-
-## 12. Analyze multiple sources
-
-### Provider-free comparison
-
-Compare two local candidates without a model-provider request:
-
-```text
 pocarchitect compare ./candidate-a ./candidate-b --output reports/comparison.md
 ```
 
-### Batch provider analysis
+Reports can contain sensitive assessment data. Store and share them under your
+organization's data-handling policy.
 
-Create a plain-text file such as `sources.txt`. Put one authorized source on
-each line. Blank lines and lines beginning with `#` are ignored:
+### Process several authorized sources
+
+Create `sources.txt` with one URL per line. Blank lines and full-line comments
+beginning with `#` are ignored:
 
 ```text
-# Authorized assessment sources
+# Approved assessment scope
 https://github.com/OWNER/FIRST-REPOSITORY
 https://github.com/OWNER/SECOND-REPOSITORY
 ```
 
-Then run:
+Run:
 
 ```text
 pocarchitect --batch sources.txt --provider openai
 ```
 
-Batch progress is recorded in `reports/batch_progress.json` by default. A
-rerun skips completed items and retries unfinished ones.
-
-Inspect recovery state without making a provider call:
+Inspect or recover batch state without a provider call:
 
 ```text
 python -m pocarchitect --format json --no-color batch-status --batch-state reports/batch_progress.json
-```
-
-Reset the ledger recoverably:
-
-```text
 python -m pocarchitect --format json --no-color batch-reset --batch-state reports/batch_progress.json --yes
 ```
 
-Reset moves the old ledger to a timestamped backup instead of deleting it.
-Inspect failures and keep the backup until the replacement batch succeeds.
+Reset moves the existing ledger to a timestamped backup instead of deleting it.
 
-## 13. Set reusable project defaults
-
-Run this inside a source repository when you want that project to remember
-non-secret defaults:
+### Remember non-secret project defaults
 
 ```text
 pocarchitect init
-```
-
-It creates `.pocarchitect.toml`. You can store provider name, risk level,
-target operating system, mitigation preference, output directory, and report
-format there. Provider keys never belong in that file; keep them in `.env` or a
-protected environment variable.
-
-Explicit terminal options override project defaults. Existing environment
-variables override matching `.env` keys. View the effective result with:
-
-```text
 pocarchitect config
-```
-
-View provider defaults and known model alternatives with:
-
-```text
 pocarchitect models
 ```
 
-## 14. Use POCArchitect safely every day
+`pocarchitect init` creates `.pocarchitect.toml`. Never store provider keys in
+that file.
 
-Before each real analysis:
+## 7. Remediate a finding safely
 
-- Confirm written authorization and scope.
-- Activate the correct `.venv`.
-- Confirm the selected provider and model.
-- Check that the source is the intended public repository or local directory.
-- Review every selected grounding filename.
-- Review redaction counts and remove questionable files.
-- Review the estimated cost or set a cost limit.
-- Approve the transfer only once you understand it.
+POCArchitect explains findings and mitigations; it does not silently modify the
+reviewed repository. Use this controlled remediation loop:
 
-After each analysis:
+1. Confirm the finding against source evidence and the authorized scope.
+2. Reproduce it only in the isolated lab. Retain the baseline report and, when
+   appropriate, baseline verification evidence.
+3. Create a normal source-control branch in the affected project.
+4. Make the smallest defensible fix and add a regression test.
+5. Run that project's normal test and security checks.
+6. Analyze the remediated source again.
+7. Compare the before and after reports.
+8. Confirm the vulnerable behavior is blocked and intended behavior still
+   works.
+9. Record the fix, test output, reviewer, and residual risk in the issue.
 
-- Read the entire report before using its conclusions.
-- Independently verify high-impact findings and commands.
-- Protect the report as assessment data.
-- Stop the GUI with `Ctrl+C` when finished.
-- Keep `.env` private and never attach it to an issue.
+For a second analysis, use the same options and add `--diff`, or compare two
+saved reports directly:
 
-Never expose or reverse-proxy the GUI. It is intentionally bound to this
-computer and designed for one local operator, not as a hosted or multi-user
-service.
+```text
+pocarchitect diff reports/older-report.md reports/newer-report.md
+```
 
-## 15. Troubleshoot problems
+Do not close an issue merely because a model suggested a patch or severity. A
+human reviewer must validate the code change and evidence. For teams that need
+durable finding states and approval gates, continue with the
+[finding-driven workflow guide](finding-workflow.md).
+
+**Success check:** the fix has a passing regression test, an independently
+reviewed code change, and retained before/after evidence.
+
+## 8. Troubleshoot and repair
 
 Start with the built-in diagnosis:
 
 ```text
 pocarchitect doctor --offline
+pocarchitect doctor --offline --fix
 ```
 
-For a configured cloud provider:
+Use `--fix` only after reading the proposed repair. For a configured provider:
 
 ```text
 pocarchitect doctor --provider openai
 ```
 
-For a local provider:
-
-```text
-pocarchitect doctor --provider local --base-url http://localhost:11434/v1
-```
-
-Replace `openai` or the endpoint as needed.
-
 ### Troubleshooting matrix
 
-| Symptom | Likely cause | Fix | Confirm the fix |
-|---|---|---|---|
-| `py`, `python3`, or `python` is not recognized | Python is missing or the terminal has not refreshed | Install Python 3.10+, close the terminal, and open a new one | Run the matching version command from Section 3 |
-| Python is older than 3.10 | An unsupported interpreter is first on PATH | Install a newer Python and recreate `.venv` with it | `python --version` inside `.venv` reports 3.10+ |
-| `git` is not recognized | Git is missing or not on PATH | Install Git and reopen the terminal | `git --version` prints a version |
-| `pyproject.toml` is not found | The terminal is in the wrong folder | Enter the cloned or extracted repository folder | The folder check in Section 4 prints both files |
-| PowerShell blocks `Activate.ps1` | Script execution is restricted | Use the process-scoped policy command in Section 5 | The Python path points inside `.venv` |
-| `externally-managed-environment` appears | Installation is using system Python instead of `.venv` | Activate `.venv`; do not use `sudo pip` | `python -m pip show pocarchitect` prints package details |
-| `No module named pocarchitect` | `.venv` is inactive or installation failed | Activate `.venv`, then rerun `python -m pip install -e ".[gui]"` | `python -m pocarchitect --version` succeeds |
-| Dependency download or certificate error | Network, proxy, certificate, or package-index access failed | Confirm browser access, then configure the organization's approved proxy/certificate settings and retry | The installation finishes without an error |
-| GUI says dependencies are not installed | The project was installed without the GUI extra | Run `python -m pip install -e ".[gui]"` inside `.venv` | `pocarchitect gui --help` succeeds |
-| Browser does not open | Automatic browser launching is unavailable | Run `pocarchitect gui --no-open` and copy the complete launch URL | The workspace shows **Ready** |
-| `Address already in use` | Another application is using port 8765 | Run `pocarchitect gui --port 8876` | The browser opens the new address |
-| `Open the GUI from its launch URL` or `GUI session required` | The browser lacks the launch cookie or the process was restarted | Stop and relaunch with `--no-open`, then use the new complete URL | `/` opens the workspace rather than an error |
-| GUI shows **Disconnected** | The terminal process stopped or the local connection was interrupted | Confirm the GUI terminal is still running; otherwise relaunch it | The status returns to **Ready** |
-| Provider needs configuration | The selected cloud key is missing, a placeholder, or the GUI has not rechecked it | Run `pocarchitect setup` or fix `.env`, then select **Recheck**; restart only when replacing a key already loaded by the GUI | Provider readiness reports available |
-| `No API key found` | The key name does not match the selected provider | Use `XAI_API_KEY`, `OPENAI_API_KEY`, or `GROQ_API_KEY` exactly | Provider preflight passes |
-| Local endpoint unavailable | The local service is stopped, its URL differs, or it lacks `/v1` compatibility | Start the service and pass its correct base URL | Local preflight passes |
-| Model not found | The model name is unavailable to the account or local service | Run `pocarchitect models` and check the provider's available models | Retry with an available model |
-| GitHub ingestion fails | The repository is private/unreachable, Git is unavailable, or network access failed | Confirm authorization, public access, Git, URL, and network; then retry | Preparation lists grounded files |
-| Source exceeds a limit | The directory is too large for bounded grounding | Analyze a smaller authorized subtree or disable ingestion for URL-only context | Preparation completes within the documented limits |
-| Estimated cost exceeds limit | The selected files exceed your configured threshold | Remove files or deliberately raise the limit in a new analysis | Review shows the payload is within the limit |
-| No grounding files appear | No eligible text files matched, or grounding was disabled | Confirm the source and toggle; use URL-only context only when intentional | Review shows expected files or clearly states URL-only |
-| Report cannot be written | The output path is unavailable or read-only | Choose a folder you own and run offline preflight with `--output-dir` | Preflight reports the directory is writable |
-| Batch exits with status 1 | At least one item failed while others continued | Inspect `batch-status`, correct the failed sources, and rerun the same batch | Failed count becomes zero |
-| A command displays too much terminal styling | The terminal does not support the output | Add `--no-color`; use `--format json` for automation | Output is plain text or JSON Lines |
+| Symptom | Cause | Repair |
+|---|---|---|
+| `python`, `python3`, or `py` is not recognized | Python is missing or the terminal is stale | Install Python, open a new terminal, and repeat Section 2 |
+| Python is older than 3.10 | Unsupported interpreter is first on PATH | Install Python 3.10–3.14 and recreate `.venv` |
+| `git` is not recognized | Git is missing or not on PATH | Install Git and open a new terminal |
+| `pyproject.toml` is missing | Terminal is in the wrong folder | Enter `POCArchitect-AI-Agent` and rerun the folder check |
+| PowerShell blocks `Activate.ps1` | Script policy blocks activation | Use the process-scoped command in Section 3; do not change machine policy |
+| `externally-managed-environment` | System Python is active | Activate `.venv`; never use `sudo pip` |
+| `No module named pocarchitect` | `.venv` is inactive or installation failed | Activate it and repeat the install command |
+| Dependency or certificate download fails | Network, proxy, CA, or package index is unavailable | Use your organization's approved proxy/CA settings and retry |
+| GUI dependencies are missing | Installed without the GUI extra | Run `python -m pip install -e ".[gui]"` in the active environment |
+| Browser does not open | Automatic browser launch failed | Use `pocarchitect gui --no-open` and open the full printed URL |
+| `Address already in use` | Port 8765 is occupied | Run `pocarchitect gui --port 8876` |
+| Provider needs configuration | Key is missing, placeholder, or stale in the GUI process | Run `pocarchitect setup`, then **Recheck** or restart after replacing a loaded key |
+| Provider returns 401/403 | Key is invalid or lacks access | Correct the selected provider key; never paste it into an issue |
+| Provider returns 429 | Rate or quota limit | Wait, reduce request frequency, or resolve quota with the provider |
+| Model not found | Model is unavailable to the account or endpoint | Run `pocarchitect models` and choose an available model |
+| GitHub ingestion fails | URL, Git, network, access, or repository visibility issue | Confirm the authorized public URL and run `git --version` |
+| Report cannot be written | Output directory is missing or read-only | Choose a folder you own and preflight it with `--output-dir` |
+| `Docker was not found` | Docker is not installed or not on PATH | Install Docker, open a new terminal, and run `docker info` |
+| Docker is unavailable | Daemon is stopped or permission is denied | Start Docker Desktop/Engine and resolve daemon access under local policy |
+| Verification image is unavailable | Contract image is not present locally | Review and explicitly `docker pull` that exact image |
+| Implementation is still draft | Review gate has not been completed | Review code and contract, then set `implementation_status` to `ready` |
+| Authorization is required | Contract scope is blank | Add the approved ticket/lab scope; do not invent authorization |
+| Test command is required | Ready contract has no meaningful acceptance test | Add and review at least one explicit test command |
+| `NOT VERIFIED` names a build or test | Candidate does not satisfy its contract | Read bounded stdout/stderr in the evidence and fix the named step |
+| Required artifact failed | Declared output is missing or traverses a symlink | Correct the build or artifact path; do not weaken the assertion to hide failure |
+| Verification timed out | Command exceeded its limit or hung | Fix the command; raise `--timeout` only with a documented reason |
+| Evidence path already exists | Evidence is intentionally never overwritten | Choose a new evidence path; retain or deliberately archive the old record |
+| Network-dependent test fails in verification | Sandbox networking is intentionally disabled | Use a self-contained local mock or a separately governed lab pipeline |
 
-### Still stuck? Rebuild the virtual environment
+### Rebuild a damaged virtual environment
 
-Do this only after closing programs that use `.venv`. Preserve `.env` and
-reports; they are separate from `.venv`.
+Close POCArchitect, run `deactivate` if available, and rename the old
+environment instead of deleting it immediately.
 
-1. Run `deactivate` if the environment is active.
-2. Delete only the `.venv` folder inside the repository.
-3. Repeat Section 5.
-4. Repeat `python -m pocarchitect quickstart`.
+Windows PowerShell:
 
-Do not delete the entire repository as a first troubleshooting step.
-
-## 16. Update, stop, clean up, or uninstall
-
-### Stop a running command or GUI
-
-Press `Ctrl+C` in the terminal running POCArchitect. The GUI does not install a
-background service. POCArchitect also does not start or stop your local model
-provider.
-
-### Leave the virtual environment
-
-```text
-deactivate
-```
-
-This does not uninstall anything. Activate `.venv` again the next time you use
-the tool.
-
-### Update a Git clone
-
-From the repository folder:
-
-```text
-git status --short
-git pull
+```powershell
+Rename-Item .venv .venv-old
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -e ".[gui]"
 python -m pocarchitect quickstart
 ```
 
-If `git status` shows changes you made, preserve or commit them before pulling.
-Do not discard local work just to update. For a ZIP installation, download and
-extract a fresh ZIP instead.
+macOS or Linux:
 
-### Remove demonstration output
+```bash
+mv .venv .venv-old
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '.[gui]'
+python -m pocarchitect quickstart
+```
 
-The credential-free demo writes under `reports/demo/`. Inspect that directory
-before deleting it. Keep real reports and batch-ledger backups you still need.
+After the new environment passes, remove `.venv-old` using your file manager or
+your organization's normal cleanup process.
 
-### Uninstall completely
+**Success check:** quickstart passes again before you retry a real source or
+provider.
 
-1. Stop POCArchitect and run `deactivate`.
-2. Back up reports you need.
-3. Back up the provider key only if you have an approved secure destination.
-4. Delete the repository folder.
+## 9. Update, back up, or uninstall
 
-Because the virtual environment and `.env` are inside the repository, deleting
-the folder removes them too. POCArchitect does not install a system service.
+### Update a Git clone
 
-## 17. Collect safe diagnostic information
+Activate `.venv`, then run from the repository folder:
 
-Before opening an issue, run:
+```text
+git status --short
+git pull --ff-only
+python -m pip install -e ".[gui]"
+python -m pocarchitect quickstart
+```
+
+If `git status` lists changes, preserve or commit your work before pulling. Do
+not discard local work just to update. ZIP users should extract a fresh download
+to a new folder and copy only approved configuration and reports.
+
+### Back up
+
+Back up these items according to your data policy:
+
+- reports and verification evidence you must retain;
+- batch ledgers and workflow state;
+- reviewed project configuration; and
+- provider credentials only to an approved secret manager.
+
+Never put `.env` in an ordinary backup, ticket, chat, or source repository.
+
+### Uninstall
+
+1. Stop the GUI or command with `Ctrl+C`.
+2. Run `deactivate`.
+3. Back up required reports and evidence.
+4. Delete the POCArchitect folder with your file manager.
+
+POCArchitect does not install a system service. The local `.venv` and `.env`
+are removed with the project folder.
+
+### Ask for help safely
+
+Collect these diagnostics:
 
 ```text
 python -m pocarchitect --version
@@ -1017,87 +660,70 @@ python -m pocarchitect preflight --offline --format json --no-color
 git status --short
 ```
 
-Record:
+Include the operating system, Python version, sanitized command, exit code, and
+smallest relevant error. Never attach `.env`, a GUI launch URL, private source,
+provider output containing secrets, or an unredacted assessment report.
 
-- operating system;
-- Python version;
-- provider name, but never the key;
-- the exact command with secrets and private paths removed;
-- the exit code; and
-- the smallest relevant error message.
+Use the [issue tracker](https://github.com/rikterskale/POCArchitect-AI-Agent/issues)
+for non-sensitive defects. Report vulnerabilities privately through the
+[Security Policy](../SECURITY.md).
 
-Never attach `.env`, the launch URL, private source, or a full sensitive report.
-Use the repository's [issue tracker](https://github.com/rikterskale/POCArchitect-AI-Agent/issues)
-for non-sensitive problems and follow the [Security Policy](../SECURITY.md) for
-vulnerabilities.
+## 10. Use the cheat sheet and glossary
 
-## 18. Command cheat sheet
+### Command cheat sheet
 
 | Goal | Command |
 |---|---|
-| Show the version | `python -m pocarchitect --version` |
-| Prove first-day operation without credentials | `python -m pocarchitect quickstart` |
-| Diagnose installation only | `pocarchitect doctor --offline` |
-| Launch the GUI | `pocarchitect gui` |
-| Print a protected GUI URL | `pocarchitect gui --no-open` |
-| Configure a provider interactively | `pocarchitect setup` |
-| Show masked configuration | `pocarchitect config` |
-| Show provider/model choices | `pocarchitect models` |
-| Safe, non-provider prompt preview | `python -m pocarchitect --url https://github.com/example/poc --no-ingest --dry-run --no-color` |
-| Inspect batch state | `python -m pocarchitect --format json --no-color batch-status --batch-state reports/batch_progress.json` |
-| List reports | `pocarchitect history --output-dir reports` |
 | Show help | `pocarchitect --help` |
+| Show version | `python -m pocarchitect --version` |
+| Prove the local installation | `python -m pocarchitect quickstart` |
+| Diagnose without credentials | `pocarchitect doctor --offline` |
+| Launch the local GUI | `pocarchitect gui` |
+| Configure a provider | `pocarchitect setup` |
+| Show masked configuration | `pocarchitect config` |
+| Analyze an authorized repository | `pocarchitect --url https://github.com/OWNER/REPOSITORY --provider openai --curate` |
+| Materialize a report manually | `pocarchitect scaffold --report reports/your-report.md --output blueprint` |
+| Create a draft verification contract | `pocarchitect verify init ./authorized-poc --authorization "Ticket SEC-123; isolated lab"` |
+| Verify a reviewed candidate | `pocarchitect verify run ./poc-blueprint` |
+| List reports | `pocarchitect history --output-dir reports` |
+| Inspect batch recovery | `python -m pocarchitect --format json --no-color batch-status --batch-state reports/batch_progress.json` |
 
-Root options such as `--format` and `--no-color` must appear before a subcommand
-such as `batch-status`. Use the generated [CLI Reference](cli-reference.md) for
-every command and option.
+Root options such as `--format` and `--no-color` appear before subcommands such
+as `batch-status`. Use the generated [CLI Reference](cli-reference.md) for every
+command and option.
 
-## 19. Glossary
+### Glossary
 
-- **API key:** A secret credential used to authorize requests to a cloud model
-  provider.
-- **Authorization:** Permission from the system or source owner to perform the
-  assessment.
-- **Batch:** Several sources processed from a text file.
-- **Batch ledger:** The JSON file that records completed and failed batch items
-  so work can resume.
-- **CLI:** Command-line interface; the terminal version of POCArchitect.
+- **Authorization:** Explicit permission defining what may be assessed and in
+  which lab or environment.
+- **Candidate implementation:** Generated or copied code that has not passed
+  its verification contract.
+- **Contract:** The reviewed image, build commands, test commands, artifacts,
+  authorization, and readiness state used by the verifier.
 - **Dry run:** A preview that stops before a model-provider request.
-- **Candidate implementation:** Generated or copied code that has not yet passed
-  its explicit verification contract.
-- **Environment variable:** A named configuration value. Provider keys can be
-  loaded from the local `.env` file.
-- **Grounding:** Selected source content supplied to the model as evidence.
-- **GUI:** Graphical user interface; POCArchitect's local browser workspace.
-- **JSON Lines:** Machine-readable output containing one JSON object per line.
-- **Local provider:** A model service running on this computer or a trusted
-  local network endpoint through an OpenAI-compatible API.
-- **Model:** The provider's AI system that generates the analysis response.
-- **Preflight:** Checks performed before a real operation.
-- **Provider:** The cloud or local service that hosts the selected model.
-- **Redaction:** Replacement of recognized secret values before transfer.
-- **Report:** The generated Markdown analysis and any requested export.
-- **Repository:** A project folder managed by Git.
-- **Source:** The repository, directory, package, image, or URL being analyzed.
-- **Transfer review:** Metadata showing what is proposed for a provider request
-  before approval.
-- **VERIFIED PoC:** A reviewed implementation whose authorization-bearing build,
-  tests, and artifact assertions all passed in the constrained sandbox, with
-  retained JSON evidence.
-- **Virtual environment:** The project-local `.venv` folder containing isolated
+- **Evidence:** Private JSON recording digests, sandbox controls, image identity,
+  step results, output, timing, and cleanup.
+- **Grounding:** Selected source text supplied to the model as evidence.
+- **Provider:** The cloud or local model service used for analysis.
+- **Redaction:** Replacement of recognized secret patterns before transfer.
+- **Scaffold:** Candidate implementation files materialized from a report's
+  strict Implementation Bundle.
+- **Transfer review:** The file, size, cost, and redaction summary shown before
+  an approved provider request.
+- **VERIFIED PoC:** A reviewed implementation whose declared build, tests,
+  artifacts, and cleanup passed inside the constrained sandbox.
+- **Virtual environment:** The repository-local `.venv` containing isolated
   Python packages.
 
 ## Continue learning
 
+- [Working PoC Verification Guide](verification-guide.md) — contract schema,
+  sandbox controls, evidence, and non-Python toolchains.
 - [CLI Reference](cli-reference.md) — every command and option.
-- [Configuration Reference](configuration-reference.md) — defaults and
-  precedence.
-- [Command Guide](command-guide.md) — automation, batch, Docker, and advanced
+- [Command Guide](command-guide.md) — batch, Docker, automation, and advanced
   workflows.
-- [Local Provider Guide](ollama-setup-guide.md) — OpenAI-compatible local model
-  setup.
-- [Docker Guide](docker-guide.md) — container installation and report volumes.
-- [Working PoC Verification Guide](verification-guide.md) — implementation
-  bundles, contracts, sandbox controls, and evidence.
+- [Local Provider Guide](ollama-setup-guide.md) — Ollama-oriented setup.
+- [Finding-driven Workflow](finding-workflow.md) — durable finding lifecycle and
+  approval gates.
 - [Security Policy](../SECURITY.md) — safe-use and vulnerability-reporting
   expectations.
