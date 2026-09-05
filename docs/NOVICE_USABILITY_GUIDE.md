@@ -8,7 +8,7 @@
 | Reviewed branch | <code>main</code> |
 | Detected project version | <code>0.3.0</code> |
 | Last documentation update | 2026-09-05 |
-| CI-gated platforms | Linux wheels on Python 3.10/3.14, Linux sdist on 3.12, and Windows/macOS wheels on 3.12; unit tests cover Python 3.10–3.14; Docker CI builds the image and runs <code>--help</code> |
+| CI-gated platforms | Linux wheels on Python 3.10/3.14, Linux sdist on 3.12, and Windows/macOS wheels on 3.12; unit tests cover Python 3.10–3.14; Docker CI builds the image, runs <code>--help</code>, and proves a harmless PoC verification contract end to end |
 | Validation limitations | No live cloud-provider request, live Ollama request, interactive setup session, WSL/Git Bash run, or native Docker Desktop run is automated |
 
 ## 1. What This Guide Helps You Do
@@ -21,12 +21,15 @@ Use this guide if you are installing POCArchitect from this repository and will 
 
 ## 3. What the Project Does
 
-POCArchitect accepts one URL or a text file of URLs and prepares a Markdown analysis request for an LLM provider. For a public GitHub repository URL, it can shallow-clone the repository into a temporary directory and select matching source files as grounding. A successful provider call is saved as a Markdown report with metadata and a body hash.
+POCArchitect accepts one URL or a text file of URLs and prepares a Markdown analysis request for an LLM provider. For a public GitHub repository URL, it can shallow-clone the repository into a temporary directory and select matching source files as grounding. A successful provider call is saved as a Markdown report with metadata and a body hash. Strictly named implementation files can be materialized into a candidate scaffold, and a separate Docker verification command can prove an authorization-bearing build/test contract.
 
 ## 4. What the Project Does Not Do
 
-POCArchitect does not execute retrieved PoC source and does not guarantee that
-an LLM response is accurate. The optional GUI uses a launch-scoped API that is
+The analysis path does not execute retrieved PoC source, and POCArchitect does
+not guarantee that an LLM response or generated candidate is accurate. Code is
+executed only when the operator separately invokes `verify run`, confirms the
+action, and supplies a ready contract with an authorization statement and at
+least one test. The optional GUI uses a launch-scoped API that is
 bound to the local computer; it is not a remotely hosted or multi-user service.
 Optional OSV enrichment checks exact dependency versions, but POCArchitect is
 not a general-purpose vulnerability scanner. Non-GitHub URLs are accepted but

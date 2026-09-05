@@ -2,10 +2,12 @@
 
 ## Overview
 
-POCArchitect is a Python CLI that turns a supplied PoC URL into a Markdown
-analysis request for a selected LLM provider. It can shallow-clone public GitHub
-repositories and include selected source files as grounding. Non-GitHub URLs and
-failed GitHub clones use explicitly labeled URL-only context.
+POCArchitect is a Python CLI that turns authorized PoC source into a grounded
+analysis, a path-safe candidate implementation bundle, and—after a separate
+operator-controlled gate—an evidence-backed verification result. It can
+shallow-clone public GitHub repositories and include selected source files as
+grounding. Non-GitHub URLs and failed GitHub clones use explicitly labeled
+URL-only context.
 
 Grounding is an input aid, not proof of report accuracy. The tool loads a
 packaged prompt, builds grounding context, redacts recognized secret patterns,
@@ -31,7 +33,16 @@ URL or batch file
   -> operator confirmation
   -> provider request (up to three attempts; 60-second client timeout)
   -> report plus provenance metadata
+  -> optional path-safe candidate implementation scaffold (draft)
   -> resolved output directory
+
+Reviewed local implementation
+  -> explicit authorization-bearing verification contract
+  -> operator execution confirmation
+  -> bounded, secret-filtered source snapshot
+  -> locked-down Docker build, tests, and artifact assertions
+  -> private JSON evidence
+  -> VERIFIED only when every contracted step passes
 ```
 
 `--dry-run` bypasses **all automatic preflight checks**, constructs the
@@ -53,6 +64,7 @@ are also needed.
 | Analysis service | `pocarchitect/service.py` | Prepare/approve/execute boundary shared with embedded clients |
 | Local GUI API and job runtime | `pocarchitect/gui.py` | Authenticated loopback API, single-worker jobs, events, and artifact registry |
 | Browser frontend | `pocarchitect/web/` | Accessible source configuration, exact transfer review, recoverable progress, and safe report presentation |
+| PoC verifier | `pocarchitect/verification.py` | Contract validation, bounded snapshots, Docker isolation, build/test execution, and durable evidence |
 
 ## Local GUI flow
 
@@ -177,6 +189,36 @@ is made.
 | Transfer cap | First 25 matching readable files |
 | Excluded directory | `.git` |
 
+## Candidate implementation and verification boundary
+
+The packaged provider prompt requires materializable implementation files to
+appear only in the `Implementation Bundle` section under strict
+`File: relative/path` headings. `create_scaffold` rejects absolute/traversing
+paths, credential/configuration paths, repository-control paths, duplicates,
+oversized bundles, and unterminated fences before creating the destination. It
+also creates a schema-versioned verification contract in `draft` state. A
+report or scaffold therefore cannot claim that generated code works.
+
+`verify run` is the sole code-execution boundary. It requires a ready contract,
+a non-empty authorization statement, at least one test command, an already
+available reviewed image, and interactive confirmation or `--yes`. It executes
+no host shell. Contract commands are passed to `/bin/sh` only after an ephemeral
+container has started with no network, read-only root/source filesystems,
+non-root identity, no capabilities, `no-new-privileges`, and CPU, memory,
+process, workspace, log, source-size, and per-command time limits. `.git`, local
+environments, dependency caches, `.env` variants, and non-regular files are not
+included in the snapshot.
+
+Every attempt that reaches build/test execution produces private JSON evidence
+binding the length-framed sanitized source digest, contract digest, locally
+resolved image ID used to start the sandbox,
+sandbox controls, exclusions, and bounded step output. Status is `verified`
+only when preparation, every build/test command, every required-artifact
+assertion, and forced container cleanup succeed. Artifact assertions reject
+symlinks in both the artifact and its parent components. See
+[Working PoC Verification](verification-guide.md) for the operator contract and
+threat model.
+
 ## Report provenance
 
 Successful provider responses are written as Markdown with YAML-like front
@@ -220,6 +262,11 @@ service must be supplied through `local` and `--base-url`.
 - Private GitHub authentication is not configured by the project.
 - No clone cache or source-completeness guarantee exists.
 - Provider output and copied commands require operator review.
-- The tool does not execute cloned source and supplies no sandbox for report content.
+- Analysis never executes cloned source. Verification operates on an explicitly
+  selected local implementation or scaffold after a separate confirmation.
+- The verifier intentionally has no external network or multi-container target
+  access. Network-dependent verification requires a separately governed lab.
+- Docker shares the host kernel; use a disposable VM when container isolation is
+  insufficient for the reviewed source's risk.
 
 **Documented version:** 0.3.0

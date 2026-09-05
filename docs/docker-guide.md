@@ -190,3 +190,17 @@ pocarch-preview --url https://github.com/example/poc --no-ingest --dry-run --no-
 ---
 
 **Validation status:** Docker build and `docker run --rm pocarchitect:test --help` are exercised by CI on Ubuntu. Native Docker Desktop runs and provider-backed runs were not executed during this documentation review.
+
+## Working-PoC verifier
+
+Run `pocarchitect verify run` from a host installation with access to the local
+Docker CLI. Do not mount `/var/run/docker.sock` into the POCArchitect application
+container; that would give the container control of the host Docker daemon and
+defeat the intended boundary. The verifier starts its own ephemeral target
+container with no network, no capabilities, a read-only root/source, a non-root
+user, and resource limits. See the
+[Working PoC Verification Guide](verification-guide.md).
+
+The Ubuntu Docker CI job builds `pocarchitect:test` and uses the host-installed
+CLI to verify a harmless fixture against that image end to end. Native Docker
+Desktop verification remains a manual host path.

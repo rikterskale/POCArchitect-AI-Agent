@@ -30,6 +30,10 @@ def test_cli_reference_is_metadata_based_and_platform_neutral():
     assert "`<current>`" in first
     assert "`<sources>`" in first
     assert "`<report>`" in first
+    assert "## Command: `verify init`" in first
+    assert "## Command: `verify run`" in first
+    assert "`--authorization`" in first
+    assert "`--evidence`" in first
 
 
 def test_configuration_reference_uses_runtime_defaults():

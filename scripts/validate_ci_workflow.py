@@ -41,10 +41,14 @@ REQUIRED_RUN_COMMANDS = (
     "pip-audit",
     "python scripts/validate_bandit_report.py bandit-report.json",
     "docker build -t pocarchitect:test .",
+    "python -m pocarchitect --format json --no-color verify run tests/fixtures/verified-poc --yes",
+    "result['status'] == 'verified'",
+    "result['sandbox']['network'] == 'none'",
+    "result['sandbox']['capabilities_dropped'] == ['ALL']",
     "python -m build",
     "python scripts/validate_distribution.py dist",
 )
-REQUIRED_ACTIONS = {"actions/upload-artifact@v7", "actions/download-artifact@v4"}
+REQUIRED_ACTIONS = {"actions/upload-artifact@v7", "actions/download-artifact@v8"}
 
 
 def validate(root: Path = ROOT) -> list[str]:

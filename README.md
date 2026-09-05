@@ -1,13 +1,19 @@
 # POCArchitect AI Agent
 
-> Turn messy PoCs into clean, reproducible blueprints.
+> Turn authorized PoC source into tested, evidence-backed implementations.
 
-POCArchitect is a command-line tool that creates structured analysis reports and reproducible project blueprints from authorized Proof-of-Concept (PoC) sources. It accepts GitHub repositories, local directories, package/image identifiers, and download URLs; GitHub and local sources can be used as bounded, redacted grounding.
+POCArchitect is a command-line tool that reviews authorized Proof-of-Concept
+(PoC) sources, produces structured analysis and candidate implementation
+bundles, and proves reviewed implementations through an explicit build-and-test
+contract. It accepts GitHub repositories, local directories, package/image
+identifiers, and download URLs; GitHub and local sources can be used as bounded,
+redacted grounding.
 
-It does not execute the retrieved PoC. A real-source report is generated only
-after a provider call succeeds; credential-free demos use clearly labeled,
-deterministic local content. Real report content depends on the selected
-provider and the available source material.
+Analysis never executes retrieved code. Execution occurs only through the
+separate, operator-confirmed `verify run` command in a network-isolated,
+read-only, non-root Docker sandbox. A report or scaffold is a candidate—not a
+working-PoC claim. POCArchitect emits VERIFIED only after every contracted build,
+test, and artifact check passes and durable JSON evidence is written.
 
 ## Features
 
@@ -29,7 +35,9 @@ provider and the available source material.
 - Rich three-pane dashboard, per-phase timing, grounding curation, and a post-run summary card
 - Dry-run sample report, inferred Mermaid architecture, report history/diffs, and HTML/PDF/JSON export
 - Local-directory analysis, multi-source comparison, OSV vulnerability enrichment, and analyzer plugins
-- Blueprint-to-scaffold generation, per-repository `.pocarchitect.toml`, example gallery, and typo suggestions
+- Path-safe implementation-bundle materialization and draft verification contracts
+- Evidence-backed working-PoC verification with locked-down Docker execution, explicit authorization, and fail-closed status
+- Per-repository `.pocarchitect.toml`, example gallery, and typo suggestions
 - Reusable GitHub Action, pre-commit hook, scheduled workflow template, and optional Gist publishing
 - Production-focused local web GUI with a one-click credential-free demo,
   readable accessible navigation, smart provider selection and refresh, exact
@@ -46,6 +54,7 @@ provider and the available source material.
 | GitHub grounding and batch recovery | Stable | Public authorized repositories; Git |
 | Finding-driven workflow kernel | Stable library capability | Integrate through the documented workflow API |
 | Local source, history/diff, export, scaffold, comparison | Stable | None |
+| Working-PoC build/test verification | Stable | Running Docker and a reviewed local toolchain image |
 | OSV enrichment and report publishing | Opt-in integration | Network; authenticated `gh` for publishing |
 | ARM64/Apple Silicon/Windows ARM | Experimental/untested | Validate Git, Docker, and local-provider compatibility on the host |
 
@@ -156,7 +165,7 @@ python -m pocarchitect --help | Select-Object -First 20
 | Windows PowerShell | CI-gated | The first-run matrix installs the wheel on Windows/Python 3.12 and runs the offline readiness gate. |
 | macOS | CI-gated | The first-run matrix installs the wheel on macOS/Python 3.12 and runs the offline readiness gate. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
-| Linux Docker | Validated in CI | CI builds the image, runs its `--help` smoke test, and checks report persistence; mount a writable host directory to `/reports` for reports. |
+| Linux Docker | Validated in CI | CI builds the image, checks help/report persistence, and runs a real candidate through the restricted verifier with retained evidence. Mount a writable host directory to `/reports` for reports. |
 | Docker Desktop | Not separately validated | Native bind mounts, path conversion, TTY behavior, and provider-backed runs remain manual/best-effort. |
 | ARM64/Apple Silicon/Windows ARM | Not separately validated | The package is pure Python, but provider, Git, Docker, and local-model compatibility depends on the host; use `doctor` and `demo` after installation. |
 
@@ -164,6 +173,33 @@ Python 3.10–3.14 are CI-supported. Native x86_64 Linux, Windows, and macOS are
 the primary support targets. ARM64/Apple Silicon, WSL/Git Bash, and Docker
 Desktop are best-effort host paths and are not release-blocking validation
 targets today.
+
+## Prove a PoC works
+
+Generate or review a candidate implementation, then create its explicit
+verification contract:
+
+```bash
+pocarchitect verify init ./authorized-poc \
+  --authorization "customer-owned isolated lab"
+```
+
+Review the generated `.pocarchitect/poc-verification.json`, its commands, every
+implementation file, and the acceptance tests. Review and pull the declared
+Docker image yourself; the verifier never pulls images implicitly. When the
+implementation is ready, set `implementation_status` to `ready` and run:
+
+```bash
+pocarchitect verify run ./authorized-poc --yes
+```
+
+The verifier copies a bounded, secret-filtered source snapshot into an ephemeral
+container with no network, a read-only root filesystem, a non-root user, no
+Linux capabilities, `no-new-privileges`, and CPU/memory/process/time limits. A
+zero exit and `poc_verified` event are accompanied by private JSON evidence that
+binds the source, contract, resolved image ID, sandbox controls, and every step
+result. See the [Working PoC Verification Guide](docs/verification-guide.md) for
+the contract schema, threat model, examples, and limitations.
 
 ## Batch progress and recovery
 
@@ -214,7 +250,7 @@ provider choices. Configure another OpenAI-compatible endpoint through
 | `--curate` | Interactively exclude selected grounding files before transfer | `false` |
 | `--dashboard` | Render run progress, grounding files, and report preview in three panes | `false` |
 | `--diff` | Save a unified diff against the latest report for the source | `false` |
-| `--scaffold` | Generate a safe project skeleton after the report | `false` |
+| `--scaffold` | Materialize a candidate implementation and draft verification contract | `false` |
 | `--report-format` | Also export as `html`, `pdf`, or `json` | Project config / `markdown` |
 | `--vuln-scan` | Query OSV for exact dependency versions found in grounding | `false` |
 | `--format` | Text or JSON Lines output for main runs and `preflight` | `text` |
@@ -308,6 +344,7 @@ python scripts/generate_docs.py
 - [CLI Reference](docs/cli-reference.md) — generated option and subcommand reference.
 - [Configuration Reference](docs/configuration-reference.md) — provider keys, defaults, precedence, and output settings.
 - [Docker Guide](docs/docker-guide.md) — image build, safe runs, provider confirmation, and report mounts.
+- [Working PoC Verification Guide](docs/verification-guide.md) — candidate materialization, build/test contracts, sandbox controls, evidence, and VERIFIED semantics.
 - [Local OpenAI-Compatible Provider Guide](docs/ollama-setup-guide.md) — Ollama-specific setup notes and limitations.
 - [Architecture](docs/architecture.md) — implementation-oriented component overview.
 - [Finding-driven workflow engine](docs/finding-driven-workflow-engine.md) — architecture, lifecycle, branching, persistence, and product integration contract.
