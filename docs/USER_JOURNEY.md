@@ -8,21 +8,24 @@ exists in the current code and was exercised in the project’s test suite.
 
 POCArchitect is a local command-line tool, with an optional loopback web
 interface, that turns an authorized proof-of-concept source into a structured
-Markdown architecture report. The operator supplies a GitHub repository, a
+analysis, a candidate implementation, and—after explicit build/test proof—a
+VERIFIED PoC. The operator supplies a GitHub repository, a
 local directory, a generic source identifier, or a batch file of sources. For
 public GitHub repositories and local directories, the tool can shallow-clone or
 walk the tree, select a bounded set of text files, redact recognized secret
 patterns, and show a transfer preview before any model provider is called.
 
-It does not execute retrieved proof-of-concept code. A credential-free
-`quickstart` / `demo` path writes a clearly labeled local report without an API
+Analysis does not execute retrieved proof-of-concept code. Candidate execution
+is confined to the separate, authorization-bearing `verify run` workflow in a
+locked-down Docker sandbox. A credential-free `quickstart` / `demo` path writes
+a clearly labeled local report without an API
 key or a billable provider call. A real analysis requires a configured
 provider (`xai`, `openai`, `groq`, or a local OpenAI-compatible endpoint),
 explicit confirmation (`--yes` or an interactive prompt), and a successful
 provider response. Reports are written under `reports/` by default (or
 `/reports` in Docker) with provenance metadata.
 
-The product is for security practitioners who need reproducible blueprints from
+The product is for security practitioners who need reproducible, tested PoCs from
 authorized sources: red-team and assessment operators, people installing the
 tool for the first time, and automation that consumes JSON events or the
 composite GitHub Action. Finding lifecycle work (scope, validation, closure)
@@ -37,13 +40,14 @@ is a separate, auditable CLI beside the report generator.
 | GUI operator | Review files, redaction, and cost, then approve a transfer in a browser | `pocarchitect gui` |
 | Automation / CI user | Run a dry-run or real analysis from a workflow and keep the report | `action.yml` composite action, or `pocarchitect --format json` |
 | Assessment lead | Record scope, findings, and closure decisions independently of an LLM report | `pocarchitect workflow-init` |
+| PoC implementer | Materialize reviewed candidate files and prove the build/test contract | `pocarchitect scaffold`, then `pocarchitect verify run` |
 
 ## 3. Primary journey
 
-Core value for a new user is a finished, on-disk Markdown report with no
+The zero-risk first touch is a finished, on-disk demonstration report with no
 credential and no provider bill. That is `quickstart` (offline doctor + demo).
-The same report path is what a later real analysis uses after transfer
-approval.
+The full product outcome is stronger: a reviewed candidate implementation whose
+explicit contract passes in the sandbox and produces retained JSON evidence.
 
 1. **Obtain the source.** Clone or unpack the repository and change into it.
    PyPI is not a supported install path. Observable: `pyproject.toml` and the

@@ -4,7 +4,7 @@ Generated directly from Typer/Click command metadata by `python scripts/generate
 
 ## Main command
 
-POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
+POCArchitect AI Agent - Turn authorized PoC source into tested, evidence-backed implementations.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -31,7 +31,7 @@ POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.
 | `--curate` | BOOLEAN | False | Interactively include/exclude selected grounding files. |
 | `--dashboard` | BOOLEAN | False | Show the three-pane Rich run dashboard. |
 | `--diff` | BOOLEAN | False | Compare the new report with the latest report for this source. |
-| `--scaffold` | BOOLEAN | False | Create a runnable project skeleton after analysis. |
+| `--scaffold` | BOOLEAN | False | Materialize a candidate implementation and draft verification contract. |
 | `--scaffold-output` | PATH | None | Destination for --scaffold. |
 | `--report-format` | markdown \| html \| pdf \| json | None | Also export each report in this format. |
 | `--vuln-scan` | BOOLEAN | False | Enrich exact dependency versions with OSV records. |
@@ -204,7 +204,7 @@ Export a Markdown report as HTML or structured JSON. Example: pocarchitect expor
 
 ## Command: `scaffold`
 
-Generate a safe project skeleton from a completed report. Example: pocarchitect scaffold --report reports/report.md --output blueprint
+Materialize a candidate implementation and draft verification contract. Example: pocarchitect scaffold --report reports/report.md --output blueprint
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -245,6 +245,42 @@ Publish a report with the authenticated GitHub CLI and return its URL. Example: 
 | `<report>` | FILE | required | — |
 | `--public` | BOOLEAN | False | Create a public rather than secret Gist. |
 
+## Command: `verify`
+
+Prove an authorized PoC builds and passes its test contract in a locked-down Docker sandbox.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| — | — | — | No options |
+
+## Command: `verify init`
+
+Create an explicit build-and-test contract without executing the PoC. Example: pocarchitect verify init ./blueprint --authorization "isolated vendor lab"
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `<project>` | DIRECTORY | . | Authorized PoC implementation directory. |
+| `--contract` | PATH | None | Contract path (default: PROJECT/.pocarchitect/poc-verification.json). |
+| `--image` | STR | None | Locally reviewed Docker image; no image is pulled implicitly. |
+| `--build-command` | STR | [] | Build command to run in the sandbox; repeat for multiple steps. |
+| `--test-command` | STR | [] | Required test command; repeat for multiple steps. |
+| `--required-artifact` | STR | [] | Relative output path that must exist after testing; repeat as needed. |
+| `--authorization` | STR | — | Short description of the approved lab or assessment scope. |
+| `--ready` | BOOLEAN | False | Mark the reviewed implementation ready; requires an explicit --test-command. |
+| `--force` | BOOLEAN | False | Replace an existing contract after explicit review. |
+
+## Command: `verify run`
+
+Build and test a reviewed PoC in the locked-down Docker sandbox. Example: pocarchitect verify run ./blueprint --yes
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `<project>` | DIRECTORY | . | Authorized PoC implementation directory. |
+| `--contract` | PATH | None | Contract path (default: PROJECT/.pocarchitect/poc-verification.json). |
+| `--evidence` | PATH | None | Private JSON evidence path (default: reports/verification-*.json). |
+| `--timeout` | INT RANGE | 120 | Maximum seconds allowed for each build or test command. |
+| `--yes` | BOOLEAN | False | Confirm authorized sandbox execution without an interactive prompt. |
+
 ## Commands
 
 | Command | Purpose |
@@ -267,11 +303,14 @@ Publish a report with the authenticated GitHub CLI and return its URL. Example: 
 | `history` | Show saved report versions and risk-analysis history. Example: pocarchitect history --output-dir reports |
 | `diff` | Compare two generated reports. Example: pocarchitect diff reports/old.md reports/new.md |
 | `export` | Export a Markdown report as HTML or structured JSON. Example: pocarchitect export reports/report.md --format html |
-| `scaffold` | Generate a safe project skeleton from a completed report. Example: pocarchitect scaffold --report reports/report.md --output blueprint |
+| `scaffold` | Materialize a candidate implementation and draft verification contract. Example: pocarchitect scaffold --report reports/report.md --output blueprint |
 | `compare` | Compare candidate PoCs using bounded, provider-free source inspection. Example: pocarchitect compare ./candidate-a ./candidate-b |
 | `plugins` | List registered analyzer plugins. Example: pocarchitect plugins |
 | `vulnerabilities` | Cross-reference exact dependency versions with the OSV database. Example: pocarchitect vulnerabilities . |
 | `publish` | Publish a report with the authenticated GitHub CLI and return its URL. Example: pocarchitect publish reports/report.md |
+| `verify` | Prove an authorized PoC builds and passes its test contract in a locked-down Docker sandbox. |
+| `verify init` | Create an explicit build-and-test contract without executing the PoC. Example: pocarchitect verify init ./blueprint --authorization "isolated vendor lab" |
+| `verify run` | Build and test a reviewed PoC in the locked-down Docker sandbox. Example: pocarchitect verify run ./blueprint --yes |
 
 ## Safe examples
 

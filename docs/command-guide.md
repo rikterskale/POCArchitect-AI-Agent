@@ -441,6 +441,30 @@ python scripts/validate_fresh_install.py dist --artifact wheel
 python scripts/validate_fresh_install.py dist --artifact sdist
 ```
 
+## Working PoC verification
+
+Create a draft build/test contract for an authorized implementation:
+
+```bash
+pocarchitect verify init ./authorized-poc \
+  --authorization "customer-owned isolated lab"
+```
+
+Review the source, tests, commands, scope statement, and declared Docker image.
+Pull the reviewed image explicitly, then change `implementation_status` in
+`.pocarchitect/poc-verification.json` to `ready` and run:
+
+```bash
+pocarchitect verify run ./authorized-poc --yes
+```
+
+The command returns zero and emits `poc_verified` only when all contracted
+steps pass inside the no-network, read-only, non-root Docker boundary. It writes
+private JSON evidence containing the source/contract digests, resolved image ID,
+sandbox controls, and bounded step results. See the
+[Working PoC Verification Guide](verification-guide.md) for custom toolchains,
+the contract schema, exit codes, and the container threat model.
+
 CI repeats tests on Python 3.10-3.14. Its first-run matrix installs wheels on
 Linux, Windows, and macOS plus the sdist on Linux. Codecov upload and hosted
 runner outcomes are CI-only; local command success does not prove those services

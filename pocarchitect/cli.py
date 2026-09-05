@@ -104,6 +104,14 @@ from .state import (
     summarize_state,
     write_state,
 )
+from .verification import (
+    CONTRACT_FILENAME,
+    DEFAULT_TIMEOUT_SECONDS,
+    VerificationError,
+    create_contract,
+    default_evidence_path,
+    run_verification,
+)
 
 load_dotenv(override=False)
 
@@ -142,7 +150,7 @@ class SuggestingGroup(TyperGroup):
 
 app = typer.Typer(
     name="pocarchitect",
-    help="POCArchitect AI Agent - Turn messy PoCs into clean, reproducible blueprints.",
+    help="POCArchitect AI Agent - Turn authorized PoC source into tested, evidence-backed implementations.",
     add_completion=True,
     no_args_is_help=True,
     # Typer's Rich help renderer can select the legacy Windows console writer
@@ -150,6 +158,11 @@ app = typer.Typer(
     rich_markup_mode=None if sys.platform.startswith("win") else "rich",
     cls=SuggestingGroup,
 )
+verify_app = typer.Typer(
+    help="Prove an authorized PoC builds and passes its test contract in a locked-down Docker sandbox.",
+    no_args_is_help=True,
+)
+app.add_typer(verify_app, name="verify")
 
 console = Console()
 output_format = "text"
@@ -2404,7 +2417,7 @@ def scaffold_command(
     report: Path = typer.Option(..., "--report", exists=True, dir_okay=False),
     output: Path = typer.Option(Path("poc-blueprint"), "--output"),
 ) -> None:
-    """Generate a safe project skeleton from a completed report.
+    """Materialize a candidate implementation and draft verification contract.
 
     Example: pocarchitect scaffold --report reports/report.md --output blueprint
     """
@@ -2415,6 +2428,183 @@ def scaffold_command(
         path=str(output),
         files=[str(path) for path in created],
     )
+
+
+@verify_app.command("init")
+def verify_init_command(
+    project: Path = typer.Argument(
+        Path("."),
+        exists=True,
+        file_okay=False,
+        resolve_path=True,
+        help="Authorized PoC implementation directory.",
+    ),
+    contract: Path | None = typer.Option(
+        None,
+        "--contract",
+        help="Contract path (default: PROJECT/.pocarchitect/poc-verification.json).",
+    ),
+    image: str | None = typer.Option(
+        None,
+        "--image",
+        help="Locally reviewed Docker image; no image is pulled implicitly.",
+    ),
+    build_command: list[str] = typer.Option(
+        [],
+        "--build-command",
+        help="Build command to run in the sandbox; repeat for multiple steps.",
+    ),
+    test_command: list[str] = typer.Option(
+        [],
+        "--test-command",
+        help="Required test command; repeat for multiple steps.",
+    ),
+    required_artifact: list[str] = typer.Option(
+        [],
+        "--required-artifact",
+        help="Relative output path that must exist after testing; repeat as needed.",
+    ),
+    authorization: str = typer.Option(
+        "",
+        "--authorization",
+        help="Short description of the approved lab or assessment scope.",
+    ),
+    ready: bool = typer.Option(
+        False,
+        "--ready",
+        help="Mark the reviewed implementation ready; requires an explicit --test-command.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Replace an existing contract after explicit review.",
+    ),
+) -> None:
+    """Create an explicit build-and-test contract without executing the PoC.
+
+    Example: pocarchitect verify init ./blueprint --authorization "isolated vendor lab"
+    """
+    target = contract or project / ".pocarchitect" / CONTRACT_FILENAME
+    try:
+        created = create_contract(
+            project,
+            target,
+            image=image,
+            build_commands=build_command,
+            test_commands=test_command,
+            required_artifacts=required_artifact,
+            authorization=authorization,
+            ready=ready,
+            force=force,
+        )
+    except VerificationError as error:
+        emit("verification_error", str(error))
+        raise typer.Exit(2) from error
+    status = "ready" if ready else "draft"
+    message = f"Verification contract created ({status}): {created}"
+    if not ready:
+        message += " Review the commands and tests, document authorization, then mark it ready."
+    emit(
+        "verification_contract_created",
+        message,
+        path=str(created),
+        implementation_status=status,
+    )
+
+
+@verify_app.command("run")
+def verify_run_command(
+    project: Path = typer.Argument(
+        Path("."),
+        exists=True,
+        file_okay=False,
+        resolve_path=True,
+        help="Authorized PoC implementation directory.",
+    ),
+    contract: Path | None = typer.Option(
+        None,
+        "--contract",
+        help="Contract path (default: PROJECT/.pocarchitect/poc-verification.json).",
+    ),
+    evidence: Path | None = typer.Option(
+        None,
+        "--evidence",
+        help="Private JSON evidence path (default: reports/verification-*.json).",
+    ),
+    timeout: int = typer.Option(
+        DEFAULT_TIMEOUT_SECONDS,
+        "--timeout",
+        min=1,
+        max=3600,
+        help="Maximum seconds allowed for each build or test command.",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Confirm authorized sandbox execution without an interactive prompt.",
+    ),
+) -> None:
+    """Build and test a reviewed PoC in the locked-down Docker sandbox.
+
+    Example: pocarchitect verify run ./blueprint --yes
+    """
+    selected_contract = contract or project / ".pocarchitect" / CONTRACT_FILENAME
+    selected_evidence = evidence or default_evidence_path(project)
+    if not yes:
+        if not sys.stdin.isatty():
+            emit(
+                "confirmation_required",
+                "Verification executes project code; review the contract and rerun with --yes in non-interactive mode.",
+            )
+            raise typer.Exit(2)
+        if not typer.confirm(
+            "Execute the reviewed PoC build and tests in the isolated Docker sandbox?",
+            default=False,
+        ):
+            emit("cancelled", "No project code was executed.")
+            raise typer.Exit(0)
+    emit(
+        "verification_started",
+        "Starting isolated PoC build and test verification.",
+        project=str(project),
+        contract=str(selected_contract),
+        network="none",
+    )
+    try:
+        result = run_verification(
+            project,
+            selected_contract,
+            selected_evidence,
+            timeout_seconds=timeout,
+        )
+    except VerificationError as error:
+        emit("verification_error", str(error), evidence_path=None)
+        raise typer.Exit(2) from error
+    details = {
+        "status": result.status,
+        "verification_id": result.verification_id,
+        "evidence_path": str(result.evidence_path),
+        "source_sha256": result.source_sha256,
+        "contract_sha256": result.contract_sha256,
+        "image_id": result.image_id,
+        "steps_passed": sum(step.passed for step in result.steps),
+        "steps_total": len(result.steps),
+    }
+    if result.status == "verified":
+        emit(
+            "poc_verified",
+            f"VERIFIED: build and tests passed. Evidence: {result.evidence_path}",
+            **details,
+        )
+        return
+    failed = next((step for step in result.steps if not step.passed), None)
+    emit(
+        "poc_verification_failed",
+        f"NOT VERIFIED: {failed.name if failed else 'verification'} failed. Evidence: {result.evidence_path}",
+        failed_step=failed.name if failed else None,
+        **details,
+    )
+    raise typer.Exit(1)
 
 
 @app.command("compare")
@@ -2690,7 +2880,9 @@ def main(
         help="Compare the new report with the latest report for this source.",
     ),
     scaffold: bool = typer.Option(
-        False, "--scaffold", help="Create a runnable project skeleton after analysis."
+        False,
+        "--scaffold",
+        help="Materialize a candidate implementation and draft verification contract.",
     ),
     scaffold_output: Path | None = typer.Option(
         None, "--scaffold-output", help="Destination for --scaffold."

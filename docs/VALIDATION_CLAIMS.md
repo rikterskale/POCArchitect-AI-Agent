@@ -27,6 +27,7 @@ listed controls:
 | Local-provider request routing and report writing work | Hermetic mock-provider gate | This does not prove a live provider or Ollama model works. |
 | Linux, Windows, and macOS artifact first-install paths are intended support targets | Release-readiness matrix | The current hosted run must still be checked for the commit being released. |
 | Docker image build, help, health, and report persistence are covered | Docker CI job | Native Docker Desktop behavior remains manual. |
+| A PoC is labeled VERIFIED only after its explicit contract passes | Unit tests plus the Docker CI end-to-end verification fixture | Test quality and authorization scope remain operator responsibilities; Docker is not a VM. |
 
 ## External or manual claims
 

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added strict implementation-bundle materialization from provider reports and
+  draft-by-default scaffold verification contracts.
+- Added `verify init` and `verify run` for authorization-gated PoC build/test
+  verification inside a network-isolated, read-only, non-root Docker sandbox,
+  with resource limits, explicit test contracts, artifact assertions, immutable
+  image evidence, bounded logs, and private JSON results.
+- Added a real Docker verification journey to CI so VERIFIED status and sandbox
+  controls are exercised end to end on every change.
+
+### Changed
+
+- Updated artifact downloads to `actions/download-artifact@v8` for the supported
+  Node runtime and fail-closed artifact digest validation.
+
 ## [0.3.0] - 2026-09-05
 
 ### Added

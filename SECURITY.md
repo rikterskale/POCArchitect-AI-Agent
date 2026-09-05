@@ -34,6 +34,16 @@ a security guarantee by the project:
   private default because they may contain sensitive assessment context.
 - Review the redacted transfer preview before confirming any real provider call.
 - Treat generated reports as unverified model output that requires your review.
+- Treat materialized implementation files as unverified until their reviewed,
+  authorization-bearing contract produces a `poc_verified` result. Do not put
+  credentials in verification commands or tests because bounded command output
+  is retained in the evidence record.
+- Verification intentionally disables networking, drops all capabilities, runs
+  as a non-root user, uses read-only source/root filesystems, and applies
+  resource/time limits. Docker still shares the host kernel; use a disposable
+  VM when the source is outside your organization's container-risk tolerance.
+- Never change a contract to `ready` or pass `--yes` unless the source, test
+  target, expected behavior, and assessment scope have been explicitly approved.
 - Keep the optional GUI bound to its built-in loopback address. Do not proxy or
   expose it as a remote service; its authentication model is launch-scoped and
   designed for a single local operator.

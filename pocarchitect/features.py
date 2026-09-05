@@ -31,6 +31,7 @@ from .file_io import (
     harden_private_descriptor,
     harden_private_path,
 )
+from .verification import CONTRACT_FILENAME, create_contract
 
 CONFIG_FILE = ".pocarchitect.toml"
 HISTORY_FILE = "history.json"
@@ -548,40 +549,181 @@ def export_report(markdown_path: Path, output_format: str) -> Path:
     raise ValueError(f"Unsupported report format: {output_format}")
 
 
+def extract_implementation_bundle(content: str) -> dict[Path, str]:
+    """Extract strictly named files from the report's implementation section."""
+    section = re.compile(
+        r"^(#{2,3})\s+(?:Phase\s+8\s*[-–—:]\s*)?(?:Full Weaponized Artifact|Implementation Bundle)\s*$",
+        re.IGNORECASE,
+    )
+    file_header = re.compile(r"^#{3,6}\s+File:\s+(.+?)\s*$", re.IGNORECASE)
+    files: dict[Path, str] = {}
+    active = False
+    section_level = 0
+    selected: Path | None = None
+    fence: str | None = None
+    captured: list[str] = []
+    total_bytes = 0
+
+    for line in content.splitlines():
+        if not active:
+            section_match = section.match(line.strip())
+            active = bool(section_match)
+            if section_match:
+                section_level = len(section_match.group(1))
+            continue
+        if fence is None:
+            heading = re.match(r"^(#{1,6})\s+", line)
+            if heading and len(heading.group(1)) <= section_level:
+                break
+            match = file_header.match(line.strip())
+            if match:
+                candidate = match.group(1).strip().strip("`").replace("\\", "/")
+                path = Path(candidate)
+                lowered = {part.lower() for part in path.parts}
+                if (
+                    not candidate
+                    or len(candidate) > 240
+                    or path.is_absolute()
+                    or re.match(r"^[A-Za-z]:", candidate)
+                    or ".." in path.parts
+                    or lowered.intersection({".git", ".ssh", ".aws", ".pocarchitect"})
+                    or path.name == ".env"
+                    or (path.name.startswith(".env.") and path.name != ".env.example")
+                    or path.name.lower()
+                    in {CONTRACT_FILENAME, "blueprint.json", "pocarchitect.md"}
+                ):
+                    raise ValueError(f"Unsafe implementation bundle path: {candidate}")
+                if path in files:
+                    raise ValueError(
+                        f"Duplicate implementation bundle path: {candidate}"
+                    )
+                selected = path
+                continue
+            if selected is not None:
+                opening = re.match(r"^(`{3,}|~{3,})", line.strip())
+                if opening:
+                    fence = opening.group(1)
+                    captured = []
+            continue
+        if line.strip().startswith(fence):
+            if selected is None:
+                raise ValueError(
+                    "Implementation bundle parser reached a fence without a file path."
+                )
+            text = "\n".join(captured) + "\n"
+            total_bytes += len(text.encode("utf-8"))
+            if len(files) >= 50 or total_bytes > 512 * 1024:
+                raise ValueError(
+                    "Implementation bundle exceeds the 50-file/512-KiB limit."
+                )
+            files[selected] = text
+            selected = None
+            fence = None
+            captured = []
+        else:
+            captured.append(line)
+    if fence is not None:
+        raise ValueError("Implementation bundle contains an unterminated code fence.")
+    return files
+
+
 def create_scaffold(report_path: Path, destination: Path) -> list[Path]:
-    """Create a safe, non-executable project skeleton from a report."""
+    """Materialize a candidate implementation with an initially draft test contract."""
+    implementation = extract_implementation_bundle(_report_body(report_path))
+    destination = Path(os.path.abspath(os.fspath(destination.expanduser())))
+    if destination.is_symlink():
+        raise ValueError(f"Scaffold destination cannot be a symlink: {destination}")
     destination.mkdir(parents=True, exist_ok=True)
-    (destination / "src").mkdir(exist_ok=True)
-    (destination / "tests").mkdir(exist_ok=True)
+    control_directory = destination / ".pocarchitect"
+    if control_directory.is_symlink():
+        raise ValueError(
+            f"Scaffold path cannot traverse a symlink: {control_directory}"
+        )
     metrics = parse_report_metrics(_report_body(report_path))
     files = {
         destination
         / "README.md": (
             f"# {destination.name}\n\nGenerated from `{report_path.name}`.\n\n"
-            "## Safe validation\n\nImplement and test only in an authorized, isolated environment.\n"
-        ),
-        destination
-        / "pyproject.toml": (
-            '[project]\nname = "poc-blueprint"\nversion = "0.1.0"\n'
-            'requires-python = ">=3.10"\ndependencies = []\n'
+            f"## Candidate implementation\n\nPOCArchitect materialized {len(implementation)} "
+            "strictly named implementation file(s) from the report. Generated code is a "
+            "candidate, not proof that the PoC works. Review every file and replace or add "
+            "meaningful acceptance tests.\n\n"
+            "Review `.pocarchitect/poc-verification.json`, document "
+            "the authorized lab scope, and change `implementation_status` to `ready`.\n\n"
+            "Then run `pocarchitect verify run . --yes`. POCArchitect only labels the "
+            "result VERIFIED after every contracted build, test, and artifact check passes "
+            "inside its isolated Docker sandbox.\n"
         ),
         destination / ".gitignore": ".venv/\n__pycache__/\n.env\n",
         destination
-        / "src"
-        / "README.md": "# Implementation\n\nPlace reviewed implementation code here.\n",
-        destination
-        / "tests"
-        / "README.md": "# Validation\n\nAdd isolated, non-destructive validation here.\n",
+        / "POCARCHITECT.md": (
+            "# Verification gate\n\nGenerated code is a candidate until the explicit "
+            "contract passes. Review every file and test, document the authorized lab "
+            "scope in `.pocarchitect/poc-verification.json`, set "
+            "`implementation_status` to `ready`, ensure the declared Docker image is "
+            "reviewed and present locally, then run:\n\n"
+            "```text\npocarchitect verify run . --yes\n```\n\n"
+            "Only a `poc_verified` result with retained JSON evidence supports a working-PoC claim.\n"
+        ),
         destination
         / "blueprint.json": json.dumps(
-            {"source_report": str(report_path), "metrics": metrics}, indent=2
+            {
+                "source_report": str(report_path),
+                "metrics": metrics,
+                "implementation_files": sorted(
+                    path.as_posix() for path in implementation
+                ),
+            },
+            indent=2,
         )
         + "\n",
     }
+    if implementation:
+        files.update(
+            {destination / path: content for path, content in implementation.items()}
+        )
+    else:
+        files.update(
+            {
+                destination
+                / "pyproject.toml": (
+                    '[project]\nname = "poc-blueprint"\nversion = "0.1.0"\n'
+                    'requires-python = ">=3.10"\ndependencies = []\n'
+                ),
+                destination
+                / "src"
+                / "poc_blueprint"
+                / "__init__.py": '"""Authorized PoC implementation package."""\n',
+                destination
+                / "tests"
+                / "test_implementation.py": (
+                    "import unittest\n\n\n"
+                    "class ImplementationAcceptanceTest(unittest.TestCase):\n"
+                    "    def test_authorized_poc_behavior(self):\n"
+                    '        self.fail("Replace this placeholder with a meaningful lab assertion.")\n'
+                ),
+            }
+        )
+    # Preflight the complete write set before materializing any file so a
+    # conflicting symlink cannot leave a misleading partial scaffold behind.
+    for path in files:
+        current = destination
+        for part in path.relative_to(destination).parts[:-1]:
+            current /= part
+            if current.is_symlink():
+                raise ValueError(f"Scaffold path cannot traverse a symlink: {current}")
+            if current.exists() and not current.is_dir():
+                raise ValueError(f"Scaffold parent is not a directory: {current}")
+        if path.is_symlink():
+            raise ValueError(f"Scaffold file cannot replace a symlink: {path}")
     for path, content in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
-            path.write_text(content, encoding="utf-8")
-    return list(files)
+            _write_private_text(path, content)
+    contract = control_directory / CONTRACT_FILENAME
+    if not contract.exists():
+        create_contract(destination, contract)
+    return [*files, contract]
 
 
 class AnalyzerPlugin(Protocol):

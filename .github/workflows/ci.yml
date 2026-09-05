@@ -180,6 +180,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
       - name: Build Docker image
         run: docker build -t pocarchitect:test .
 
@@ -191,6 +197,12 @@ jobs:
           docker volume create pocarchitect-smoke
           docker run --rm -v pocarchitect-smoke:/reports pocarchitect:test --format json --no-color demo
           docker run --rm --entrypoint python -v pocarchitect-smoke:/reports pocarchitect:test -c "from pathlib import Path; reports = list(Path('/reports/demo').glob('*.md')); assert reports, 'No demo report persisted in /reports'"
+
+      - name: Verify PoC sandbox end to end
+        run: |
+          python -m pip install -e .
+          python -m pocarchitect --format json --no-color verify run tests/fixtures/verified-poc --yes --evidence /tmp/pocarchitect-verification.json
+          python -c "import json; result=json.load(open('/tmp/pocarchitect-verification.json', encoding='utf-8')); assert result['status'] == 'verified'; assert result['sandbox']['network'] == 'none'; assert result['sandbox']['capabilities_dropped'] == ['ALL']"
 
   package:
     needs: quality
@@ -260,7 +272,7 @@ jobs:
           cache: pip
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-distributions
           path: dist
@@ -277,7 +289,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Download validated release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-distributions
           path: dist

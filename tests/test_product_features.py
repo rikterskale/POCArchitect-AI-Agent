@@ -58,6 +58,91 @@ def test_report_history_diff_export_and_scaffold(tmp_path):
     assert all(path.exists() for path in created)
 
 
+def test_scaffold_materializes_a_strict_implementation_bundle(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text(
+        "# Report\n\n"
+        "## Implementation Bundle\n\n"
+        "### File: pyproject.toml\n"
+        '```toml\n[project]\nname = "lab-poc"\nversion = "1.0.0"\n```\n\n'
+        "### File: src/lab_poc.py\n"
+        "```python\ndef prove(value: int) -> bool:\n    return value == 42\n```\n\n"
+        "### File: tests/test_acceptance.py\n"
+        "```python\nimport unittest\n\nclass TestPoC(unittest.TestCase):\n"
+        "    def test_lab_behavior(self):\n        self.assertTrue(True)\n```\n\n"
+        "## Mitigations\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "working-candidate"
+
+    created = features.create_scaffold(report, output)
+
+    assert (
+        (output / "src" / "lab_poc.py")
+        .read_text(encoding="utf-8")
+        .startswith("def prove")
+    )
+    assert (output / "tests" / "test_acceptance.py").is_file()
+    contract = json.loads(
+        (output / ".pocarchitect" / "poc-verification.json").read_text(encoding="utf-8")
+    )
+    assert contract["implementation_status"] == "draft"
+    assert contract["test_commands"]
+    assert any(path.name == "poc-verification.json" for path in created)
+
+
+def test_scaffold_rejects_implementation_path_traversal_before_writing(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text(
+        "## Implementation Bundle\n\n"
+        "### File: ../../outside.py\n```python\nprint('unsafe')\n```\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "candidate"
+
+    with pytest.raises(ValueError, match="Unsafe implementation bundle path"):
+        features.create_scaffold(report, output)
+
+    assert not output.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlinks require elevated Windows rights")
+def test_scaffold_does_not_follow_a_generated_file_symlink(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text(
+        "## Implementation Bundle\n\n"
+        "### File: src/poc.py\n```python\nprint('candidate')\n```\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "candidate"
+    (output / "src").mkdir(parents=True)
+    victim = tmp_path / "victim.py"
+    victim.write_text("keep = True\n", encoding="utf-8")
+    (output / "src" / "poc.py").symlink_to(victim)
+
+    with pytest.raises(ValueError, match="cannot replace a symlink"):
+        features.create_scaffold(report, output)
+
+    assert victim.read_text(encoding="utf-8") == "keep = True\n"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlinks require elevated Windows rights")
+def test_scaffold_rejects_a_symlinked_control_directory_before_writing(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text("# Report\n", encoding="utf-8")
+    output = tmp_path / "candidate"
+    output.mkdir()
+    control_target = tmp_path / "control-target"
+    control_target.mkdir()
+    (output / ".pocarchitect").symlink_to(control_target, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="cannot traverse a symlink"):
+        features.create_scaffold(report, output)
+
+    assert list(output.iterdir()) == [output / ".pocarchitect"]
+    assert list(control_target.iterdir()) == []
+
+
 @pytest.mark.skipif(os.name == "nt", reason="symlinks require elevated Windows rights")
 def test_report_derived_writes_replace_symlinks_without_touching_their_targets(
     tmp_path,

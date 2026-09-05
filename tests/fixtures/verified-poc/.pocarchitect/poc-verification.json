@@ -1,0 +1,16 @@
+{
+  "authorization": "POCArchitect CI harmless isolated fixture",
+  "build_commands": [
+    "python -m compileall -q ."
+  ],
+  "image": "pocarchitect:test",
+  "implementation_status": "ready",
+  "project_name": "pocarchitect-verification-fixture",
+  "required_artifacts": [
+    "lab_poc.py"
+  ],
+  "schema_version": 1,
+  "test_commands": [
+    "python -m unittest discover -s tests -v"
+  ]
+}

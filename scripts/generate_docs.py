@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 from typer.core import TyperArgument, TyperOption
@@ -66,18 +67,31 @@ def command_section(title: str, command: click.Command) -> str:
     )
 
 
+def nested_commands(group: object, prefix: str = "") -> list[tuple[str, click.Command]]:
+    """Return every public command, including nested Typer command groups."""
+    commands: list[tuple[str, click.Command]] = []
+    children: dict[str, Any] = getattr(group, "commands", {})
+    for name, command in children.items():
+        qualified = f"{prefix} {name}".strip()
+        commands.append((qualified, command))
+        if getattr(command, "commands", None) is not None:
+            commands.extend(nested_commands(command, qualified))
+    return commands
+
+
 def cli_reference() -> str:
     from pocarchitect.cli import app
 
     root_command = get_command(app)
     sections = [command_section("Main command", root_command)]
+    discovered_commands = nested_commands(root_command)
     sections.extend(
         command_section(f"Command: `{name}`", command)
-        for name, command in root_command.commands.items()
+        for name, command in discovered_commands
     )
     commands = "\n".join(
         f"| `{name}` | {markdown_cell(command.help or '')} |"
-        for name, command in root_command.commands.items()
+        for name, command in discovered_commands
     )
     return (
         "# CLI Reference\n\n"

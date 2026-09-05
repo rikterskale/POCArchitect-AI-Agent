@@ -574,7 +574,8 @@ Open **Advanced controls** only when needed:
 - **OSV enrichment** queries public vulnerability records for exact dependency
   versions discovered in the selected text.
 - **Compare with previous** saves a diff against the latest matching report.
-- **Create safe scaffold** creates a project skeleton from the report.
+- **Create safe scaffold** materializes a candidate implementation and draft
+  verification contract from the report.
 
 Network enrichment can take additional time. Start with the defaults for your
 first report.
@@ -785,7 +786,13 @@ filename before running the command.
 pocarchitect scaffold --report reports/your-report.md --output blueprint
 ```
 
-The scaffold is generated content. Inspect it before running or extending it.
+The scaffold materializes strictly named files from the report's
+`Implementation Bundle` when present and creates a draft verification contract.
+Generated code is still only a candidate. Inspect every file, add meaningful
+acceptance tests, document the approved lab scope, and use the separate
+`pocarchitect verify run` gate before calling it working. Follow the
+[Working PoC Verification Guide](verification-guide.md) for the complete
+contract and sandbox workflow.
 
 ### Keep or back up reports
 
@@ -1056,6 +1063,8 @@ every command and option.
   so work can resume.
 - **CLI:** Command-line interface; the terminal version of POCArchitect.
 - **Dry run:** A preview that stops before a model-provider request.
+- **Candidate implementation:** Generated or copied code that has not yet passed
+  its explicit verification contract.
 - **Environment variable:** A named configuration value. Provider keys can be
   loaded from the local `.env` file.
 - **Grounding:** Selected source content supplied to the model as evidence.
@@ -1072,6 +1081,9 @@ every command and option.
 - **Source:** The repository, directory, package, image, or URL being analyzed.
 - **Transfer review:** Metadata showing what is proposed for a provider request
   before approval.
+- **VERIFIED PoC:** A reviewed implementation whose authorization-bearing build,
+  tests, and artifact assertions all passed in the constrained sandbox, with
+  retained JSON evidence.
 - **Virtual environment:** The project-local `.venv` folder containing isolated
   Python packages.
 
@@ -1085,5 +1097,7 @@ every command and option.
 - [Local Provider Guide](ollama-setup-guide.md) — OpenAI-compatible local model
   setup.
 - [Docker Guide](docker-guide.md) — container installation and report volumes.
+- [Working PoC Verification Guide](verification-guide.md) — implementation
+  bundles, contracts, sandbox controls, and evidence.
 - [Security Policy](../SECURITY.md) — safe-use and vulnerability-reporting
   expectations.
