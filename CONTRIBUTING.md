@@ -25,7 +25,7 @@ python -m pip install -e .
 python -m pip install -r requirements-dev.txt
 ```
 
-`requirements-dev.txt` pins the developer toolchain, including `ruff==0.15.9`.
+`requirements-dev.txt` pins the developer toolchain, including `ruff==0.16.5`.
 Use that exact Ruff version locally; a different version can format code in a
 way CI then rejects.
 
@@ -77,6 +77,18 @@ python scripts/generate_docs.py
 CI runs `python scripts/generate_docs.py --check` and fails if the checked-in
 reference is out of date, so commit the regenerated files with your change. Do
 not hand-edit the generated references.
+
+The documentation closure report binds each finding to its cited source lines.
+If a reviewed change intentionally updates those lines, refresh the evidence
+fingerprint explicitly and commit it with the change:
+
+```bash
+python scripts/validate_documentation_reports.py --update-fingerprint
+python scripts/validate_documentation_reports.py
+```
+
+The update command validates every citation before writing the new fingerprint;
+it is not a substitute for reviewing whether the closure claim remains true.
 
 ## Change and pull request workflow
 

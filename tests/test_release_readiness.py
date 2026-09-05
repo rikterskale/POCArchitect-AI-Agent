@@ -17,12 +17,13 @@ from scripts.release_readiness import (
     Check,
     Pillar,
     all_long_options,
+    cli_result_detail,
     console_executable_path,
-    render_text,
-    run_console,
-    run_completion_probe,
     json_events,
     pillar_installation,
+    render_text,
+    run_completion_probe,
+    run_console,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,6 +95,17 @@ def test_console_runner_missing_and_present_executable(tmp_path, monkeypatch):
 
 def test_json_event_parser_ignores_blank_and_invalid_lines():
     assert json_events('\nnot-json\n{"event": "ok"}\n') == [{"event": "ok"}]
+
+
+def test_cli_result_detail_is_bounded_and_keeps_the_error_tail():
+    result = subprocess.CompletedProcess([], 2, "x" * 300, "prefix fatal error")
+
+    detail = cli_result_detail(result, max_stream_chars=20)
+
+    assert "exit=2" in detail
+    assert "…" in detail
+    assert "fatal error" in detail
+    assert len(detail) < 100
 
 
 def test_installation_pillar_records_entry_point_discovery_failure(

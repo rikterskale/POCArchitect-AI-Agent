@@ -10,7 +10,6 @@ import html
 import json
 import os
 import re
-import stat
 import tempfile
 import time
 from collections.abc import Iterator
@@ -28,11 +27,13 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
+from .file_io import (
+    harden_private_descriptor,
+    harden_private_path,
+)
+
 CONFIG_FILE = ".pocarchitect.toml"
 HISTORY_FILE = "history.json"
-PRIVATE_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR
-
-
 DEFAULT_PROJECT_CONFIG: dict[str, Any] = {
     "provider": "xai",
     "risk_level": "High",
@@ -374,14 +375,14 @@ def _write_private_bytes(path: Path, content: bytes) -> None:
     )
     temporary_path = Path(temporary_name)
     try:
-        os.fchmod(descriptor, PRIVATE_FILE_MODE)
+        harden_private_descriptor(descriptor)
         with os.fdopen(descriptor, "wb") as handle:
             descriptor = -1
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_path, path)
-        path.chmod(PRIVATE_FILE_MODE)
+        harden_private_path(path)
     finally:
         if descriptor >= 0:
             os.close(descriptor)
@@ -508,7 +509,7 @@ def _write_simple_pdf(target: Path, content: str) -> None:
     output.extend(
         f"trailer << /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
     )
-    _write_private_bytes(target, output)
+    _write_private_bytes(target, bytes(output))
 
 
 def export_report(markdown_path: Path, output_format: str) -> Path:

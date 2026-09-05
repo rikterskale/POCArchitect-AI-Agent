@@ -19,7 +19,7 @@ def test_release_workflow_builds_validates_attests_and_publishes_tagged_artifact
     assert "--artifact wheel" in text
     assert "--artifact sdist" in text
     assert "sha256sum *.whl *.tar.gz > SHA256SUMS" in text
-    assert "actions/attest-build-provenance@v3" in text
+    assert "actions/attest-build-provenance@v4" in text
     assert "id-token: write" in text
     assert "attestations: write" in text
     assert "gh release create" in text

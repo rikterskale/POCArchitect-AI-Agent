@@ -1,7 +1,7 @@
 import importlib.util
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -63,7 +63,7 @@ def test_venv_python_run_clean_environment_and_successful_main(
     artifact = tmp_path / "pocarchitect.whl"
     artifact.touch()
     venv = tmp_path / "venv"
-    expected_name = "python.exe" if validator.os.name == "nt" else "python"
+    expected_name = "python.exe" if sys.platform.startswith("win") else "python"
     assert validator.venv_python(venv).name == expected_name
 
     subprocess_calls = []
@@ -93,8 +93,10 @@ def test_venv_python_run_clean_environment_and_successful_main(
 
 def test_windows_venv_path_and_missing_artifact_parser_error(tmp_path, monkeypatch):
     validator = load_validator()
-    monkeypatch.setattr(validator.os, "name", "nt")
-    assert validator.venv_python(tmp_path) == tmp_path / "Scripts" / "python.exe"
+    assert (
+        validator.venv_python(tmp_path, platform="win32")
+        == tmp_path / "Scripts" / "python.exe"
+    )
 
     monkeypatch.setattr(sys, "argv", ["validate_fresh_install.py", str(tmp_path)])
     with pytest.raises(SystemExit) as error:

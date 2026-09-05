@@ -17,3 +17,11 @@ def test_dockerfile_sets_owner_before_switching_user():
     user_switch_index = dockerfile.index("USER pocuser")
 
     assert useradd_index < chown_index < user_switch_index
+
+
+def test_dockerfile_copies_a_version_independent_virtualenv():
+    dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+
+    assert "VIRTUAL_ENV=/opt/venv" in dockerfile
+    assert "COPY --from=builder /opt/venv /opt/venv" in dockerfile
+    assert "/usr/local/lib/python" not in dockerfile

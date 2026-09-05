@@ -1,8 +1,8 @@
 import importlib.util
 import io
+import sys
 import tarfile
 from pathlib import Path
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate_distribution.py"

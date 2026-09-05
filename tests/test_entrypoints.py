@@ -1,6 +1,6 @@
 import importlib.metadata
-from pathlib import Path
 import runpy
+from pathlib import Path
 
 
 def test_only_packaged_cli_and_preflight_implementations_are_tracked():

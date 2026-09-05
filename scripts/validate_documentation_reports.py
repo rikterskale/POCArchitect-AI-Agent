@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import re
 from pathlib import Path
@@ -41,10 +42,9 @@ def _normalized_file_bytes(path: Path) -> bytes:
 
 
 def evidence_fingerprint(root: Path, rows: dict[str, tuple[str, str]]) -> str:
-    """Bind finding IDs and citation coordinates to normalized evidence bytes."""
+    """Bind finding IDs and citation coordinates to normalized cited bytes."""
     digest = hashlib.sha256()
-    digest.update(b"documentation-closure-v2\0")
-    paths: set[Path] = set()
+    digest.update(b"documentation-closure-v3\0")
     for finding_id in sorted(rows):
         status, evidence = rows[finding_id]
         digest.update(finding_id.strip().upper().encode("utf-8"))
@@ -54,20 +54,45 @@ def evidence_fingerprint(root: Path, rows: dict[str, tuple[str, str]]) -> str:
         citations = sorted(CITATION_PATTERN.findall(evidence))
         for raw_path, raw_start, raw_end in citations:
             relative = Path(raw_path)
-            paths.add(relative)
-            coordinate = (
-                f"{relative.as_posix()}:{int(raw_start)}-{int(raw_end or raw_start)}"
-            )
+            start = int(raw_start)
+            end = int(raw_end or raw_start)
+            coordinate = f"{relative.as_posix()}:{start}-{end}"
             digest.update(coordinate.encode("utf-8"))
             digest.update(b"\0")
-
-    for relative in sorted(paths, key=lambda item: item.as_posix()):
-        path = root / relative
-        digest.update(relative.as_posix().encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(hashlib.sha256(_normalized_file_bytes(path)).digest())
-        digest.update(b"\0")
+            lines = _normalized_file_bytes(root / relative).splitlines(keepends=True)
+            cited_bytes = b"".join(lines[start - 1 : end])
+            digest.update(hashlib.sha256(cited_bytes).digest())
+            digest.update(b"\0")
     return digest.hexdigest()
+
+
+def update_fingerprint(
+    root: Path = ROOT, *, expected_ids: set[str] = EXPECTED_IDS
+) -> str:
+    """Refresh the closure fingerprint after its cited evidence was reviewed."""
+    gap_report = root / GAP_REPORT.relative_to(ROOT)
+    if not gap_report.is_file():
+        raise ValueError(f"Required documentation artifact is missing: {gap_report}")
+    text = gap_report.read_text(encoding="utf-8")
+    rows = closure_rows(text)
+    if set(rows) != expected_ids:
+        missing = sorted(expected_ids - set(rows))
+        extra = sorted(set(rows) - expected_ids)
+        raise ValueError(
+            f"Closure matrix ID mismatch; missing={missing}, extra={extra}"
+        )
+    citation_errors, _ = validate_citations(root, rows)
+    if citation_errors:
+        raise ValueError("; ".join(citation_errors))
+    current = evidence_fingerprint(root, rows)
+    replacement = f"<!-- closure-evidence-sha256: {current} -->"
+    updated, replacements = FINGERPRINT_PATTERN.subn(replacement, text)
+    if replacements != 1:
+        raise ValueError(
+            "Gap report must contain exactly one closure evidence fingerprint"
+        )
+    gap_report.write_text(updated, encoding="utf-8")
+    return current
 
 
 def validate_citations(
@@ -238,7 +263,23 @@ def validate(root: Path = ROOT) -> list[str]:
     return errors
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--update-fingerprint",
+        action="store_true",
+        help="Refresh the fingerprint after reviewing all cited closure evidence.",
+    )
+    args = parser.parse_args(argv)
+    if args.update_fingerprint:
+        try:
+            fingerprint = update_fingerprint()
+        except (OSError, UnicodeError, ValueError) as error:
+            print(f"Could not update closure evidence fingerprint: {error}")
+            return 1
+        print(f"Updated closure evidence fingerprint: {fingerprint}")
+        return 0
+
     errors = validate()
     if errors:
         print("Documentation report validation failed:")

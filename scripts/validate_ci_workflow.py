@@ -44,7 +44,7 @@ REQUIRED_RUN_COMMANDS = (
     "python -m build",
     "python scripts/validate_distribution.py dist",
 )
-REQUIRED_ACTIONS = {"actions/upload-artifact@v4", "actions/download-artifact@v4"}
+REQUIRED_ACTIONS = {"actions/upload-artifact@v7", "actions/download-artifact@v4"}
 
 
 def validate(root: Path = ROOT) -> list[str]:

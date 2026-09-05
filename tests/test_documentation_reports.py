@@ -87,6 +87,18 @@ def test_evidence_fingerprint_changes_with_cited_file(tmp_path):
     assert validator.evidence_fingerprint(tmp_path, rows) != before
 
 
+def test_evidence_fingerprint_ignores_uncited_file_content(tmp_path):
+    validator = load_validator()
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("cited\nfirst uncited value\n", encoding="utf-8")
+    rows = {"DOC-001": ("Closed", "`evidence.md:1`")}
+    before = validator.evidence_fingerprint(tmp_path, rows)
+
+    evidence.write_text("cited\nsecond uncited value\n", encoding="utf-8")
+
+    assert validator.evidence_fingerprint(tmp_path, rows) == before
+
+
 def test_evidence_fingerprint_normalizes_lf_and_crlf(tmp_path):
     validator = load_validator()
     evidence = tmp_path / "evidence.md"
@@ -127,6 +139,26 @@ def test_citation_validator_reports_absent_citation_and_file(tmp_path):
     assert paths == {Path("missing.md")}
 
 
+def test_update_fingerprint_requires_valid_citations_and_rewrites_marker(tmp_path):
+    validator = load_validator()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    evidence = tmp_path / "evidence.md"
+    evidence.write_text("reviewed evidence\n", encoding="utf-8")
+    gap = docs / "DOCUMENTATION_GAP_ANALYSIS.md"
+    gap.write_text(
+        "# Report\n\n"
+        "## 10. Remediation closure matrix\n\n"
+        "| DOC-001 | Closed | `evidence.md:1` | verified |\n\n"
+        "<!-- closure-evidence-sha256: " + "0" * 64 + " -->\n",
+        encoding="utf-8",
+    )
+
+    fingerprint = validator.update_fingerprint(tmp_path, expected_ids={"DOC-001"})
+
+    assert f"closure-evidence-sha256: {fingerprint}" in gap.read_text(encoding="utf-8")
+
+
 def test_report_validator_reports_missing_artifacts_and_main_status(
     tmp_path, monkeypatch, capsys
 ):
@@ -136,10 +168,10 @@ def test_report_validator_reports_missing_artifacts_and_main_status(
     assert all("artifact is missing" in error for error in errors)
 
     monkeypatch.setattr(validator, "validate", lambda: ["broken"])
-    assert validator.main() == 1
+    assert validator.main([]) == 1
     assert "broken" in capsys.readouterr().out
-    monkeypatch.setattr(validator, "validate", lambda: [])
-    assert validator.main() == 0
+    monkeypatch.setattr(validator, "validate", list)
+    assert validator.main([]) == 0
     assert "fingerprint are valid" in capsys.readouterr().out
 
 

@@ -449,6 +449,25 @@ def json_events(stdout: str) -> list[dict]:
     return events
 
 
+def cli_result_detail(
+    result: subprocess.CompletedProcess[str], *, max_stream_chars: int = 240
+) -> str:
+    """Return bounded diagnostics for a failed subprocess-backed readiness check."""
+
+    def compact(value: str) -> str:
+        normalized = " ".join(value.split())
+        if len(normalized) <= max_stream_chars:
+            return normalized
+        return "…" + normalized[-max_stream_chars:]
+
+    parts = [f"exit={result.returncode}"]
+    if result.stdout.strip():
+        parts.append(f"stdout={compact(result.stdout)}")
+    if result.stderr.strip():
+        parts.append(f"stderr={compact(result.stderr)}")
+    return "; ".join(parts)
+
+
 # ── Pillar 1: Proven installation ────────────────────────────────────────────
 def pillar_installation(work: Path, require_console_script: bool = False) -> Pillar:
     p = Pillar("installation", "Proven installation")
@@ -622,29 +641,41 @@ def pillar_features(work: Path) -> Pillar:
         work,
     )
     doctor_events = json_events(doctor.stdout)
-    p.record(
-        "`doctor --offline` runs a credential-free installation diagnosis",
+    doctor_ok = (
         doctor.returncode == 0
         and any(event.get("event") == "preflight" for event in doctor_events)
-        and any(event.get("message") == "Preflight passed." for event in doctor_events),
+        and any(event.get("message") == "Preflight passed." for event in doctor_events)
+    )
+    p.record(
+        "`doctor --offline` runs a credential-free installation diagnosis",
+        doctor_ok,
+        "" if doctor_ok else cli_result_detail(doctor),
     )
 
     demo = run_cli(["--format", "json", "--no-color", "demo"], work)
     demo_events = json_events(demo.stdout)
-    p.record(
-        "`demo` creates a report through the deterministic offline path",
+    demo_ok = (
         demo.returncode == 0
         and any(event.get("event") == "report_saved" for event in demo_events)
-        and any(event.get("event") == "report_digest" for event in demo_events),
+        and any(event.get("event") == "report_digest" for event in demo_events)
+    )
+    p.record(
+        "`demo` creates a report through the deterministic offline path",
+        demo_ok,
+        "" if demo_ok else cli_result_detail(demo),
     )
 
     quickstart = run_cli(["--format", "json", "--no-color", "quickstart"], work)
     quickstart_events = json_events(quickstart.stdout)
-    p.record(
-        "`quickstart` runs doctor and demo without credentials",
+    quickstart_ok = (
         quickstart.returncode == 0
         and any(event.get("event") == "preflight" for event in quickstart_events)
-        and any(event.get("event") == "report_saved" for event in quickstart_events),
+        and any(event.get("event") == "report_saved" for event in quickstart_events)
+    )
+    p.record(
+        "`quickstart` runs doctor and demo without credentials",
+        quickstart_ok,
+        "" if quickstart_ok else cli_result_detail(quickstart),
     )
 
     # Inventory control: a new option must identify its executable evidence owner.
@@ -869,8 +900,7 @@ def pillar_features(work: Path) -> Pillar:
         requests_after_refusal = len(captured)
         confirmed = run_cli([*confirmation_args, "--yes"], work)
         confirmed_events = json_events(confirmed.stdout)
-        p.record(
-            "`--yes` controls non-interactive source transfer",
+        confirmation_ok = (
             unconfirmed.returncode == 2
             and any(
                 event.get("event") == "confirmation_required"
@@ -879,7 +909,19 @@ def pillar_features(work: Path) -> Pillar:
             and requests_after_refusal == request_count
             and confirmed.returncode == 0
             and any(event.get("event") == "report_saved" for event in confirmed_events)
-            and len(captured) == request_count + 1,
+            and len(captured) == request_count + 1
+        )
+        p.record(
+            "`--yes` controls non-interactive source transfer",
+            confirmation_ok,
+            (
+                ""
+                if confirmation_ok
+                else "unconfirmed: "
+                + cli_result_detail(unconfirmed)
+                + "; confirmed: "
+                + cli_result_detail(confirmed)
+            ),
         )
 
         run_args = [
@@ -911,10 +953,17 @@ def pillar_features(work: Path) -> Pillar:
     report_files = list(out_dir.glob("*.md")) if out_dir.exists() else []
     report_text = report_files[0].read_text(encoding="utf-8") if report_files else ""
 
+    provider_ok = (
+        e2e.returncode == 0 and saved is not None and MOCK_MARKER in report_text
+    )
     p.record(
         "`--provider local`/`--base-url` reach the provider and return a report",
-        e2e.returncode == 0 and saved is not None and MOCK_MARKER in report_text,
-        ",".join(n for n in e2e_names if n),
+        provider_ok,
+        (
+            ",".join(n for n in e2e_names if n)
+            if provider_ok
+            else cli_result_detail(e2e)
+        ),
     )
     p.record(
         "`--model`/`--temperature` reach the provider call unchanged",

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import difflib
 import hashlib
 import json
@@ -89,6 +88,11 @@ from .features import (
     update_history,
     write_project_config,
 )
+from .file_io import (
+    harden_private_descriptor,
+    harden_private_path,
+    open_private_exclusive,
+)
 from .finding_workflow import WorkflowEngine, WorkflowError
 from .output import event_payload
 from .preflight import main as run_preflight
@@ -129,7 +133,10 @@ class SuggestingGroup(TyperGroup):
             if args:
                 matches = difflib.get_close_matches(args[0], self.list_commands(ctx), n=1, cutoff=0.55)  # type: ignore[arg-type]
                 if matches and "Did you mean" not in error.message:
-                    error.message += f" Did you mean '{matches[0]}'?"
+                    raise click.UsageError(
+                        f"{error.message} Did you mean '{matches[0]}'?",
+                        ctx=error.ctx,
+                    ) from error
             raise
 
 
@@ -783,19 +790,14 @@ def save_report(
     temporary_path = output_dir / f".{filename}.{uuid.uuid4().hex}.tmp"
     descriptor = -1
     try:
-        descriptor = os.open(
-            temporary_path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-            stat.S_IRUSR | stat.S_IWUSR,
-        )
-        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        descriptor = open_private_exclusive(temporary_path)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             handle.write(metadata_block + content)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_path, output_path)
-        output_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        harden_private_path(output_path)
     finally:
         if descriptor >= 0:
             os.close(descriptor)
@@ -2038,14 +2040,14 @@ def _upsert_env_file(env_path: Path, key: str, value: str) -> None:
     )
     temporary_path = Path(temporary_name)
     try:
-        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        harden_private_descriptor(descriptor)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             handle.write("\n".join(lines) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_path, env_path)
-        env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        harden_private_path(env_path)
     finally:
         if descriptor >= 0:
             os.close(descriptor)

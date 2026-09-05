@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import typer
+from click import unstyle
 from rich.console import Console
 from typer.testing import CliRunner
 
@@ -27,7 +28,7 @@ def test_windows_help_uses_plain_renderer_for_redirected_output():
     )
 
     assert result.returncode == 0
-    assert "Usage: python -m pocarchitect" in result.stdout
+    assert "Usage: python -m pocarchitect" in unstyle(result.stdout)
     expected_markup = None if sys.platform.startswith("win") else "rich"
     assert cli.app.rich_markup_mode == expected_markup
 
@@ -887,7 +888,7 @@ def test_workflow_cli_round_trip_and_invalid_payload(tmp_path):
     assert created.exit_code == status.exit_code == applied.exit_code == 0
     assert invalid.exit_code == 2
     assert "payload must be a JSON object" in invalid.stdout
-    help_text = RUNNER.invoke(cli.app, ["workflow-apply", "--help"]).stdout
+    help_text = unstyle(RUNNER.invoke(cli.app, ["workflow-apply", "--help"]).stdout)
     assert "confirm_scope" not in help_text
     assert "--command decide" in help_text
     unsupported = RUNNER.invoke(
@@ -1074,9 +1075,8 @@ def test_cli_prompt_load_failure_and_output_reconfigure_errors(monkeypatch):
 
     events = []
     monkeypatch.setattr(cli, "files", lambda package: BrokenResource())
-    with cli.capture_events(events.append):
-        with pytest.raises(typer.Exit) as error:
-            cli.load_prompt()
+    with cli.capture_events(events.append), pytest.raises(typer.Exit) as error:
+        cli.load_prompt()
     assert error.value.exit_code == 1
     assert events[-1]["event"] == "error"
 
@@ -1104,18 +1104,18 @@ def test_cli_confirmation_interactive_cancel_and_accept(monkeypatch):
 
 
 def test_cli_batch_and_recovery_error_paths(tmp_path, monkeypatch):
-    common = dict(
-        provider="local",
-        api_key=None,
-        model="model",
-        temperature=0.2,
-        base_url=None,
-        output_dir=tmp_path,
-        risk_level="High",
-        target_os="Linux",
-        include_mitigations=True,
-        no_ingest=True,
-    )
+    common = {
+        "provider": "local",
+        "api_key": None,
+        "model": "model",
+        "temperature": 0.2,
+        "base_url": None,
+        "output_dir": tmp_path,
+        "risk_level": "High",
+        "target_os": "Linux",
+        "include_mitigations": True,
+        "no_ingest": True,
+    }
     with pytest.raises(typer.Exit) as missing:
         cli.process_batch_file(batch_path=tmp_path / "missing.txt", **common)
     assert missing.value.exit_code == 2
@@ -1409,22 +1409,22 @@ def test_process_single_url_optional_outputs_and_text_summary(tmp_path, monkeypa
 
 
 def _single_url_kwargs(tmp_path, **overrides):
-    values = dict(
-        url="https://example.test/source",
-        provider="local",
-        api_key=None,
-        model="model",
-        temperature=0.2,
-        base_url=None,
-        output_dir=tmp_path / "reports",
-        risk_level="High",
-        target_os="Linux",
-        include_mitigations=True,
-        no_ingest=True,
-        dry_run=False,
-        verbose=False,
-        confirmed=True,
-    )
+    values = {
+        "url": "https://example.test/source",
+        "provider": "local",
+        "api_key": None,
+        "model": "model",
+        "temperature": 0.2,
+        "base_url": None,
+        "output_dir": tmp_path / "reports",
+        "risk_level": "High",
+        "target_os": "Linux",
+        "include_mitigations": True,
+        "no_ingest": True,
+        "dry_run": False,
+        "verbose": False,
+        "confirmed": True,
+    }
     values.update(overrides)
     return values
 
@@ -1484,9 +1484,8 @@ def test_doctor_fix_interactive_paths_and_repair_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "mkdir", fail_target)
     events = []
-    with cli.capture_events(events.append):
-        with pytest.raises(typer.Exit) as failed:
-            cli.doctor(offline=True, fix=True, yes=True, output_dir=target)
+    with cli.capture_events(events.append), pytest.raises(typer.Exit) as failed:
+        cli.doctor(offline=True, fix=True, yes=True, output_dir=target)
     assert failed.value.exit_code == 1
     assert any(
         "Could not repair output directory" in event["message"] for event in events
@@ -1506,15 +1505,14 @@ def test_doctor_fix_stores_key_and_reports_missing_git(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: True)
     monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: "sk-doctor-key")
     events = []
-    with cli.capture_events(events.append):
-        with pytest.raises(typer.Exit) as error:
-            cli.doctor(
-                provider="openai",
-                offline=False,
-                fix=True,
-                yes=True,
-                output_dir=tmp_path / "out",
-            )
+    with cli.capture_events(events.append), pytest.raises(typer.Exit) as error:
+        cli.doctor(
+            provider="openai",
+            offline=False,
+            fix=True,
+            yes=True,
+            output_dir=tmp_path / "out",
+        )
     assert error.value.exit_code == 1
     env_text = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "OPENAI_API_KEY=sk-doctor-key" in env_text
@@ -1733,9 +1731,8 @@ def test_batch_reset_interactive_confirm_and_compare_url_only(tmp_path, monkeypa
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
     events = []
-    with cli.capture_events(events.append):
-        with pytest.raises(typer.Exit) as cancelled:
-            cli.batch_reset(batch_state=ledger, yes=False)
+    with cli.capture_events(events.append), pytest.raises(typer.Exit) as cancelled:
+        cli.batch_reset(batch_state=ledger, yes=False)
     assert cancelled.value.exit_code == 0
     assert any("was not reset" in event["message"] for event in events)
     assert ledger.is_file()

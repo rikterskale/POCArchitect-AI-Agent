@@ -1,6 +1,6 @@
 import importlib.util
-from pathlib import Path
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +36,7 @@ def test_command_validator_main_reports_success_and_failure(
     guide = tmp_path / "START_HERE.md"
     guide.write_text("\n".join(validator.DOCUMENTED_COMMANDS), encoding="utf-8")
     monkeypatch.setattr(validator, "GUIDE", guide)
-    monkeypatch.setattr(validator, "run_safe_probes", lambda: [])
+    monkeypatch.setattr(validator, "run_safe_probes", list)
     monkeypatch.setattr(sys, "argv", ["validate_documentation_commands.py"])
 
     assert validator.main() == 0

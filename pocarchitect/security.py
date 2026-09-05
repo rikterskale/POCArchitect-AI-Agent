@@ -58,16 +58,18 @@ def query_osv(
     with urlopen(request, timeout=timeout) as response:  # nosec B310
         result = json.loads(response.read().decode("utf-8"))
     if not isinstance(result, dict) or not isinstance(result.get("results"), list):
-        raise ValueError("OSV returned an invalid batch response")
+        raise ValueError("OSV returned an invalid batch response")  # noqa: TRY004
     if len(result["results"]) != len(packages):
         raise ValueError("OSV returned a result count that does not match the request")
     findings: list[dict[str, Any]] = []
     for package, item in zip(packages, result["results"], strict=True):
         if not isinstance(item, dict) or not isinstance(item.get("vulns", []), list):
-            raise ValueError("OSV returned an invalid package result")
+            raise ValueError("OSV returned an invalid package result")  # noqa: TRY004
         for vulnerability in item.get("vulns", []):
             if not isinstance(vulnerability, dict):
-                raise ValueError("OSV returned an invalid vulnerability record")
+                raise ValueError(  # noqa: TRY004
+                    "OSV returned an invalid vulnerability record"
+                )
             findings.append(
                 {
                     **package,

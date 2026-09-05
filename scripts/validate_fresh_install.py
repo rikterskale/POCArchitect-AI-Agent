@@ -27,8 +27,10 @@ def select_artifact(dist: Path, artifact_kind: str) -> Path:
     return matches[0].resolve()
 
 
-def venv_python(venv_dir: Path) -> Path:
-    if os.name == "nt":
+def venv_python(venv_dir: Path, *, platform: str | None = None) -> Path:
+    """Return the virtualenv interpreter without mutating global platform state."""
+    resolved_platform = sys.platform if platform is None else platform
+    if resolved_platform.startswith("win"):
         return venv_dir / "Scripts" / "python.exe"
     return venv_dir / "bin" / "python"
 

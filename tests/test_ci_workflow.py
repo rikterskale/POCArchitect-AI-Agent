@@ -1,6 +1,6 @@
 import importlib.util
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "validate_ci_workflow.py"
@@ -65,7 +65,7 @@ def test_ci_validator_does_not_count_commented_controls(tmp_path):
 def test_ci_validator_main_reports_success_and_failure(monkeypatch, capsys):
     validator = load_validator()
     monkeypatch.setattr(sys, "argv", ["validate_ci_workflow.py"])
-    monkeypatch.setattr(validator, "validate", lambda: [])
+    monkeypatch.setattr(validator, "validate", list)
     assert validator.main() == 0
     assert "Canonical CI workflow is valid YAML" in capsys.readouterr().out
 

@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from urllib.parse import unquote
 
-import re
 from markdown_it import MarkdownIt
 
 ROOT = Path(__file__).resolve().parents[1]

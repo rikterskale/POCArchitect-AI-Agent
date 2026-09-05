@@ -1,13 +1,13 @@
 import json
-from datetime import datetime
 import os
+import stat
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from rich.console import Console
 
-from pocarchitect import features
-from pocarchitect import security
+from pocarchitect import features, security
 from pocarchitect.security import extract_dependencies
 
 
@@ -468,5 +468,5 @@ def test_pdf_export_wraps_long_lines(tmp_path):
 
     assert pdf.read_bytes().startswith(b"%PDF-1.4")
     assert pdf.stat().st_size > 200
-    if features.os.name != "nt":
-        assert features.stat.S_IMODE(pdf.stat().st_mode) == 0o600
+    if os.name != "nt":
+        assert stat.S_IMODE(pdf.stat().st_mode) == 0o600

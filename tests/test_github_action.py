@@ -22,7 +22,7 @@ def test_github_action_composite_installs_runs_comments_and_uploads():
     assert "POCA_PROVIDER" in text
     assert "gh pr comment" in text
     assert "POCAnalysis_*.md" in text
-    assert "actions/upload-artifact@v4" in text
+    assert "actions/upload-artifact@v7" in text
     assert "if-no-files-found: error" in text
     assert "path: reports/" in text
     assert "inputs.dry-run != 'true'" in text

@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from pocarchitect.finding_workflow import (
+    STEPS,
     Finding,
     FindingStatus,
     WorkflowCommandError,
@@ -13,7 +14,6 @@ from pocarchitect.finding_workflow import (
     WorkflowError,
     WorkflowPhase,
     WorkflowState,
-    STEPS,
 )
 
 
