@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-05
+
 ### Added
 
 - Verified tag-driven GitHub release workflow with clean wheel/sdist installs,
@@ -48,11 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Python 3.14 into the CI support matrix, and updated the security toolchain.
 - The GUI now validates output-directory writability before source inspection
   or provider access, and the reusable Action rejects ambiguous boolean inputs.
+- Updated the runtime and development dependency sets, GitHub Actions, and the
+  Docker runtime to their validated current versions.
+- Made release-readiness failures include bounded subprocess diagnostics and
+  made clean-install platform simulation safe across supported Python versions.
 
 ### Security
 
-- Credential updates are atomic and owner-only on POSIX; reports, history,
-  diffs, and exports now use private file permissions by default.
+- Credential updates, reports, history, diffs, and exports use atomic private
+  writes with POSIX owner-only modes and Windows-compatible ACL behavior.
 - GUI artifact access rejects files replaced by symlinks, and CI fails closed
   when Bandit reports an incomplete scan or any finding.
 
@@ -62,5 +68,6 @@ Released as git tag `v0.2.0`. This is the earliest release with a recorded tag;
 entries below the level of that tag are intentionally omitted because no prior
 tagged history exists to verify them against.
 
-[Unreleased]: https://github.com/rikterskale/POCArchitect-AI-Agent/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rikterskale/POCArchitect-AI-Agent/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rikterskale/POCArchitect-AI-Agent/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rikterskale/POCArchitect-AI-Agent/releases/tag/v0.2.0

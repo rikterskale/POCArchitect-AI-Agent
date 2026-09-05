@@ -19,7 +19,7 @@ def load_validator():
 
 def test_select_artifact_requires_exactly_one_matching_distribution(tmp_path):
     validator = load_validator()
-    wheel = tmp_path / "pocarchitect-0.2.0-py3-none-any.whl"
+    wheel = tmp_path / "pocarchitect-0.3.0-py3-none-any.whl"
     wheel.touch()
 
     assert validator.select_artifact(tmp_path, "wheel") == wheel.resolve()
@@ -31,7 +31,7 @@ def test_select_artifact_requires_exactly_one_matching_distribution(tmp_path):
 
 def test_select_artifact_keeps_wheel_and_sdist_checks_separate(tmp_path):
     validator = load_validator()
-    sdist = tmp_path / "pocarchitect-0.2.0.tar.gz"
+    sdist = tmp_path / "pocarchitect-0.3.0.tar.gz"
     sdist.touch()
 
     assert validator.select_artifact(tmp_path, "sdist") == sdist.resolve()

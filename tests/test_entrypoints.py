@@ -24,4 +24,4 @@ def test_package_version_has_a_source_checkout_fallback(monkeypatch):
 
     namespace = runpy.run_path(root / "pocarchitect" / "__init__.py")
 
-    assert namespace["__version__"] == "0.2.0"
+    assert namespace["__version__"] == "0.3.0"

@@ -25,22 +25,22 @@ def write_member(archive, name: str, content: str) -> None:
 
 def test_distribution_validator_checks_required_reports_and_links(tmp_path):
     validator = load_validator()
-    archive_path = tmp_path / "pocarchitect-0.2.0.tar.gz"
+    archive_path = tmp_path / "pocarchitect-0.3.0.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
         write_member(
             archive,
-            "pocarchitect-0.2.0/README.md",
+            "pocarchitect-0.3.0/README.md",
             "[Gap](docs/DOCUMENTATION_GAP_ANALYSIS.md)\n"
             "[History](docs/DOCUMENTATION_REVIEW_REPORT.md)\n",
         )
         write_member(
             archive,
-            "pocarchitect-0.2.0/docs/DOCUMENTATION_GAP_ANALYSIS.md",
+            "pocarchitect-0.3.0/docs/DOCUMENTATION_GAP_ANALYSIS.md",
             "# Gap\n",
         )
         write_member(
             archive,
-            "pocarchitect-0.2.0/docs/DOCUMENTATION_REVIEW_REPORT.md",
+            "pocarchitect-0.3.0/docs/DOCUMENTATION_REVIEW_REPORT.md",
             "# History\n",
         )
 
@@ -49,11 +49,11 @@ def test_distribution_validator_checks_required_reports_and_links(tmp_path):
 
 def test_distribution_validator_reports_missing_local_target(tmp_path):
     validator = load_validator()
-    archive_path = tmp_path / "pocarchitect-0.2.0.tar.gz"
+    archive_path = tmp_path / "pocarchitect-0.3.0.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
         write_member(
             archive,
-            "pocarchitect-0.2.0/README.md",
+            "pocarchitect-0.3.0/README.md",
             "[Missing](docs/missing.md)\n",
         )
 
@@ -74,9 +74,9 @@ def test_distribution_validator_reports_corrupt_archive(tmp_path):
 
 def test_distribution_validator_reports_non_utf8_markdown(tmp_path):
     validator = load_validator()
-    archive_path = tmp_path / "pocarchitect-0.2.0.tar.gz"
+    archive_path = tmp_path / "pocarchitect-0.3.0.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
-        info = tarfile.TarInfo("pocarchitect-0.2.0/README.md")
+        info = tarfile.TarInfo("pocarchitect-0.3.0/README.md")
         content = b"\xff\xfe"
         info.size = len(content)
         archive.addfile(info, io.BytesIO(content))
@@ -88,22 +88,22 @@ def test_distribution_validator_main_accepts_valid_archive(
     tmp_path, monkeypatch, capsys
 ):
     validator = load_validator()
-    archive_path = tmp_path / "pocarchitect-0.2.0.tar.gz"
+    archive_path = tmp_path / "pocarchitect-0.3.0.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
         write_member(
             archive,
-            "pocarchitect-0.2.0/README.md",
+            "pocarchitect-0.3.0/README.md",
             "[Gap](docs/DOCUMENTATION_GAP_ANALYSIS.md)\n"
             "[History](docs/DOCUMENTATION_REVIEW_REPORT.md)\n",
         )
         write_member(
             archive,
-            "pocarchitect-0.2.0/docs/DOCUMENTATION_GAP_ANALYSIS.md",
+            "pocarchitect-0.3.0/docs/DOCUMENTATION_GAP_ANALYSIS.md",
             "# Gap\n",
         )
         write_member(
             archive,
-            "pocarchitect-0.2.0/docs/DOCUMENTATION_REVIEW_REPORT.md",
+            "pocarchitect-0.3.0/docs/DOCUMENTATION_REVIEW_REPORT.md",
             "# History\n",
         )
     monkeypatch.setattr(sys, "argv", ["validate_distribution.py", str(tmp_path)])

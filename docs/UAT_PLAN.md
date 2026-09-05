@@ -10,7 +10,7 @@ Automated cases: `tests/test_uat.py` (J1–J22, B1–B3) and
 | Test ID | Precondition | Steps | Expected result | Actual result | Pass/Fail |
 |---|---|---|---|---|---|
 | UAT-J1 | Repo checkout; Python ≥ 3.10 venv | `python -m pip install -e ".[gui]"` then `python -m pocarchitect --help` | Help exits 0 and mentions `quickstart` | Live: `Usage: python -m pocarchitect` … exit 0. `tests/test_uat.py::test_uat_j1_help_exits_zero_after_install` PASSED | Pass |
-| UAT-J2 | Package installed | `python -m pocarchitect --version` | Exit 0; stdout contains `POCArchitect v` | Live: `POCArchitect v0.2.0` EXIT:0. `test_uat_j2_version_prints_product_banner` PASSED | Pass |
+| UAT-J2 | Package installed | `python -m pocarchitect --version` | Exit 0; stdout contains `POCArchitect v` | Live: `POCArchitect v0.3.0` EXIT:0. `test_uat_j2_version_prints_product_banner` PASSED | Pass |
 | UAT-J3 | Package installed; writable cwd | `python -m pocarchitect preflight --offline --format json --no-color` | Exit 0; JSON `"event": "preflight"` and `Preflight passed.` | Live JSON starts `{"checks": [{"check": "Python >=3.10"…`; EXIT:0. `test_uat_j3_offline_preflight_passes_json` PASSED | Pass |
 | UAT-J4 | Package installed; writable cwd | `python -m pocarchitect --format json --no-color quickstart` | Exit 0; events include `preflight` and `report_saved` | `test_uat_j4_j5_quickstart_writes_demo_report` PASSED (exit 0, both events present) | Pass |
 | UAT-J5 | UAT-J4 succeeded | Read `reports/demo/POCAnalysis_*.md` | File exists; body contains `POCArchitect Demo Report` | Same test: glob found `POCAnalysis_*.md` containing `POCArchitect Demo Report` | Pass |
