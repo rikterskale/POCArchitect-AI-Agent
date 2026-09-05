@@ -1,6 +1,6 @@
 # requirements.txt – runtime dependencies
 # CLI metadata is used to generate a checked-in reference; keep its renderer stable.
-typer==0.23.1
+typer==0.27.2
 click==8.3.3
 rich==15.0.0
 openai==3.1.0
