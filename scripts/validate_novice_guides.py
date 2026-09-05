@@ -125,6 +125,38 @@ def validate_canonical_guide(path: Path) -> list[str]:
     return errors
 
 
+def has_unclosed_fence(text: str) -> bool:
+    """Return whether CommonMark-style fences are malformed or unclosed."""
+    opening_pattern = re.compile(r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
+    marker_character = ""
+    minimum_length = 0
+
+    for line in text.splitlines():
+        if marker_character:
+            closing_pattern = (
+                rf" {{0,3}}(?P<marker>{re.escape(marker_character)}"
+                rf"{{{minimum_length},}})(?P<trailing>.*)"
+            )
+            closing = re.fullmatch(closing_pattern, line)
+            if closing is not None and closing.group("trailing").strip():
+                return True
+            if closing is not None:
+                marker_character = ""
+                minimum_length = 0
+            continue
+
+        opening = opening_pattern.fullmatch(line)
+        if opening is None:
+            continue
+        marker = opening.group("marker")
+        if marker.startswith("`") and "`" in opening.group("info"):
+            continue
+        marker_character = marker[0]
+        minimum_length = len(marker)
+
+    return bool(marker_character)
+
+
 def validate_start_guide(path: Path) -> list[str]:
     if not path.exists():
         return [f"Start Here guide is missing: {path}"]
@@ -148,7 +180,7 @@ def validate_start_guide(path: Path) -> list[str]:
         errors.append("Start Here guide is missing the issue-remediation workflow")
     if len(text.splitlines()) > 800:
         errors.append("Start Here guide is too long for the novice-first journey")
-    if len(re.findall(r"^```", text, flags=re.MULTILINE)) % 2:
+    if has_unclosed_fence(text):
         errors.append("Start Here guide contains an unbalanced fenced code block")
     return errors
 

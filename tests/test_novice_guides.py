@@ -64,6 +64,17 @@ def test_start_here_guide_rejects_regressions_in_safety_and_readability(tmp_path
         for error in validator.validate_start_guide(broken_fence)
     )
 
+    mismatched_closer = tmp_path / "mismatched-closer.md"
+    lines = original.splitlines()
+    opening_index = lines.index("```text")
+    closing_index = lines.index("```", opening_index + 1)
+    lines[closing_index] = "```text"
+    mismatched_closer.write_text("\n".join(lines), encoding="utf-8")
+    assert any(
+        "unbalanced fenced code block" in error
+        for error in validator.validate_start_guide(mismatched_closer)
+    )
+
     oversized = tmp_path / "oversized.md"
     oversized.write_text(f"{original}\n" + "padding\n" * 801, encoding="utf-8")
     assert any(
