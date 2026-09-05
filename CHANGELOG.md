@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated artifact downloads to `actions/download-artifact@v8` for the supported
   Node runtime and fail-closed artifact digest validation.
+- Hardened verification with length-framed source digests, immutable image-ID
+  execution, full artifact-path symlink checks, and incomplete draft contracts
+  for manually configured toolchains.
 
 ## [0.3.0] - 2026-09-05
 

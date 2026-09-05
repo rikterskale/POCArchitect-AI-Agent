@@ -91,6 +91,27 @@ def test_scaffold_materializes_a_strict_implementation_bundle(tmp_path):
     assert any(path.name == "poc-verification.json" for path in created)
 
 
+def test_scaffold_keeps_an_unknown_toolchain_as_an_incomplete_draft(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text(
+        "## Implementation Bundle\n\n"
+        "### File: proof.c\n"
+        "```c\nint main(void) { return 0; }\n```\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "custom-candidate"
+
+    created = features.create_scaffold(report, output)
+
+    assert (output / "proof.c").is_file()
+    contract_path = output / ".pocarchitect" / "poc-verification.json"
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    assert contract["implementation_status"] == "draft"
+    assert contract["build_commands"] == []
+    assert contract["test_commands"] == []
+    assert contract_path in created
+
+
 def test_scaffold_rejects_implementation_path_traversal_before_writing(tmp_path):
     report = tmp_path / "report.md"
     report.write_text(

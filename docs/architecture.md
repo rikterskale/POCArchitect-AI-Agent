@@ -210,11 +210,12 @@ environments, dependency caches, `.env` variants, and non-regular files are not
 included in the snapshot.
 
 Every attempt that reaches build/test execution produces private JSON evidence
-binding the sanitized source digest, contract digest, locally resolved image ID,
+binding the length-framed sanitized source digest, contract digest, locally
+resolved image ID used to start the sandbox,
 sandbox controls, exclusions, and bounded step output. Status is `verified`
 only when preparation, every build/test command, every required-artifact
 assertion, and forced container cleanup succeed. Artifact assertions reject
-symlink substitutes. See
+symlinks in both the artifact and its parent components. See
 [Working PoC Verification](verification-guide.md) for the operator contract and
 threat model.
 

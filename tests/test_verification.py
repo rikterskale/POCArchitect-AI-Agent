@@ -192,7 +192,7 @@ def test_sandbox_command_enforces_the_runtime_boundary(tmp_path):
         container_name="pocarchitect-verify-test",
         verification_id="test",
         snapshot=tmp_path,
-        image="python:3.12-slim",
+        image_id="sha256:reviewed-image",
     )
     rendered = " ".join(arguments)
 
@@ -206,6 +206,7 @@ def test_sandbox_command_enforces_the_runtime_boundary(tmp_path):
     assert "--memory=512m" in arguments
     assert "target=/source,readonly" in rendered
     assert "/var/run/docker.sock" not in rendered
+    assert arguments[-3] == "sha256:reviewed-image"
 
 
 def test_untrusted_step_output_is_capped_while_the_process_runs():
@@ -255,6 +256,57 @@ def test_snapshot_is_readable_by_the_non_root_sandbox_and_binds_modes(tmp_path):
     assert first_digest != second_digest
 
 
+def test_snapshot_digest_length_frames_file_content_and_metadata(tmp_path):
+    split_project = tmp_path / "split-project"
+    split_project.mkdir()
+    (split_project / "a").write_bytes(b"prefix")
+    (split_project / "b").write_bytes(b"suffix")
+
+    combined_project = tmp_path / "combined-project"
+    combined_project.mkdir()
+    (combined_project / "a").write_bytes(b"prefix\0F\0b\0" b"644\0suffix")
+
+    split_digest, _ = verification._copy_snapshot(
+        split_project, tmp_path / "split-snapshot"
+    )
+    combined_digest, _ = verification._copy_snapshot(
+        combined_project, tmp_path / "combined-snapshot"
+    )
+
+    assert split_digest != combined_digest
+
+
+@pytest.mark.skipif(os.name == "nt", reason="requires a POSIX shell and symlinks")
+def test_artifact_check_rejects_a_symlinked_parent(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (outside / "result.txt").write_text("not retained", encoding="utf-8")
+    (workspace / "build").symlink_to(outside, target_is_directory=True)
+    captured: list[str] = []
+
+    def run_locally(arguments, *, timeout):
+        command = list(arguments)
+        captured.extend(command)
+        return subprocess.run(  # nosec B603
+            ["/bin/sh", "-c", command[5], command[6], str(workspace), command[8]],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+
+    monkeypatch.setattr(verification, "_run_host", run_locally)
+
+    result = verification._execute_artifact_check(
+        "test-container", "build/result.txt", 5
+    )
+
+    assert result.passed is False
+    assert captured[-2:] == ["/workspace", "build/result.txt"]
+
+
 def test_successful_verification_writes_complete_private_evidence(
     tmp_path, monkeypatch
 ):
@@ -286,6 +338,9 @@ def test_successful_verification_writes_complete_private_evidence(
     assert payload["authorization"] == "ACME isolated validation lab"
     assert "SECRET=never-copy-this" not in evidence.read_text(encoding="utf-8")
     assert any(call[1:3] == ["rm", "--force"] for call in calls)
+    run_call = next(call for call in calls if call[1:2] == ["run"])
+    assert run_call[-3] == "sha256:reviewed-image"
+    assert "python:3.12-slim" not in run_call
     if os.name != "nt":
         assert evidence.stat().st_mode & 0o777 == 0o600
 

@@ -106,7 +106,9 @@ does not follow a destination symlink.
 }
 ```
 
-At least one test command is mandatory. Commands are executed by `/bin/sh`
+A draft for an unrecognized toolchain may leave build and test commands empty
+so scaffolding can complete for manual configuration. A ready contract always
+requires at least one explicit test command. Commands are executed by `/bin/sh`
 inside the container because build systems require shell syntax; POCArchitect
 never sends them through a host shell. Artifact paths must remain inside the
 copied workspace. Each command has an independently enforced timeout.
@@ -146,13 +148,15 @@ The private JSON evidence document records:
 
 - a unique verification ID and UTC start/finish times;
 - the authorization statement;
-- SHA-256 digests for the sanitized source snapshot and contract;
-- the requested image and locally resolved immutable image ID;
+- a length-framed SHA-256 digest for the sanitized source snapshot and a
+  SHA-256 digest for the contract;
+- the requested image and locally resolved immutable image ID that was actually
+  passed to Docker;
 - every applied sandbox control;
 - excluded paths;
 - each preparation, build, test, artifact, and cleanup step with exit status,
   duration, timeout state, and bounded stdout/stderr. Artifact assertions reject
-  symlink substitutes.
+  symlinks in the artifact or any of its parent components.
 
 Output is capped per stream so a noisy process cannot create unbounded evidence.
 Do not put secrets in commands or tests; command text and captured output are

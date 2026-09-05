@@ -704,9 +704,10 @@ def create_scaffold(report_path: Path, destination: Path) -> list[Path]:
                 ),
             }
         )
+    contract = control_directory / CONTRACT_FILENAME
     # Preflight the complete write set before materializing any file so a
     # conflicting symlink cannot leave a misleading partial scaffold behind.
-    for path in files:
+    for path in [*files, contract]:
         current = destination
         for part in path.relative_to(destination).parts[:-1]:
             current /= part
@@ -720,7 +721,6 @@ def create_scaffold(report_path: Path, destination: Path) -> list[Path]:
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
             _write_private_text(path, content)
-    contract = control_directory / CONTRACT_FILENAME
     if not contract.exists():
         create_contract(destination, contract)
     return [*files, contract]

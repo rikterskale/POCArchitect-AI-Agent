@@ -227,22 +227,33 @@ def _copy_snapshot(project: Path, destination: Path) -> tuple[str, tuple[str, ..
             path.chmod(0o755 if executable else 0o644)
 
     digest = hashlib.sha256()
+    digest.update(b"pocarchitect-source-snapshot-v1\0")
+
+    def add_field(value: bytes) -> None:
+        # Length-prefix every variable field. Without framing, file content can
+        # be crafted to look like the metadata record for the following path.
+        digest.update(len(value).to_bytes(8, byteorder="big"))
+        digest.update(value)
+
     for path in sorted(destination.rglob("*"), key=lambda item: item.as_posix()):
-        relative = path.relative_to(destination).as_posix()
+        relative = os.fsencode(path.relative_to(destination).as_posix())
         mode = stat.S_IMODE(path.lstat().st_mode)
         if path.is_symlink():
-            digest.update(b"L\0" + relative.encode() + b"\0")
-            digest.update(os.readlink(path).encode(errors="surrogateescape") + b"\0")
+            digest.update(b"L")
+            add_field(relative)
+            add_field(os.fsencode(os.readlink(path)))
         elif path.is_dir():
-            digest.update(b"D\0" + relative.encode() + b"\0")
-            digest.update(f"{mode:o}".encode() + b"\0")
+            digest.update(b"D")
+            add_field(relative)
+            add_field(f"{mode:o}".encode())
         elif path.is_file():
-            digest.update(b"F\0" + relative.encode() + b"\0")
-            digest.update(f"{mode:o}".encode() + b"\0")
+            digest.update(b"F")
+            add_field(relative)
+            add_field(f"{mode:o}".encode())
+            digest.update(path.stat().st_size.to_bytes(8, byteorder="big"))
             with path.open("rb") as handle:
                 for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                     digest.update(chunk)
-            digest.update(b"\0")
     return digest.hexdigest(), excluded
 
 
@@ -335,7 +346,7 @@ def _validate_contract_document(
         raise ContractError(
             "Implementation is still draft. Review it, add meaningful tests, then set implementation_status to 'ready'."
         )
-    if require_ready and not authorization.strip():
+    if status == "ready" and not authorization.strip():
         raise ContractError(
             "authorization must describe the approved lab scope before verification."
         )
@@ -347,7 +358,9 @@ def _validate_contract_document(
             document.get("build_commands", []), "build_commands", required=False
         ),
         test_commands=_validate_commands(
-            document.get("test_commands", []), "test_commands", required=True
+            document.get("test_commands", []),
+            "test_commands",
+            required=status == "ready",
         ),
         required_artifacts=_validate_artifacts(document.get("required_artifacts", [])),
         implementation_status=status,
@@ -411,13 +424,29 @@ def create_contract(
     project = project.resolve()
     if not project.is_dir():
         raise ContractError(f"Project directory does not exist: {project}")
+    if ready and not authorization.strip():
+        raise ContractError(
+            "authorization must describe the approved lab scope before verification."
+        )
+    if ready and not test_commands:
+        raise ContractError(
+            "Creating a ready contract requires at least one explicit test command. "
+            "Pass --test-command or create a draft and review its inferred command."
+        )
     detected_image: str
     detected_build: list[str]
     detected_test: list[str]
     if image is not None and test_commands:
         detected_image, detected_build, detected_test = image, [], list(test_commands)
     else:
-        detected_image, detected_build, detected_test = _detected_commands(project)
+        try:
+            detected_image, detected_build, detected_test = _detected_commands(project)
+        except ContractError:
+            if ready:
+                raise
+            # Draft contracts are deliberately non-executable. Keep an unknown
+            # toolchain scaffold usable so its operator can fill these fields.
+            detected_image, detected_build, detected_test = DEFAULT_IMAGE, [], []
     selected_image = image or detected_image
     document = {
         "schema_version": CONTRACT_SCHEMA_VERSION,
@@ -432,11 +461,6 @@ def create_contract(
     # A ready contract must already include its authorization gate; drafts may be
     # incomplete because they cannot be executed.
     _validate_contract_document(document, require_ready=ready)
-    if ready and not test_commands:
-        raise ContractError(
-            "Creating a ready contract requires at least one explicit test command. "
-            "Pass --test-command or create a draft and review its inferred command."
-        )
     temporary_document = json.dumps(document, indent=2, sort_keys=True) + "\n"
     destination = _absolute_without_resolving(destination)
     if (destination.exists() or destination.is_symlink()) and not force:
@@ -592,7 +616,7 @@ def _require_runtime(image: str) -> str:
 
 
 def _sandbox_arguments(
-    *, container_name: str, verification_id: str, snapshot: Path, image: str
+    *, container_name: str, verification_id: str, snapshot: Path, image_id: str
 ) -> list[str]:
     if "," in str(snapshot):
         raise VerificationError("Verification snapshot path cannot contain a comma.")
@@ -623,7 +647,7 @@ def _sandbox_arguments(
         f"type=bind,source={snapshot},target=/source,readonly",
         "--workdir=/workspace",
         "--entrypoint=/bin/sh",
-        image,
+        image_id,
         "-c",
         "while :; do sleep 3600; done",
     ]
@@ -677,9 +701,17 @@ def _execute_artifact_check(
         container_name,
         "/bin/sh",
         "-c",
-        'test -e "$1" && test ! -L "$1"',
+        (
+            'artifact=$2; path=$1; while [ -n "$artifact" ]; do '
+            "component=${artifact%%/*}; "
+            'if [ "$component" = "$artifact" ]; then artifact=; '
+            "else artifact=${artifact#*/}; fi; "
+            'path=$path/$component; test ! -L "$path" || exit 1; '
+            'done; test -e "$path"'
+        ),
         "pocarchitect-artifact-check",
-        f"/workspace/{artifact}",
+        "/workspace",
+        artifact,
     ]
     try:
         completed = _run_host(arguments, timeout=timeout)
@@ -799,7 +831,7 @@ def run_verification(
                     container_name=container_name,
                     verification_id=verification_id,
                     snapshot=snapshot,
-                    image=contract.image,
+                    image_id=image_id,
                 ),
                 timeout=30,
             )
