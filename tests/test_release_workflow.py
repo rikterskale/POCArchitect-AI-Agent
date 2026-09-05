@@ -23,6 +23,7 @@ def test_release_workflow_builds_validates_attests_and_publishes_tagged_artifact
     assert "id-token: write" in text
     assert "attestations: write" in text
     assert "gh release create" in text
+    assert "GH_REPO: ${{ github.repository }}" in text
     assert "--verify-tag" in text
     assert "contents: write" in text
     assert text.count("timeout-minutes:") == 2
