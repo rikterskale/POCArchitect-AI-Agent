@@ -58,6 +58,28 @@ def test_report_history_diff_export_and_scaffold(tmp_path):
     assert all(path.exists() for path in created)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="symlinks require elevated Windows rights")
+def test_report_derived_writes_replace_symlinks_without_touching_their_targets(
+    tmp_path,
+):
+    report = tmp_path / "report.md"
+    report.write_text("# Report\n", encoding="utf-8")
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not replace", encoding="utf-8")
+
+    export = report.with_suffix(".json")
+    export.symlink_to(victim)
+    features.export_report(report, "json")
+    assert not export.is_symlink()
+    assert victim.read_text(encoding="utf-8") == "do not replace"
+
+    history = tmp_path / features.HISTORY_FILE
+    history.symlink_to(victim)
+    features.update_history(tmp_path, report)
+    assert not history.is_symlink()
+    assert victim.read_text(encoding="utf-8") == "do not replace"
+
+
 def test_source_classification_covers_broader_inputs(tmp_path):
     local_file = tmp_path / "artifact.bin"
     local_file.write_bytes(b"x")
@@ -446,3 +468,5 @@ def test_pdf_export_wraps_long_lines(tmp_path):
 
     assert pdf.read_bytes().startswith(b"%PDF-1.4")
     assert pdf.stat().st_size > 200
+    if features.os.name != "nt":
+        assert features.stat.S_IMODE(pdf.stat().st_mode) == 0o600

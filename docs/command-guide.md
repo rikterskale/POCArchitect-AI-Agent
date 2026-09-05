@@ -56,8 +56,7 @@ supported installation path. Use a source checkout or a project release
 artifact. Runtime dependencies are pinned in `pyproject.toml` and
 `requirements.txt` for reproducible clean installs.
 
-Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.13. Python
-3.14 is best-effort until it is added to the matrix. The
+Python 3.10 or newer is required. Ubuntu CI covers Python 3.10-3.14. The
 first-run matrix installs release artifacts and runs the offline readiness gate
 on Linux, Windows, and macOS. Interactive shell behavior and paid-provider calls
 remain outside that gate. Native x86_64 is the primary support target; ARM64,
@@ -226,8 +225,8 @@ fix the URL/Git/network problem and retry. Successful report metadata records
 python -m pocarchitect --format json --no-color demo
 ```
 
-This exercises preflight, local-provider routing, report generation, and report
-writing through a temporary in-process mock. It creates a demonstration report
+This exercises offline preflight, deterministic report generation, and report
+writing without starting a local server. It creates a demonstration report
 under `reports/demo/` and makes no network or billable provider request.
 
 `--url owner/repository` expands to the corresponding GitHub URL. Malformed
@@ -251,9 +250,9 @@ is best-effort and does not change report generation success.
 
 | Provider | Required cloud setting | Default model |
 |---|---|---|
-| `xai` | `XAI_API_KEY` | `grok-3` |
+| `xai` | `XAI_API_KEY` | `grok-4.6` |
 | `openai` | `OPENAI_API_KEY` | `gpt-4o` |
-| `groq` | `GROQ_API_KEY` | `llama-3.1-70b-versatile` |
+| `groq` | `GROQ_API_KEY` | `openai/gpt-oss-120b` |
 | `local` | None | `qwen2.5-coder:14b` |
 
 The current provider choices are exactly those four. Claude/Gemini wording in
@@ -416,7 +415,6 @@ Install developer dependencies, then run the quality/documentation controls:
 ```bash
 python -m pip install -r requirements-dev.txt
 ruff check --output-format=github .
-ruff format --check .
 black --check --diff .
 mypy pocarchitect tests
 python scripts/generate_docs.py --check
@@ -433,6 +431,8 @@ Run the test/security/build equivalents:
 ```bash
 pytest --cov=pocarchitect --cov-report=xml
 pip-audit
+bandit -r pocarchitect -q -f json -o bandit-report.json
+python scripts/validate_bandit_report.py bandit-report.json
 docker build -t pocarchitect:test .
 docker run --rm pocarchitect:test --help
 python -m build
@@ -441,7 +441,7 @@ python scripts/validate_fresh_install.py dist --artifact wheel
 python scripts/validate_fresh_install.py dist --artifact sdist
 ```
 
-CI repeats tests on Python 3.10-3.13. Its first-run matrix installs wheels on
+CI repeats tests on Python 3.10-3.14. Its first-run matrix installs wheels on
 Linux, Windows, and macOS plus the sdist on Linux. Codecov upload and hosted
 runner outcomes are CI-only; local command success does not prove those services
 succeed.

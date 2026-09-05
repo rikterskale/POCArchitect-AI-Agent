@@ -30,9 +30,9 @@ and `preflight --offline` do not require a provider key.
 
 | Provider | Default model |
 |---|---|
-| `xai` | `grok-3` |
+| `xai` | `grok-4.6` |
 | `openai` | `gpt-4o` |
-| `groq` | `llama-3.1-70b-versatile` |
+| `groq` | `openai/gpt-oss-120b` |
 | `local` | `qwen2.5-coder:14b` |
 
 The current CLI provider choices are `xai`, `openai`, `groq`, `local`. Claude and Gemini

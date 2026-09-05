@@ -9,7 +9,7 @@ This is a short orientation page. The complete, generated option list is the [CL
 | `--url` / `-u` | Single PoC URL or GitHub `owner/repo` shorthand | Required (or use `--batch`) |
 | `--batch` / `-b` | Text input: blank lines and full-line `#` comments ignored | None |
 | `--provider` / `-p` | LLM provider: `xai`, `openai`, `groq`, `local` | `xai` |
-| `--model` / `-m` | Model name | Provider-specific (e.g., `grok-3` for xai, `gpt-4o` for openai) |
+| `--model` / `-m` | Model name | Provider-specific (e.g., `grok-4.6` for xai, `gpt-4o` for openai) |
 | `--temperature` / `-t` | Provider temperature | `0.2` |
 | `--risk-level` | Free-text label sent to the provider | `High` |
 | `--target-os` | Free-text label sent to the provider | `Linux` |

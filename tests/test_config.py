@@ -11,3 +11,5 @@ def test_default_output_directory_honors_in_docker(tmp_path, monkeypatch):
 
 def test_every_cli_provider_has_a_default_model():
     assert set(DEFAULT_MODELS) == {"xai", "openai", "groq", "local"}
+    assert DEFAULT_MODELS["xai"] == "grok-4.6"
+    assert DEFAULT_MODELS["groq"] == "openai/gpt-oss-120b"

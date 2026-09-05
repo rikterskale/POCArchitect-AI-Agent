@@ -7,7 +7,9 @@ import re
 import secrets
 import shutil
 import stat
-import subprocess  # nosec B404 - controlled Git/viewer subprocesses are required by the CLI
+
+# Subprocess use is limited to fixed Git/viewer/gh commands at documented boundaries.
+import subprocess  # nosec B404
 import sys
 import tempfile
 import threading
@@ -17,7 +19,6 @@ from contextlib import AbstractContextManager, contextmanager, nullcontext
 from contextvars import ContextVar
 from dataclasses import dataclass, is_dataclass
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from importlib.resources import files
 from pathlib import Path
 from typing import Literal, cast
@@ -212,9 +213,9 @@ def emit(event: str, message: str, **details: object) -> None:
 
 # Known-good models per provider, surfaced when a provider rejects a model name.
 KNOWN_MODELS = {
-    "xai": ["grok-3", "grok-3-mini", "grok-2"],
+    "xai": ["grok-4.6", "grok-4.3"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-    "groq": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+    "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
     "local": [
         "qwen2.5-coder:14b",
         "qwen2.5-coder:32b",
@@ -230,11 +231,10 @@ MODEL_INPUT_PRICES_PER_MTOK = {
     "gpt-4o": 2.50,
     "gpt-4o-mini": 0.15,
     "gpt-4-turbo": 10.00,
-    "grok-3": 3.00,
-    "grok-3-mini": 0.30,
-    "grok-2": 2.00,
-    "llama-3.1-70b-versatile": 0.59,
-    "llama-3.1-8b-instant": 0.05,
+    "grok-4.6": 2.00,
+    "grok-4.3": 1.25,
+    "openai/gpt-oss-120b": 0.15,
+    "openai/gpt-oss-20b": 0.075,
 }
 
 
@@ -317,13 +317,14 @@ def open_in_default_viewer(path: Path) -> bool:
     """Best-effort open of a file in the OS default application."""
     try:
         if sys.platform.startswith("win"):
-            os.startfile(str(path))  # type: ignore[attr-defined]  # nosec B606 - OS default viewer for an operator-selected report
+            # The OS opens the operator-selected report with its registered viewer.
+            os.startfile(str(path))  # type: ignore[attr-defined]  # nosec
         elif sys.platform == "darwin":
-            # nosec B603, B607 - fixed viewer executable and selected report path
-            subprocess.run(["open", str(path)], check=False)  # nosec B603, B607
+            # Fixed viewer executable; the report path is operator-selected.
+            subprocess.run(["open", str(path)], check=False)  # nosec
         else:
-            # nosec B603, B607 - fixed viewer executable and selected report path
-            subprocess.run(["xdg-open", str(path)], check=False)  # nosec B603, B607
+            # Fixed viewer executable; the report path is operator-selected.
+            subprocess.run(["xdg-open", str(path)], check=False)  # nosec
         return True
     except Exception:
         return False
@@ -340,67 +341,6 @@ def report_digest(content: str, max_lines: int = 8) -> str:
         if len(lines) >= max_lines:
             break
     return "\n".join(lines)
-
-
-class _DemoProviderHandler(BaseHTTPRequestHandler):
-    """Minimal OpenAI-compatible endpoint used by the credential-free demo."""
-
-    def log_message(self, *_args: object) -> None:
-        return None
-
-    def _send(self, status: int, payload: dict[str, object]) -> None:
-        body = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_GET(self) -> None:
-        if self.path.endswith("/models"):
-            self._send(200, {"object": "list", "data": [{"id": "demo-model"}]})
-        else:
-            self._send(404, {"error": "not found"})
-
-    def do_POST(self) -> None:
-        length = int(self.headers.get("Content-Length", "0"))
-        self.rfile.read(length)
-        self._send(
-            200,
-            {
-                "id": "chatcmpl-demo",
-                "object": "chat.completion",
-                "model": "demo-model",
-                "choices": [
-                    {
-                        "index": 0,
-                        "finish_reason": "stop",
-                        "message": {
-                            "role": "assistant",
-                            "content": (
-                                "# POCArchitect Demo Report\n\n"
-                                "This credential-free report proves the installed "
-                                "provider and report-writing path.\n"
-                            ),
-                        },
-                    }
-                ],
-            },
-        )
-
-
-@contextmanager
-def demo_provider() -> Iterator[str]:
-    """Serve a deterministic local response for ``pocarchitect demo``."""
-    server = HTTPServer(("127.0.0.1", 0), _DemoProviderHandler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_address[1]}/v1"
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
 
 
 @app.command("preflight")
@@ -553,38 +493,38 @@ def demo() -> None:
     Example: pocarchitect demo
     """
     output_dir = default_output_dir() / "demo"
-    with demo_provider() as base_url:
-        run_preflight(
-            provider="local",
-            base_url=base_url,
-            require_api_key=True,
-            output_dir=output_dir,
-            output_format=output_format,
-            no_color=no_color_state,
-            require_git=False,
-        )
-        process_single_url(
-            url="https://github.com/example/poc",
-            provider="local",
-            api_key=None,
-            model="demo-model",
-            temperature=0.0,
-            base_url=base_url,
-            output_dir=output_dir,
-            risk_level=DEFAULT_RISK_LEVEL,
-            target_os=DEFAULT_TARGET_OS,
-            include_mitigations=True,
-            no_ingest=True,
-            dry_run=False,
-            verbose=False,
-            confirmed=True,
-            open_report=False,
-            show_spinner=False,
-            response_override=(
-                "# POCArchitect Demo Report\n\n"
-                "This credential-free report proves the installed provider and report-writing path.\n"
-            ),
-        )
+    run_preflight(
+        provider="local",
+        require_api_key=False,
+        offline=True,
+        output_dir=output_dir,
+        output_format=output_format,
+        no_color=no_color_state,
+        require_git=False,
+    )
+    process_single_url(
+        url="https://github.com/example/poc",
+        provider="local",
+        api_key=None,
+        model="demo-model",
+        temperature=0.0,
+        base_url=None,
+        output_dir=output_dir,
+        risk_level=DEFAULT_RISK_LEVEL,
+        target_os=DEFAULT_TARGET_OS,
+        include_mitigations=True,
+        no_ingest=True,
+        dry_run=False,
+        verbose=False,
+        confirmed=True,
+        open_report=False,
+        show_spinner=False,
+        response_override=(
+            "# POCArchitect Demo Report\n\n"
+            "This credential-free report proves the installed report-writing path "
+            "without starting a server or contacting a provider.\n"
+        ),
+    )
 
 
 @app.command("quickstart")
@@ -841,15 +781,25 @@ def save_report(
         + "\n---\n\n"
     )
     temporary_path = output_dir / f".{filename}.{uuid.uuid4().hex}.tmp"
+    descriptor = -1
     try:
-        with temporary_path.open("x", encoding="utf-8") as handle:
+        descriptor = os.open(
+            temporary_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            stat.S_IRUSR | stat.S_IWUSR,
+        )
+        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
             handle.write(metadata_block + content)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_path, output_path)
-    except OSError:
+        output_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
         temporary_path.unlink(missing_ok=True)
-        raise
     absolute_path = output_path.resolve()
     emit(
         "report_saved",
@@ -1250,7 +1200,7 @@ def build_grounding_context(
                 f"Cloning {repo_name} (shallow)...",
                 repository=repo_name,
             )
-            # nosec B603, B607 - fixed git executable and bounded public clone arguments
+            # Fixed Git executable with bounded, noninteractive clone arguments.
             subprocess.run(  # nosec B603, B607
                 [
                     "git",
@@ -2062,7 +2012,13 @@ def _mask_secret(value: str | None) -> str:
 
 
 def _upsert_env_file(env_path: Path, key: str, value: str) -> None:
-    """Add or replace a single KEY=value line, preserving other entries."""
+    """Atomically upsert one key and keep the credential file owner-readable only."""
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
+        raise ValueError(
+            "Environment variable names must use uppercase letters, numbers, and underscores"
+        )
+    if "\n" in value or "\r" in value:
+        raise ValueError("Credential values must be a single line")
     lines: list[str] = []
     replaced = False
     if env_path.exists():
@@ -2076,7 +2032,24 @@ def _upsert_env_file(env_path: Path, key: str, value: str) -> None:
                 lines.append(line)
     if not replaced:
         lines.append(f"{key}={value}")
-    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{env_path.name}.", suffix=".tmp", dir=env_path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write("\n".join(lines) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, env_path)
+        env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary_path.unlink(missing_ok=True)
 
 
 @app.command("setup")
@@ -2157,7 +2130,7 @@ def setup() -> None:
                 url="https://github.com/example/poc",
                 provider=provider,
                 api_key=None,
-                model=DEFAULT_MODELS.get(provider, "grok-3"),
+                model=DEFAULT_MODELS.get(provider, DEFAULT_MODELS[DEFAULT_PROVIDER]),
                 temperature=DEFAULT_TEMPERATURE,
                 base_url=None,
                 output_dir=get_default_output_dir(),
@@ -2583,7 +2556,7 @@ def publish_command(
     try:
         completed = subprocess.run(
             command, check=True, capture_output=True, text=True, timeout=30
-        )  # nosec B603 - fixed gh executable and operator-selected report
+        )  # nosec B603
     except subprocess.TimeoutExpired:
         emit("error", "Publishing timed out. Check GitHub CLI connectivity and retry.")
         raise typer.Exit(1)
@@ -2820,7 +2793,7 @@ def main(
 
     # (#9) Resolve provider-specific default model if not explicitly set
     if model is None:
-        model = DEFAULT_MODELS.get(provider.lower(), "grok-3")
+        model = DEFAULT_MODELS.get(provider.lower(), DEFAULT_MODELS[DEFAULT_PROVIDER])
         if verbose:
             emit("model_selected", f"Using default model for {provider}: {model}")
 

@@ -78,7 +78,10 @@ First-run demo action
 
 `AnalysisService.prepare()` retains prompt and source content in backend memory
 and exposes only review metadata. `AnalysisService.execute()` consumes the
-prepared object after explicit approval. The GUI job runner intentionally uses
+prepared object after explicit approval. Preparation also verifies that the
+resolved output directory is writable before source inspection or any provider
+request, so a paid run cannot finish only to discover an unusable destination.
+The GUI job runner intentionally uses
 one worker so report history and other file-backed state cannot be updated by
 concurrent GUI jobs. The CLI remains the default installation surface; FastAPI
 and Uvicorn are optional dependencies.
@@ -182,6 +185,8 @@ matter containing `project`, `source_url`, `provider`, `model`, `prompt_asset`,
 `content_sha256`. `ingestion` is the outcome above, not an inference from the
 operator's flags. `grounding_files_selected` is zero for disabled/URL-only
 outcomes and the number of files included for a successful clone.
+On POSIX systems, credential files, reports, history, diffs, and exported report
+artifacts are written with owner-only read/write permissions by default.
 
 ## Batch behavior
 
@@ -197,9 +202,9 @@ also inspect `batch_complete.failed` or the ledger.
 
 | Provider | Default model |
 |---|---|
-| `xai` | `grok-3` |
+| `xai` | `grok-4.6` |
 | `openai` | `gpt-4o` |
-| `groq` | `llama-3.1-70b-versatile` |
+| `groq` | `openai/gpt-oss-120b` |
 | `local` | `qwen2.5-coder:14b` |
 
 The OpenAI SDK is used for all four choices. Prompt portability references to

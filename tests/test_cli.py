@@ -211,6 +211,9 @@ def test_demo_does_not_require_git(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.stdout
     assert calls and calls[0]["require_git"] is False
+    assert calls[0]["offline"] is True
+    assert calls[0]["require_api_key"] is False
+    assert calls[0].get("base_url") is None
 
 
 def test_cost_limit_aborts_before_provider_call(tmp_path, monkeypatch):
@@ -401,6 +404,9 @@ def test_save_report_contains_safe_metadata(tmp_path, monkeypatch):
     assert 'ingestion: "disabled"' in text
     assert "grounding_files_selected: 0" in text
     assert "test-model" in text
+    if cli.os.name != "nt":
+        assert cli.stat.S_IMODE(report.stat().st_mode) == 0o600
+        assert cli.stat.S_IMODE((tmp_path / "history.json").stat().st_mode) == 0o600
 
 
 def test_grounding_records_non_github_and_clone_failure_outcomes(monkeypatch):
@@ -638,7 +644,16 @@ def test_validate_poc_url_rejects_malformed_github_url():
 def test_estimate_cost_usd_known_and_unknown_models():
     cost = cli.estimate_cost_usd("gpt-4o", 1_000_000)
     assert cost == 2.50
+    assert cli.estimate_cost_usd("grok-4.6", 1_000_000) == 2.00
+    assert cli.estimate_cost_usd("openai/gpt-oss-120b", 1_000_000) == 0.15
     assert cli.estimate_cost_usd("no-such-model", 1_000_000) is None
+
+
+def test_every_cloud_default_is_known_and_has_a_cost_estimate():
+    for provider in ("xai", "openai", "groq"):
+        model = cli.DEFAULT_MODELS[provider]
+        assert model in cli.KNOWN_MODELS[provider]
+        assert cli.estimate_cost_usd(model, 1_000_000) is not None
 
 
 def test_save_report_emits_absolute_path_and_digest(tmp_path, monkeypatch):
@@ -1550,6 +1565,14 @@ def test_mask_secret_and_upsert_preserves_spacing_variants(tmp_path):
     assert "GROQ_API_KEY=new-value" in text
     assert "OTHER=keep" in text
     assert "old-value" not in text
+    if cli.os.name != "nt":
+        assert cli.stat.S_IMODE(env_path.stat().st_mode) == 0o600
+
+    with pytest.raises(ValueError, match="single line"):
+        cli._upsert_env_file(env_path, "GROQ_API_KEY", "first\nINJECTED=value")
+    with pytest.raises(ValueError, match="uppercase"):
+        cli._upsert_env_file(env_path, "invalid-key", "value")
+    assert list(tmp_path.glob("..env.*.tmp")) == []
 
 
 def test_is_retryable_and_transient_provider_retry(monkeypatch):

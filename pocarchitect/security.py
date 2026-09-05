@@ -54,9 +54,8 @@ def query_osv(
         headers={"Content-Type": "application/json", "User-Agent": "pocarchitect/0.3"},
         method="POST",
     )
-    with urlopen(
-        request, timeout=timeout
-    ) as response:  # nosec B310 - fixed HTTPS OSV endpoint
+    # OSV_QUERY_URL is a fixed HTTPS endpoint.
+    with urlopen(request, timeout=timeout) as response:  # nosec B310
         result = json.loads(response.read().decode("utf-8"))
     if not isinstance(result, dict) or not isinstance(result.get("results"), list):
         raise ValueError("OSV returned an invalid batch response")

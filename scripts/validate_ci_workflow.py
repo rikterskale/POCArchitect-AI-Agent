@@ -39,6 +39,7 @@ REQUIRED_RUN_COMMANDS = (
     "pytest -q tests/test_cli.py::test_windows_help_uses_plain_renderer_for_redirected_output",
     "python -m playwright install --with-deps chromium",
     "pip-audit",
+    "python scripts/validate_bandit_report.py bandit-report.json",
     "docker build -t pocarchitect:test .",
     "python -m build",
     "python scripts/validate_distribution.py dist",
@@ -79,9 +80,21 @@ def validate(root: Path = ROOT) -> list[str]:
         errors.append(f"Canonical workflow is missing action `{action}`")
 
     serialized = repr(document)
-    for value in ("windows-latest", "macos-latest", "3.10", "3.13", "wheel", "sdist"):
+    for value in (
+        "windows-latest",
+        "macos-latest",
+        "3.10",
+        "3.14",
+        "wheel",
+        "sdist",
+    ):
         if value not in serialized:
             errors.append(f"Canonical workflow is missing matrix value `{value}`")
+    for name, job in jobs.items():
+        if isinstance(job, dict) and not isinstance(job.get("timeout-minutes"), int):
+            errors.append(
+                f"Canonical CI job `{name}` must set an integer timeout-minutes"
+            )
     for retired in RETIRED_MUTATORS:
         if (root / retired).exists():
             errors.append(

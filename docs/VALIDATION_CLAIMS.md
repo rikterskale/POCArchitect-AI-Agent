@@ -22,7 +22,7 @@ listed controls:
 | Claim | Current control | Important boundary |
 |---|---|---|
 | Source checkout and release-artifact installation are supported | CI package and release-readiness jobs | PyPI is not supported. |
-| Offline diagnosis and credential-free demo work | `doctor --offline`, `demo`, `quickstart`, and hermetic gate | Git is not required for these paths. |
+| Offline diagnosis and credential-free demo work | `doctor --offline`, `demo`, `quickstart`, and hermetic gate | Git, provider credentials, and loopback sockets are not required for these paths. |
 | The packaged CLI exposes the documented commands/options | Generated-reference check and option inventory | This does not prove hosted CI success for a new commit. |
 | Local-provider request routing and report writing work | Hermetic mock-provider gate | This does not prove a live provider or Ollama model works. |
 | Linux, Windows, and macOS artifact first-install paths are intended support targets | Release-readiness matrix | The current hosted run must still be checked for the commit being released. |

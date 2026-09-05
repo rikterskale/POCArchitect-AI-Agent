@@ -10,7 +10,7 @@ fixture, or in an issue.
 
 ## Prerequisites
 
-- Python 3.10 or newer. CI runs the test suite on Python 3.10, 3.11, 3.12, and 3.13.
+- Python 3.10 or newer. CI runs the test suite on Python 3.10 through 3.14.
 - Git.
 
 ## Development setup
@@ -39,7 +39,6 @@ Quality:
 
 ```bash
 ruff check .
-ruff format --check .
 black --check --diff .
 mypy pocarchitect tests
 python scripts/generate_docs.py --check
@@ -57,6 +56,8 @@ Dependency vulnerability scan:
 
 ```bash
 pip-audit
+bandit -r pocarchitect -q -f json -o bandit-report.json
+python scripts/validate_bandit_report.py bandit-report.json
 ```
 
 A convenience script, `verify.sh`, runs an install plus dry-run smoke test on

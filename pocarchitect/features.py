@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
+import stat
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -27,6 +30,7 @@ from rich.table import Table
 
 CONFIG_FILE = ".pocarchitect.toml"
 HISTORY_FILE = "history.json"
+PRIVATE_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR
 
 
 DEFAULT_PROJECT_CONFIG: dict[str, Any] = {
@@ -362,6 +366,33 @@ def _report_body(path: Path) -> str:
     return text
 
 
+def _write_private_bytes(path: Path, content: bytes) -> None:
+    """Atomically write report output without following a destination symlink."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, PRIVATE_FILE_MODE)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = -1
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        path.chmod(PRIVATE_FILE_MODE)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary_path.unlink(missing_ok=True)
+
+
+def _write_private_text(path: Path, content: str) -> None:
+    """Atomically write UTF-8 report output with private permissions."""
+    _write_private_bytes(path, content.encode("utf-8"))
+
+
 def report_diff(previous: Path, current: Path) -> str:
     before = _report_body(previous).splitlines()
     after = _report_body(current).splitlines()
@@ -417,9 +448,7 @@ def update_history(output_dir: Path, report_path: Path) -> Path:
         reports = []
         data["reports"] = reports
     reports.append({"path": str(report_path), **metadata})
-    temp = output_dir / f".{HISTORY_FILE}.{time.time_ns()}.tmp"
-    temp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    temp.replace(history_path)
+    _write_private_text(history_path, json.dumps(data, indent=2, sort_keys=True) + "\n")
     return history_path
 
 
@@ -479,7 +508,7 @@ def _write_simple_pdf(target: Path, content: str) -> None:
     output.extend(
         f"trailer << /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
     )
-    target.write_bytes(output)
+    _write_private_bytes(target, output)
 
 
 def export_report(markdown_path: Path, output_format: str) -> Path:
@@ -490,7 +519,8 @@ def export_report(markdown_path: Path, output_format: str) -> Path:
         return markdown_path
     if output_format == "json":
         target = markdown_path.with_suffix(".json")
-        target.write_text(
+        _write_private_text(
+            target,
             json.dumps(
                 {
                     "metadata": metadata,
@@ -500,7 +530,6 @@ def export_report(markdown_path: Path, output_format: str) -> Path:
                 indent=2,
             )
             + "\n",
-            encoding="utf-8",
         )
         return target
     if output_format == "html":
@@ -509,7 +538,7 @@ def export_report(markdown_path: Path, output_format: str) -> Path:
         document = f"""<!doctype html><html><head><meta charset=\"utf-8\"><title>{html.escape(markdown_path.stem)}</title>
 <style>body{{font:16px/1.55 system-ui;max-width:960px;margin:3rem auto;padding:0 1rem;background:#10151c;color:#e7edf4}}pre{{white-space:pre-wrap;background:#18212c;padding:1.5rem;border-radius:10px}}</style></head>
 <body><h1>{html.escape(markdown_path.stem)}</h1><pre>{escaped}</pre></body></html>"""
-        target.write_text(document, encoding="utf-8")
+        _write_private_text(target, document)
         return target
     if output_format == "pdf":
         target = markdown_path.with_suffix(".pdf")
@@ -585,7 +614,7 @@ def discover_plugins() -> None:
             register_plugin(plugin() if isinstance(plugin, type) else plugin)
         except Exception:  # noqa: BLE001, S112 - third-party discovery is isolated
             # A third-party plugin must not prevent core analysis from running.
-            continue
+            continue  # nosec B112
 
 
 def registered_plugins() -> list[str]:
@@ -599,7 +628,8 @@ def run_plugins(source: str, grounding: str) -> list[str]:
         try:
             sections.append(_PLUGINS[name].analyze(source, grounding))
         except Exception:  # noqa: BLE001, S112 - third-party execution is isolated
-            continue
+            # Analyzer failures are isolated so one plugin cannot abort the run.
+            continue  # nosec B112
     return sections
 
 

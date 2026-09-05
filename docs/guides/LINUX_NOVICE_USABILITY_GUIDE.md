@@ -1,6 +1,6 @@
 # POCArchitect Linux Bash Supplement
 
-Status: **PARTIALLY VERIFIED**. Ubuntu CI exercises Python 3.10-3.13 and
+Status: **PARTIALLY VERIFIED**. Ubuntu CI exercises Python 3.10-3.14 and
 clean-installs wheels at the supported-version boundaries plus the sdist on
 Python 3.12. Interactive shell setup and provider-backed operation remain
 outside that gate.

@@ -23,6 +23,25 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        POCA_PROVIDER: ${{ inputs.provider }}
+        POCA_DRY_RUN: ${{ inputs.dry-run }}
+        POCA_COMMENT: ${{ inputs.comment }}
+      run: |
+        case "$POCA_PROVIDER" in
+          xai|openai|groq|local) ;;
+          *) echo "Invalid provider: $POCA_PROVIDER" >&2; exit 2 ;;
+        esac
+        case "$POCA_DRY_RUN" in
+          true|false) ;;
+          *) echo "dry-run must be exactly 'true' or 'false'" >&2; exit 2 ;;
+        esac
+        case "$POCA_COMMENT" in
+          true|false) ;;
+          *) echo "comment must be exactly 'true' or 'false'" >&2; exit 2 ;;
+        esac
     - name: Install POCArchitect
       shell: bash
       run: python -m pip install "${{ github.action_path }}"

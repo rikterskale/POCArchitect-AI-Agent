@@ -365,6 +365,26 @@ def test_gui_preview_reports_type_size_encoding_and_missing_file_errors(tmp_path
         )
 
 
+def test_gui_rejects_artifact_replaced_by_symlink(tmp_path):
+    runtime = GuiRuntime(StubAnalysisService())
+    app = create_app(session_token="token", port=8765, runtime=runtime)
+    report = tmp_path / "report.md"
+    outside = tmp_path / "outside.txt"
+    report.write_text("# safe\n", encoding="utf-8")
+    outside.write_text("private\n", encoding="utf-8")
+    artifact_id = runtime._register_artifact(report)
+    report.unlink()
+    try:
+        report.symlink_to(outside)
+    except OSError:
+        return
+
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        assert client.get("/?token=token", follow_redirects=True).status_code == 200
+        assert client.get(f"/api/artifacts/{artifact_id}").status_code == 404
+        assert client.get(f"/api/artifacts/{artifact_id}/download").status_code == 404
+
+
 def test_gui_rejects_empty_token_invalid_length_and_unlaunched_index():
     import pytest
 

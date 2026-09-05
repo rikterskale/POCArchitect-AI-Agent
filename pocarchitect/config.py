@@ -12,9 +12,9 @@ PROVIDER_KEY_NAMES = {
 }
 
 DEFAULT_MODELS = {
-    "xai": "grok-3",
+    "xai": "grok-4.6",
     "openai": "gpt-4o",
-    "groq": "llama-3.1-70b-versatile",
+    "groq": "openai/gpt-oss-120b",
     # Keep the default practical for a developer laptop. Larger models remain
     # available through an explicit --model selection.
     "local": "qwen2.5-coder:14b",

@@ -219,8 +219,13 @@ class AnalysisService:
         self, request: AnalysisRequest, event_sink: EventSink = _discard_event
     ) -> PreparedAnalysis:
         from . import cli
+        from .preflight import check_output_directory_writable
 
         normalized = self.normalize_request(request)
+        output_dir = Path(normalized.output_dir or default_output_dir())
+        writable, detail = check_output_directory_writable(output_dir)
+        if not writable:
+            raise AnalysisServiceError(detail.removeprefix("FAIL: "))
         _emit(
             event_sink,
             "preparation_started",
@@ -335,6 +340,7 @@ class AnalysisService:
     ) -> AnalysisResult:
         from . import cli
         from .features import (
+            _write_private_text,
             create_scaffold,
             ensure_architecture_section,
             export_report,
@@ -462,9 +468,9 @@ class AnalysisService:
             if previous is not None:
                 diff_path = report_path.with_suffix(".diff")
                 diff_text = report_diff(previous, report_path)
-                diff_path.write_text(
+                _write_private_text(
+                    diff_path,
                     diff_text + ("\n" if diff_text else "No content changes.\n"),
-                    encoding="utf-8",
                 )
                 _emit(
                     event_sink,

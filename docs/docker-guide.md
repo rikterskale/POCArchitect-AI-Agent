@@ -134,7 +134,7 @@ docker run --rm -it \
   pocarchitect:latest \
   --url <AUTHORIZED_GITHUB_URL> \
   --provider xai \
-  --model grok-3 \
+  --model grok-4.6 \
   --output-dir /reports \
   --verbose
 ```

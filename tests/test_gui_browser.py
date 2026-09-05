@@ -59,6 +59,15 @@ def test_browser_form_validation_demo_recovery_and_report_library(
             "element => element === document.activeElement"
         )
 
+        page.locator("#source").fill("https://example.com/advisory")
+        page.locator("#provider").select_option("local")
+        page.locator("#base-url").fill("not-a-url")
+        page.locator("#prepare-button").click()
+        assert page.locator("#base-url-error").text_content() == (
+            "Enter a complete HTTP or HTTPS endpoint URL."
+        )
+        page.locator("#base-url").fill("http://localhost:11434/v1")
+
         page.locator("#run-demo").click()
         page.locator("#report-content:not(.is-hidden)").wait_for(timeout=15_000)
         assert "POCArchitect Demo Report" in page.locator("#report-body").text_content()

@@ -37,7 +37,7 @@ def test_configuration_reference_uses_runtime_defaults():
 
     reference = generator.config_reference()
 
-    assert "| `groq` | `llama-3.1-70b-versatile` |" in reference
+    assert "| `groq` | `openai/gpt-oss-120b` |" in reference
     assert "| `local` | `qwen2.5-coder:14b` |" in reference
     assert "imported from `pocarchitect/config.py`" in reference
     assert "when placed before the subcommand" in reference

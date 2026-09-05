@@ -143,6 +143,17 @@ function clearSourceError() {
   setInlineError("source-error");
 }
 
+function clearFieldError(inputId, errorId) {
+  byId(inputId).closest(".field").classList.remove("is-invalid");
+  setInlineError(errorId);
+}
+
+function showFieldError(inputId, errorId, message) {
+  byId(inputId).closest(".field").classList.add("is-invalid");
+  setInlineError(errorId, message);
+  byId(inputId).focus();
+}
+
 function updateProvider({ preserveModel = false } = {}) {
   if (!state.bootstrap) return;
   const provider = byId("provider").value;
@@ -190,6 +201,8 @@ function payloadFromForm() {
 
 function validateForm() {
   clearSourceError();
+  clearFieldError("base-url", "base-url-error");
+  clearFieldError("cost-limit", "cost-limit-error");
   setInlineError("form-error");
   const source = byId("source").value.trim();
   let error = "";
@@ -210,6 +223,21 @@ function validateForm() {
   if (!byId("model").value.trim()) {
     setInlineError("form-error", "Select or enter a model before preparing the transfer.");
     byId("model").focus();
+    return false;
+  }
+  if (byId("provider").value === "local") {
+    const endpoint = byId("base-url").value.trim();
+    try {
+      const parsed = new URL(endpoint);
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("scheme");
+    } catch (_) {
+      showFieldError("base-url", "base-url-error", "Enter a complete HTTP or HTTPS endpoint URL.");
+      return false;
+    }
+  }
+  const costValue = byId("cost-limit").value;
+  if (costValue !== "" && (!Number.isFinite(Number(costValue)) || Number(costValue) < 0)) {
+    showFieldError("cost-limit", "cost-limit-error", "Enter zero or a positive cost limit.");
     return false;
   }
   return true;
@@ -806,6 +834,8 @@ function bindEvents() {
   document.querySelectorAll("[data-source-mode]").forEach((button) => button.addEventListener("click", () => setSourceMode(button.dataset.sourceMode)));
   byId("provider").addEventListener("change", () => updateProvider());
   byId("source").addEventListener("input", clearSourceError);
+  byId("base-url").addEventListener("input", () => clearFieldError("base-url", "base-url-error"));
+  byId("cost-limit").addEventListener("input", () => clearFieldError("cost-limit", "cost-limit-error"));
   byId("analysis-form").addEventListener("submit", prepareAnalysis);
   byId("run-demo").addEventListener("click", startDemo);
   byId("approval").addEventListener("change", updateRunAvailability);

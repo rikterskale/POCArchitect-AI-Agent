@@ -199,6 +199,36 @@ def test_service_reports_ingestion_failure_before_preparation(tmp_path, monkeypa
         )
 
 
+def test_service_rejects_unwritable_output_before_source_or_provider_work(
+    tmp_path, monkeypatch
+):
+    source_calls = []
+    monkeypatch.setattr(
+        "pocarchitect.preflight.check_output_directory_writable",
+        lambda path: (
+            False,
+            f"FAIL: {path} is not writable; use --output-dir <writable-folder>",
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "build_grounding_context",
+        lambda *args, **kwargs: source_calls.append((args, kwargs)),
+    )
+
+    with pytest.raises(AnalysisServiceError, match="is not writable"):
+        AnalysisService().prepare(
+            AnalysisRequest(
+                source="https://example.test/advisory",
+                provider="local",
+                no_ingest=True,
+                output_dir=str(tmp_path / "blocked"),
+            )
+        )
+
+    assert source_calls == []
+
+
 def test_service_optional_outputs_and_vulnerability_failure(tmp_path, monkeypatch):
     source = tmp_path / "source"
     source.mkdir()

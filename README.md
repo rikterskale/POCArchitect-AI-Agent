@@ -152,7 +152,7 @@ python -m pocarchitect --help | Select-Object -First 20
 
 | Platform/path | Status | Notes |
 |---|---|---|
-| Linux Bash | CI-gated | Unit tests cover Python 3.10–3.13; the first-run matrix installs wheels on 3.10/3.13 and the sdist on 3.12. |
+| Linux Bash | CI-gated | Unit tests cover Python 3.10–3.14; the first-run matrix installs wheels on 3.10/3.14 and the sdist on 3.12. |
 | Windows PowerShell | CI-gated | The first-run matrix installs the wheel on Windows/Python 3.12 and runs the offline readiness gate. |
 | macOS | CI-gated | The first-run matrix installs the wheel on macOS/Python 3.12 and runs the offline readiness gate. |
 | WSL/Git Bash | Not separately validated | Treat as an alternative shell, not proof of native Windows support. |
@@ -160,10 +160,10 @@ python -m pocarchitect --help | Select-Object -First 20
 | Docker Desktop | Not separately validated | Native bind mounts, path conversion, TTY behavior, and provider-backed runs remain manual/best-effort. |
 | ARM64/Apple Silicon/Windows ARM | Not separately validated | The package is pure Python, but provider, Git, Docker, and local-model compatibility depends on the host; use `doctor` and `demo` after installation. |
 
-Python 3.10–3.13 are CI-supported. Python 3.14 is best-effort until it is
-added to the matrix. Native x86_64 Linux, Windows, and macOS are the primary
-support targets. ARM64/Apple Silicon, WSL/Git Bash, and Docker Desktop are
-best-effort host paths and are not release-blocking validation targets today.
+Python 3.10–3.14 are CI-supported. Native x86_64 Linux, Windows, and macOS are
+the primary support targets. ARM64/Apple Silicon, WSL/Git Bash, and Docker
+Desktop are best-effort host paths and are not release-blocking validation
+targets today.
 
 ## Batch progress and recovery
 
@@ -180,9 +180,9 @@ item failed, so automation can use both the exit code and the final
 
 | Provider | Default model |
 |---|---|
-| `xai` | `grok-3` |
+| `xai` | `grok-4.6` |
 | `openai` | `gpt-4o` |
-| `groq` | `llama-3.1-70b-versatile` |
+| `groq` | `openai/gpt-oss-120b` |
 | `local` | `qwen2.5-coder:14b` |
 
 The CLI exposes exactly `xai`, `openai`, `groq`, and `local`. Claude/Gemini
@@ -199,7 +199,7 @@ provider choices. Configure another OpenAI-compatible endpoint through
 | `--path` | Local source directory, including unpushed code | None |
 | `--batch`, `-b` | Path to `.txt` file with multiple URLs | None |
 | `--provider`, `-p` | LLM provider | `xai` |
-| `--model`, `-m` | Model name | Provider-specific (e.g., `grok-3`) |
+| `--model`, `-m` | Model name | Provider-specific (e.g., `grok-4.6`) |
 | `--temperature`, `-t` | Provider temperature | `0.2` |
 | `--risk-level` | Free-text risk label sent to the provider | `High` |
 | `--target-os` | Free-text target label sent to the provider | `Linux` |
@@ -281,9 +281,15 @@ keeps reports from custom output directories discoverable for the current
 session. CLI and GUI demo reports under `reports/demo/` also appear in the
 library.
 
-`doctor` checks the installation and selected provider readiness. `demo` starts
-a temporary local OpenAI-compatible endpoint and writes a real Markdown report
-under `reports/demo/`; it requires no credentials, network, or provider spend.
+`doctor` checks the installation and selected provider readiness. `demo` uses a
+deterministic offline response and writes a real Markdown report under
+`reports/demo/`; it starts no server and requires no credentials, network, or
+provider spend.
+
+Version tags matching `v<project-version>` trigger the release workflow. It
+builds and clean-installs both distributions, validates package contents,
+generates SHA-256 checksums, records build provenance, and publishes the
+verified files as GitHub release assets.
 
 The CLI reference is generated from Typer/Click metadata. The configuration
 reference imports provider maps and defaults from `pocarchitect/config.py`;

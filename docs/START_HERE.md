@@ -325,9 +325,9 @@ This command:
 
 1. checks the local installation and report directory;
 2. uses no cloud credential;
-3. starts a temporary local test provider inside the process;
+3. uses a deterministic offline response without starting a server;
 4. creates a real demonstration report under `reports/demo/`; and
-5. makes no external provider request and incurs no provider cost.
+5. makes no network request and incurs no provider cost.
 
 **Success check:** the diagnosis passes and a report path under `reports/demo/`
 is printed. Open that Markdown file in a text editor to confirm that a report

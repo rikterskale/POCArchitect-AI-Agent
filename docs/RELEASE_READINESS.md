@@ -99,7 +99,7 @@ Enforced checks:
 - `--dry-run` prints a compact summary and accepts `owner/repo` shorthand;
   `--dry-run --full` prints the entire prompt.
 - `doctor --offline` diagnoses installation readiness without credentials, and
-  `demo` exercises local-provider routing and report writing without network or cost.
+  `demo` exercises deterministic report writing without a server, network, or cost.
 - The JSON dry-run is a stable two-event stream (`processing`, `dry_run`) and
   shorthand is expanded to a full GitHub URL in the emitted events.
 - `--risk-level`, `--target-os`, and `--include-mitigations`/`--no-mitigations`

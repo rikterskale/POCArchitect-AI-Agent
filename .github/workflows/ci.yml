@@ -16,6 +16,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -69,10 +70,11 @@ jobs:
   test:
     needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - name: Checkout repository
@@ -110,6 +112,7 @@ jobs:
   windows-test:
     needs: quality
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -136,6 +139,7 @@ jobs:
   security:
     needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -150,23 +154,28 @@ jobs:
             requirements-dev.txt
             pyproject.toml
 
-      - name: Install dependencies + pip-audit
+      - name: Install dependencies and security tools
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip install -e .
-          pip install pip-audit
-          pip install bandit
 
       - name: Dependency vulnerability scan
         run: pip-audit
 
       - name: Static security scan
-        run: bandit -r pocarchitect -q
+        run: |
+          set +e
+          bandit -r pocarchitect -q -f json -o bandit-report.json
+          bandit_status=$?
+          set -e
+          python scripts/validate_bandit_report.py bandit-report.json
+          exit "$bandit_status"
 
   docker:
     needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -186,6 +195,7 @@ jobs:
   package:
     needs: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -225,7 +235,7 @@ jobs:
             python-version: "3.10"
             artifact: wheel
           - os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.14"
             artifact: wheel
           - os: windows-latest
             python-version: "3.12"
@@ -237,6 +247,7 @@ jobs:
             python-version: "3.12"
             artifact: sdist
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     name: First run (${{ matrix.os }}, Python ${{ matrix.python-version }}, ${{ matrix.artifact }})
     steps:
       - name: Checkout repository
@@ -260,6 +271,7 @@ jobs:
   build:
     needs: [quality, test, windows-test, security, docker, package, release-readiness]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

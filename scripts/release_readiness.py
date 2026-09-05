@@ -632,7 +632,7 @@ def pillar_features(work: Path) -> Pillar:
     demo = run_cli(["--format", "json", "--no-color", "demo"], work)
     demo_events = json_events(demo.stdout)
     p.record(
-        "`demo` creates a report through a hermetic local provider",
+        "`demo` creates a report through the deterministic offline path",
         demo.returncode == 0
         and any(event.get("event") == "report_saved" for event in demo_events)
         and any(event.get("event") == "report_digest" for event in demo_events),

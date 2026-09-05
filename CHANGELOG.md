@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Verified tag-driven GitHub release workflow with clean wheel/sdist installs,
+  SHA-256 checksums, build provenance attestations, bounded job timeouts, and
+  automated dependency updates for Python, Actions, and Docker.
+
 - One-click credential-free GUI demo, automatic selection of an available cloud
   provider, in-place readiness refresh for newly added keys, current-session
   custom-output report discovery, persistent demo discovery, clearer source
@@ -33,6 +37,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ledgers, workflow schema validation, and a workflow CLI surface.
 - Added security reporting guidance, package classifiers, static security CI,
   Docker health checks, and release distribution validation.
+
+### Changed
+
+- Replaced retired xAI and Groq defaults with `grok-4.6` and
+  `openai/gpt-oss-120b`, including current input-cost estimates and alternatives.
+- Included `SECURITY.md` in source distributions so packaged Start Here links
+  resolve correctly.
+- Made the credential-free CLI demo fully offline and socket-free, promoted
+  Python 3.14 into the CI support matrix, and updated the security toolchain.
+- The GUI now validates output-directory writability before source inspection
+  or provider access, and the reusable Action rejects ambiguous boolean inputs.
+
+### Security
+
+- Credential updates are atomic and owner-only on POSIX; reports, history,
+  diffs, and exports now use private file permissions by default.
+- GUI artifact access rejects files replaced by symlinks, and CI fails closed
+  when Bandit reports an incomplete scan or any finding.
 
 ## [0.2.0]
 

@@ -424,7 +424,12 @@ class GuiRuntime:
     def artifact(self, artifact_id: str) -> Path:
         with self._lock:
             path = self._artifacts.get(artifact_id)
-        if path is None or not path.is_file():
+        if (
+            path is None
+            or path.is_symlink()
+            or not path.is_file()
+            or path.resolve() != path
+        ):
             raise KeyError(artifact_id)
         return path
 
@@ -443,7 +448,10 @@ class GuiRuntime:
         candidates: list[tuple[float, Path]] = []
         for path in candidate_paths:
             try:
-                candidates.append((path.stat().st_mtime, path.resolve()))
+                if path.is_symlink():
+                    continue
+                resolved = path.resolve()
+                candidates.append((resolved.stat().st_mtime, resolved))
             except OSError:
                 continue
         for _, path in sorted(candidates, reverse=True)[:40]:

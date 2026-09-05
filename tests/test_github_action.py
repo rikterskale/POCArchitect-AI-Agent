@@ -9,6 +9,9 @@ def test_github_action_composite_installs_runs_comments_and_uploads():
     text = ACTION.read_text(encoding="utf-8")
 
     assert "using: composite" in text
+    assert "Validate inputs" in text
+    assert "dry-run must be exactly 'true' or 'false'" in text
+    assert "xai|openai|groq|local" in text
     assert "required: true" in text
     assert 'default: "true"' in text
     assert "python -m pip install" in text

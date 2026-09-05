@@ -7,8 +7,8 @@
 | Status | **PARTIALLY VERIFIED** |
 | Reviewed branch | <code>main</code> |
 | Detected project version | <code>0.2.0</code> |
-| Last documentation update | 2026-08-17 |
-| CI-gated platforms | Linux wheels on Python 3.10/3.13, Linux sdist on 3.12, and Windows/macOS wheels on 3.12; Docker CI builds the image and runs <code>--help</code> |
+| Last documentation update | 2026-09-05 |
+| CI-gated platforms | Linux wheels on Python 3.10/3.14, Linux sdist on 3.12, and Windows/macOS wheels on 3.12; unit tests cover Python 3.10–3.14; Docker CI builds the image and runs <code>--help</code> |
 | Validation limitations | No live cloud-provider request, live Ollama request, interactive setup session, WSL/Git Bash run, or native Docker Desktop run is automated |
 
 ## 1. What This Guide Helps You Do
@@ -41,7 +41,7 @@ Only analyze repositories you are authorized to inspect. A real grounded run clo
 
 You need Python 3.10 or newer and a terminal: Windows Terminal with PowerShell on Windows or a Bash-compatible terminal on Linux. Git is required for public GitHub grounding, but not for the offline checks, demo, or <code>--no-ingest</code> paths. Check Python with <code>py --version</code> in PowerShell or <code>python3 --version</code> in Bash; check Git with <code>git --version</code> before grounded runs. A provider credential is required only for a real cloud-provider run.
 
-CI runs unit tests on Ubuntu with Python 3.10–3.13. It also installs release artifacts into disposable environments and runs the offline first-day readiness gate on Windows and macOS with Python 3.12, on Linux wheels with Python 3.10 and 3.13, and on a Linux source distribution with Python 3.12. The repository requires Python 3.10+ but does not enforce a processor-architecture restriction.
+CI runs unit tests on Ubuntu with Python 3.10–3.14. It also installs release artifacts into disposable environments and runs the offline first-day readiness gate on Windows and macOS with Python 3.12, on Linux wheels with Python 3.10 and 3.14, and on a Linux source distribution with Python 3.12. The repository requires Python 3.10+ but does not enforce a processor-architecture restriction.
 
 ## 7. Basic Terms Explained
 
@@ -318,8 +318,8 @@ This moves an existing state file to a timestamped <code>.bak</code> file. Check
 Use either <code>--url</code> or <code>--batch</code>, never both.
 <code>--provider</code> accepts <code>xai</code>, <code>openai</code>,
 <code>groq</code>, or <code>local</code>; its default is <code>xai</code>.
-Default models are <code>grok-3</code>, <code>gpt-4o</code>,
-<code>llama-3.1-70b-versatile</code>, and
+Default models are <code>grok-4.6</code>, <code>gpt-4o</code>,
+<code>openai/gpt-oss-120b</code>, and
 <code>qwen2.5-coder:14b</code>, respectively. Claude/Gemini prompt wording does
 not add CLI providers; another OpenAI-compatible service uses
 <code>--provider local --base-url</code>.

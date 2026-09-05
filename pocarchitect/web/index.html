@@ -83,8 +83,9 @@
                 </div>
                 <label class="field field-wide is-hidden" id="base-url-field" for="base-url">
                   <span>Local endpoint</span>
-                  <input id="base-url" name="base_url" type="url" value="http://localhost:11434/v1" spellcheck="false">
-                  <small>Must expose an OpenAI-compatible API.</small>
+                  <input id="base-url" name="base_url" type="url" value="http://localhost:11434/v1" spellcheck="false" aria-describedby="base-url-hint base-url-error">
+                  <small id="base-url-hint">Must expose an OpenAI-compatible HTTP(S) API.</small>
+                  <small class="field-error is-hidden" id="base-url-error" role="alert"></small>
                 </label>
                 <div class="field-row">
                   <label class="field" for="risk-level"><span>Risk posture</span><select id="risk-level" name="risk_level"><option>Critical</option><option selected>High</option><option>Medium</option><option>Low</option></select></label>
@@ -104,7 +105,7 @@
                 <summary><span>Advanced controls</span><small>Output, budget, and enrichment</small></summary>
                 <div class="advanced-grid">
                   <label class="field" for="report-format"><span>Output format</span><select id="report-format"><option value="markdown">Markdown</option><option value="html">HTML</option><option value="pdf">PDF</option><option value="json">JSON</option></select></label>
-                  <label class="field" for="cost-limit"><span>Maximum input cost</span><div class="input-prefix"><span>$</span><input id="cost-limit" type="number" min="0" step="0.01" placeholder="No limit"></div></label>
+                  <label class="field" for="cost-limit"><span>Maximum input cost</span><div class="input-prefix"><span>$</span><input id="cost-limit" type="number" min="0" step="0.01" placeholder="No limit" aria-describedby="cost-limit-hint cost-limit-error"></div><small id="cost-limit-hint">Optional ceiling for estimated provider input cost.</small><small class="field-error is-hidden" id="cost-limit-error" role="alert"></small></label>
                   <label class="field field-wide" for="output-dir"><span>Output directory</span><input id="output-dir" type="text" spellcheck="false"></label>
                   <label class="check-row"><input id="vulnerability-scan" type="checkbox"><span><strong>OSV enrichment</strong><small>Check exact dependency versions for known vulnerabilities.</small></span></label>
                   <label class="check-row"><input id="diff-previous" type="checkbox"><span><strong>Compare with previous</strong><small>Save a diff against the latest matching report.</small></span></label>

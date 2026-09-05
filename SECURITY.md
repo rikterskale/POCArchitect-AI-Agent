@@ -29,6 +29,9 @@ a security guarantee by the project:
 - Only analyze repositories you are authorized to inspect.
 - Keep provider credentials in a local, gitignored `.env` file; never place a
   key on a command line or in an issue, log, or report.
+- Setup updates `.env` atomically and applies owner-only read/write permissions
+  on POSIX systems. Generated reports and report-derived artifacts use the same
+  private default because they may contain sensitive assessment context.
 - Review the redacted transfer preview before confirming any real provider call.
 - Treat generated reports as unverified model output that requires your review.
 - Keep the optional GUI bound to its built-in loopback address. Do not proxy or

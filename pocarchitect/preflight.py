@@ -3,7 +3,9 @@ import importlib
 import json
 import os
 import shutil
-import subprocess  # nosec B404 - controlled diagnostic subprocesses are required by preflight
+
+# Subprocess use is limited to fixed, read-only diagnostic commands below.
+import subprocess  # nosec B404
 import sys
 import tempfile
 from pathlib import Path
@@ -87,9 +89,8 @@ def check_local_endpoint(base_url: str | None = None) -> tuple[bool, str]:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return False, f"FAIL: Local endpoint must use an http(s) URL: {endpoint}"
     try:
-        with urlopen(  # nosec B310 - scheme and network location are validated above
-            f"{endpoint}/models", timeout=3
-        ) as response:
+        # The scheme and network location were validated immediately above.
+        with urlopen(f"{endpoint}/models", timeout=3) as response:  # nosec B310
             if 200 <= response.status < 300:
                 return True, f"OK: Local endpoint ready at {endpoint}"
     except (OSError, URLError) as error:
@@ -116,7 +117,7 @@ def check_git_command() -> tuple[bool, str]:
     if git is None:
         return False, "FAIL: Git executable not found"
     try:
-        # nosec B603 - executable comes from shutil.which("git")
+        # The executable is the resolved result of shutil.which("git").
         result = subprocess.run(  # nosec B603
             [git, "--version"],
             capture_output=True,
@@ -155,8 +156,8 @@ def check_cli_command() -> tuple[bool, str]:
     ]
     for cmd in candidates:
         try:
-            # nosec B603, B607 - fixed module/CLI diagnostic commands
-            subprocess.run(  # nosec B603, B607
+            # Fixed module/CLI diagnostic commands.
+            subprocess.run(  # nosec B603
                 cmd, capture_output=True, check=True, timeout=10
             )
             return True, f"OK: Available via: {' '.join(cmd[:3])}".strip()

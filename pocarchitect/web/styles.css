@@ -190,7 +190,7 @@ h1 { max-width: 850px; margin: 0; font-size: clamp(32px, 3.7vw, 56px); font-weig
 .field small { display: block; margin-top: 6px; color: var(--dim); font-size: 11px; line-height: 1.45; }
 .field small.provider-ready { color: var(--cyan); }
 .field small.provider-warning, .field small.field-error { color: var(--amber); }
-.field.is-invalid input { border-color: rgba(255,142,138,.7); box-shadow: 0 0 0 3px rgba(255,142,138,.08); }
+.field.is-invalid input, .field.is-invalid .input-prefix { border-color: rgba(255,142,138,.7); box-shadow: 0 0 0 3px rgba(255,142,138,.08); }
 .field input, .field select, .search-field input, .input-prefix { width: 100%; min-height: 43px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: #0a0f16; outline: none; transition: border-color .15s, background .15s, box-shadow .15s; }
 .field input, .field select { padding: 0 12px; }
 .field input:hover, .field select:hover, .search-field:hover, .input-prefix:hover { border-color: var(--line-strong); }
