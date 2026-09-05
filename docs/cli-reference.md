@@ -127,7 +127,7 @@ Show the current workflow read model and recommendations. Example: pocarchitect 
 
 ## Command: `workflow-apply`
 
-Apply one auditable workflow command and persist the resulting state. Example: pocarchitect workflow-apply --command confirm_scope --payload '{}'
+Apply one auditable workflow command and persist the resulting state. Example: pocarchitect workflow-apply --command decide --payload '{"key":"scope_defined","value":true}'
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -258,7 +258,7 @@ Publish a report with the authenticated GitHub CLI and return its URL. Example: 
 | `batch-reset` | Reset a ledger by moving its prior contents to a timestamped backup. Example: pocarchitect batch-reset --yes |
 | `workflow-init` | Create a new auditable finding-driven workflow state file. Example: pocarchitect workflow-init --state reports/workflow.json |
 | `workflow-status` | Show the current workflow read model and recommendations. Example: pocarchitect workflow-status --state reports/workflow.json |
-| `workflow-apply` | Apply one auditable workflow command and persist the resulting state. Example: pocarchitect workflow-apply --command confirm_scope --payload '{}' |
+| `workflow-apply` | Apply one auditable workflow command and persist the resulting state. Example: pocarchitect workflow-apply --command decide --payload '{"key":"scope_defined","value":true}' |
 | `setup` | Interactive first-run wizard: choose a provider, store a key, verify readiness. Example: pocarchitect setup |
 | `config` | Show effective settings and where each value comes from (keys masked). Example: pocarchitect config |
 | `models` | Show provider defaults and practical model alternatives. Example: pocarchitect models |

@@ -362,3 +362,44 @@ def test_service_enforces_cost_limit_and_writes_previous_diff(tmp_path, monkeypa
 
     assert second.report_path.with_suffix(".diff").is_file()
     assert any(event["event"] == "report_diff" for event in events)
+
+
+def test_service_includes_plugin_sections_in_provider_prompt(tmp_path, monkeypatch):
+    from pocarchitect import service as service_module
+
+    captured = {}
+    original = service_module._build_user_message
+
+    class Plugin:
+        name = "svc-plugin"
+
+        def analyze(self, source, grounding):
+            return f"PLUGIN:{source}"
+
+    def wrapped(request, grounding, plugin_sections=None, vulnerabilities=None):
+        message = original(
+            request,
+            grounding,
+            plugin_sections=plugin_sections,
+            vulnerabilities=vulnerabilities,
+        )
+        captured["message"] = message
+        return message
+
+    monkeypatch.setattr("pocarchitect.features._PLUGINS", {"svc-plugin": Plugin()})
+    monkeypatch.setattr("pocarchitect.features._PLUGINS_DISCOVERED", True)
+    monkeypatch.setattr(service_module, "_build_user_message", wrapped)
+    service = AnalysisService()
+    prepared = service.prepare(
+        AnalysisRequest(
+            source="https://example.test/advisory",
+            provider="local",
+            no_ingest=True,
+            output_dir=str(tmp_path),
+        )
+    )
+
+    service.execute(prepared, response_override="# Result")
+
+    assert "Registered analyzer output" in captured["message"]
+    assert "PLUGIN:https://example.test/advisory" in captured["message"]

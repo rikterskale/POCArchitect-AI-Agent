@@ -780,15 +780,18 @@ class WorkflowEngine:
             {"kind": "blocker", "title": text, "required": True} for text in blockers
         ]
         if not blockers:
-            result.append(
-                {
-                    "kind": "step",
-                    "step_id": step.id,
-                    "title": step.title,
-                    "explanation": step.explanation,
-                    "required": True,
-                }
-            )
+            if self.state.terminal:
+                result.append({"kind": "complete", "title": "No action is pending."})
+            else:
+                result.append(
+                    {
+                        "kind": "step",
+                        "step_id": step.id,
+                        "title": step.title,
+                        "explanation": step.explanation,
+                        "required": True,
+                    }
+                )
         actions = sorted(
             (
                 action
@@ -834,8 +837,6 @@ class WorkflowEngine:
                 "priority_score": self.state.priority_score,
             }
         )
-        if not result:
-            result.append({"kind": "complete", "title": "No action is pending."})
         return result
 
     def _finding_next_action(self, finding: Finding) -> str:

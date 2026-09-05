@@ -11,7 +11,12 @@ from typer.testing import CliRunner
 
 from pocarchitect import cli
 from pocarchitect.gui import GuiRuntime, create_app
-from pocarchitect.service import AnalysisRequest, AnalysisService, AnalysisServiceError
+from pocarchitect.service import (
+    AnalysisRequest,
+    AnalysisResult,
+    AnalysisService,
+    AnalysisServiceError,
+)
 
 
 class StubAnalysisService(AnalysisService):
@@ -526,3 +531,77 @@ def test_gui_runtime_bounds_terminal_jobs_and_ignores_unreadable_reports(
     )
     assert runtime.reports() == []
     runtime.close()
+
+
+def test_gui_runtime_bounds_session_reports_and_skips_unreadable_candidates(
+    tmp_path, monkeypatch
+):
+    from pocarchitect import gui
+
+    runtime = GuiRuntime(StubAnalysisService())
+    monkeypatch.setattr(gui, "MAX_RETAINED_JOBS", 1)
+    monkeypatch.setattr(gui, "default_output_dir", lambda: tmp_path)
+    older = tmp_path / "old.md"
+    newer = tmp_path / "new.md"
+    older.write_text("old", encoding="utf-8")
+    newer.write_text("new", encoding="utf-8")
+    older.touch()
+    newer.touch()
+    import os
+
+    os.utime(older, (1, 1))
+    os.utime(newer, (2, 2))
+    runtime._session_reports.add(older.resolve())
+    job = gui.GuiJob(id="bounded")
+    runtime._jobs[job.id] = job
+    runtime._finish(
+        job.id,
+        AnalysisResult(
+            report_path=newer,
+            export_path=newer,
+            content="# new",
+            grounding_files=(),
+            estimated_cost_usd=None,
+            completed_at="2026-01-01T00:00:00+00:00",
+        ),
+    )
+    assert runtime._session_reports == {newer.resolve()}
+
+    runtime._session_reports.add(tmp_path / "missing-report.md")
+    listed = runtime.reports()
+    assert all(row["name"] != "missing-report.md" for row in listed)
+    runtime.close()
+
+
+def test_gui_event_stream_invalid_last_event_id_and_keepalive(tmp_path, monkeypatch):
+    from pocarchitect import gui
+
+    runtime = GuiRuntime(StubAnalysisService())
+    job = gui.GuiJob(id="run-keepalive", status="running")
+    job.events.append(
+        {"event": "queued", "message": "queued", "sequence": 0, "at": "t"}
+    )
+    runtime._jobs[job.id] = job
+    ticks = {"n": 0}
+
+    async def fake_sleep(_delay):
+        ticks["n"] += 1
+        if ticks["n"] >= 40:
+            job.status = "completed"
+            job.updated_at = gui._now()
+
+    monkeypatch.setattr(gui.asyncio, "sleep", fake_sleep)
+    app = create_app(session_token="token", port=8765, runtime=runtime)
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        client.get("/?token=token", follow_redirects=True)
+        with client.stream(
+            "GET",
+            f"/api/runs/{job.id}/events",
+            headers={"Last-Event-ID": "not-an-id"},
+        ) as response:
+            assert response.status_code == 200
+            body = b"".join(response.iter_bytes()).decode("utf-8")
+
+    assert ": keepalive" in body
+    assert '"type": "finished"' in body
+    assert '"type": "event"' in body

@@ -872,6 +872,23 @@ def test_workflow_cli_round_trip_and_invalid_payload(tmp_path):
     assert created.exit_code == status.exit_code == applied.exit_code == 0
     assert invalid.exit_code == 2
     assert "payload must be a JSON object" in invalid.stdout
+    help_text = RUNNER.invoke(cli.app, ["workflow-apply", "--help"]).stdout
+    assert "confirm_scope" not in help_text
+    assert "--command decide" in help_text
+    unsupported = RUNNER.invoke(
+        cli.app,
+        [
+            "workflow-apply",
+            "--state",
+            str(state_path),
+            "--command",
+            "confirm_scope",
+            "--payload",
+            "{}",
+        ],
+    )
+    assert unsupported.exit_code == 2
+    assert "Unsupported workflow command" in unsupported.stdout
 
 
 def test_auxiliary_cli_commands_cover_success_and_error_paths(tmp_path, monkeypatch):
@@ -1127,12 +1144,16 @@ def test_cli_auxiliary_failure_and_json_paths(tmp_path, monkeypatch):
         RUNNER.invoke(cli.app, ["workflow-init", "--state", str(existing)]).exit_code
         == 2
     )
-    assert (
-        RUNNER.invoke(
-            cli.app, ["workflow-status", "--state", str(tmp_path / "none")]
-        ).exit_code
-        == 2
+    missing = RUNNER.invoke(
+        cli.app, ["workflow-status", "--state", str(tmp_path / "none")]
     )
+    assert missing.exit_code == 2
+    assert "Workflow state not found" in missing.stdout
+    corrupt = tmp_path / "broken-workflow.json"
+    corrupt.write_text("{not json", encoding="utf-8")
+    broken = RUNNER.invoke(cli.app, ["workflow-status", "--state", str(corrupt)])
+    assert broken.exit_code == 2
+    assert "Cannot load workflow state" in broken.stdout
 
     assert RUNNER.invoke(cli.app, ["compare", "only-one"]).exit_code == 2
     monkeypatch.setattr(
@@ -1370,3 +1391,342 @@ def test_process_single_url_optional_outputs_and_text_summary(tmp_path, monkeypa
     assert first.with_suffix(".json").is_file()
     assert (tmp_path / "blueprint").is_dir()
     assert second.with_suffix(".diff").is_file()
+
+
+def _single_url_kwargs(tmp_path, **overrides):
+    values = dict(
+        url="https://example.test/source",
+        provider="local",
+        api_key=None,
+        model="model",
+        temperature=0.2,
+        base_url=None,
+        output_dir=tmp_path / "reports",
+        risk_level="High",
+        target_os="Linux",
+        include_mitigations=True,
+        no_ingest=True,
+        dry_run=False,
+        verbose=False,
+        confirmed=True,
+    )
+    values.update(overrides)
+    return values
+
+
+def test_doctor_fix_repairs_output_directory_and_retries(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    calls = {"n": 0}
+
+    def fake_preflight(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise SystemExit(1)
+
+    monkeypatch.setattr(cli, "run_preflight", fake_preflight)
+    target = tmp_path / "repaired-out"
+    result = RUNNER.invoke(
+        cli.app,
+        [
+            "--format",
+            "json",
+            "--no-color",
+            "doctor",
+            "--offline",
+            "--fix",
+            "--yes",
+            "--output-dir",
+            str(target),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert target.is_dir()
+    assert calls["n"] == 2
+    assert "Output directory is ready" in result.stdout
+
+
+def test_doctor_fix_interactive_paths_and_repair_failure(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "blocked-out"
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(
+        cli, "run_preflight", lambda **kwargs: (_ for _ in ()).throw(SystemExit(1))
+    )
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
+
+    with pytest.raises(typer.Exit) as cancelled:
+        cli.doctor(offline=True, fix=True, yes=False, output_dir=target)
+    assert cancelled.value.exit_code == 1
+    assert not target.exists()
+
+    original_mkdir = Path.mkdir
+
+    def fail_target(self, *args, **kwargs):
+        if Path(self) == target:
+            raise OSError("denied")
+        return original_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", fail_target)
+    events = []
+    with cli.capture_events(events.append):
+        with pytest.raises(typer.Exit) as failed:
+            cli.doctor(offline=True, fix=True, yes=True, output_dir=target)
+    assert failed.value.exit_code == 1
+    assert any(
+        "Could not repair output directory" in event["message"] for event in events
+    )
+
+
+def test_doctor_fix_stores_key_and_reports_missing_git(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(
+        cli,
+        "run_preflight",
+        lambda **kwargs: (_ for _ in ()).throw(SystemExit("failed")),
+    )
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: True)
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: "sk-doctor-key")
+    events = []
+    with cli.capture_events(events.append):
+        with pytest.raises(typer.Exit) as error:
+            cli.doctor(
+                provider="openai",
+                offline=False,
+                fix=True,
+                yes=True,
+                output_dir=tmp_path / "out",
+            )
+    assert error.value.exit_code == 1
+    env_text = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENAI_API_KEY=sk-doctor-key" in env_text
+    assert any("Stored OPENAI_API_KEY" in event["message"] for event in events)
+    assert all("sk-doctor-key" not in event["message"] for event in events)
+    assert any("Git is missing" in event["message"] for event in events)
+
+
+def test_setup_non_tty_and_cloud_key_paths(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    non_tty = RUNNER.invoke(cli.app, ["setup"])
+    assert non_tty.exit_code == 2
+    assert "Setup is interactive" in non_tty.stdout
+
+    answers = iter(("bogus", "openai", "sk-setup-key-value"))
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: next(answers))
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
+    monkeypatch.setattr(cli, "run_preflight", lambda **kwargs: None)
+    cli.setup()
+    saved = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENAI_API_KEY=sk-setup-key-value" in saved
+
+    cli._upsert_env_file(tmp_path / ".env", "OPENAI_API_KEY", "replaced")
+    cli._upsert_env_file(tmp_path / ".env", "XAI_API_KEY", "added")
+    updated = (tmp_path / ".env").read_text(encoding="utf-8")
+    assert "OPENAI_API_KEY=replaced" in updated
+    assert "sk-setup-key-value" not in updated
+    assert "XAI_API_KEY=added" in updated
+
+    empty = iter(("openai", "   "))
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: next(empty))
+    with pytest.raises(typer.Exit) as error:
+        cli.setup()
+    assert error.value.exit_code == 2
+
+
+def test_mask_secret_and_upsert_preserves_spacing_variants(tmp_path):
+    assert cli._mask_secret(None) == "(unset)"
+    assert cli._mask_secret("short") == "set (••••)"
+    assert cli._mask_secret("abcdefghij") == "set (abcd…ij)"
+
+    env_path = tmp_path / ".env"
+    env_path.write_text("GROQ_API_KEY = old-value\nOTHER=keep\n", encoding="utf-8")
+    cli._upsert_env_file(env_path, "GROQ_API_KEY", "new-value")
+    text = env_path.read_text(encoding="utf-8")
+    assert "GROQ_API_KEY=new-value" in text
+    assert "OTHER=keep" in text
+    assert "old-value" not in text
+
+
+def test_is_retryable_and_transient_provider_retry(monkeypatch):
+    assert cli._is_retryable(typer.Exit(1)) is False
+    assert cli._is_retryable(cli.FatalProviderError("bad model")) is False
+    bad_request = RuntimeError("bad request")
+    bad_request.status_code = 400
+    assert cli._is_retryable(bad_request) is False
+    rate_limited = RuntimeError("slow down")
+    rate_limited.status_code = 429
+    assert cli._is_retryable(rate_limited) is True
+    timeout = RuntimeError("timeout")
+    timeout.status_code = 408
+    assert cli._is_retryable(timeout) is True
+    assert cli._is_retryable(RuntimeError("401 unauthorized")) is False
+    assert cli._is_retryable(RuntimeError("model not found")) is False
+    assert cli._is_retryable(RuntimeError("connection reset")) is True
+
+    calls = {"n": 0}
+
+    class Completions:
+        def create(self, **kwargs):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                error = RuntimeError("temporary")
+                error.status_code = 429
+                raise error
+            message = type("Message", (), {"content": " recovered "})()
+            choice = type("Choice", (), {"message": message})()
+            return type("Response", (), {"choices": [choice]})()
+
+    class Client:
+        def __init__(self, **kwargs):
+            self.chat = type("Chat", (), {"completions": Completions()})()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(cli, "OpenAI", lambda **kwargs: Client())
+    assert (
+        cli.get_llm_response("openai", "sk-x", "gpt-4o", 0.2, None, "sys", "user")
+        == "recovered"
+    )
+    assert calls["n"] == 3
+
+    calls["n"] = 0
+
+    class Permanent:
+        def create(self, **kwargs):
+            calls["n"] += 1
+            error = RuntimeError("bad request")
+            error.status_code = 400
+            raise error
+
+    class PermanentClient:
+        def __init__(self, **kwargs):
+            self.chat = type("Chat", (), {"completions": Permanent()})()
+
+    monkeypatch.setattr(cli, "OpenAI", lambda **kwargs: PermanentClient())
+    with pytest.raises(RuntimeError, match="bad request"):
+        cli.get_llm_response("openai", "sk-x", "gpt-4o", 0.2, None, "sys", "user")
+    assert calls["n"] == 1
+
+
+def test_gui_command_reports_missing_extra(monkeypatch):
+    monkeypatch.setitem(sys.modules, "uvicorn", None)
+    result = RUNNER.invoke(cli.app, ["gui", "--no-open"])
+    assert result.exit_code == 2
+    assert "GUI dependencies are not installed" in result.stdout
+
+
+def test_process_single_url_error_paths(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "MAX_PROMPT_CHARACTERS", 10)
+    with pytest.raises(typer.Exit) as oversized:
+        cli.process_single_url(**_single_url_kwargs(tmp_path))
+    assert oversized.value.exit_code == 2
+
+    monkeypatch.setattr(cli, "MAX_PROMPT_CHARACTERS", 500_000)
+    monkeypatch.setattr(cli, "extract_dependencies", lambda text: [{"name": "demo"}])
+    monkeypatch.setattr(
+        cli,
+        "query_osv",
+        lambda packages: (_ for _ in ()).throw(OSError("offline")),
+    )
+    events = []
+    with cli.capture_events(events.append):
+        cli.process_single_url(
+            **_single_url_kwargs(
+                tmp_path, vulnerability_scan=True, response_override="# ok"
+            )
+        )
+    assert any(event["event"] == "vulnerability_scan_failed" for event in events)
+
+    monkeypatch.setattr(
+        cli,
+        "get_llm_response",
+        lambda **kwargs: (_ for _ in ()).throw(cli.FatalProviderError("unknown model")),
+    )
+    with pytest.raises(typer.Exit) as fatal:
+        cli.process_single_url(**_single_url_kwargs(tmp_path))
+    assert fatal.value.exit_code == 1
+
+    monkeypatch.setattr(
+        cli,
+        "get_llm_response",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("provider broke")),
+    )
+    with pytest.raises(RuntimeError, match="provider broke"):
+        cli.process_single_url(**_single_url_kwargs(tmp_path))
+
+
+def test_save_report_cleans_temporary_file_and_reports_open_failure(
+    tmp_path, monkeypatch
+):
+    grounding = cli.GroundingResult("content", "disabled")
+    original_replace = os.replace
+    monkeypatch.setattr(
+        cli.os,
+        "replace",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
+    with pytest.raises(OSError, match="denied"):
+        cli.save_report(
+            "# Report\n",
+            "https://example.test/x",
+            tmp_path,
+            "local",
+            "model",
+            grounding,
+        )
+    assert list(tmp_path.glob(".POCAnalysis_*")) == []
+
+    monkeypatch.setattr(cli.os, "replace", original_replace)
+    monkeypatch.setattr(cli, "open_in_default_viewer", lambda path: False)
+    events = []
+    with cli.capture_events(events.append):
+        path = cli.save_report(
+            "# Report\n",
+            "https://example.test/x",
+            tmp_path,
+            "local",
+            "model",
+            grounding,
+            open_report=True,
+        )
+    assert path.is_file()
+    assert any(event["event"] == "report_open_failed" for event in events)
+
+
+def test_batch_reset_interactive_confirm_and_compare_url_only(tmp_path, monkeypatch):
+    ledger = tmp_path / "batch_progress.json"
+    ledger.write_text(
+        json.dumps(
+            {"version": 2, "items": {"https://example.test/a": {"status": "success"}}}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
+    events = []
+    with cli.capture_events(events.append):
+        with pytest.raises(typer.Exit) as cancelled:
+            cli.batch_reset(batch_state=ledger, yes=False)
+    assert cancelled.value.exit_code == 0
+    assert any("was not reset" in event["message"] for event in events)
+    assert ledger.is_file()
+
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: True)
+    events = []
+    with cli.capture_events(events.append):
+        cli.batch_reset(batch_state=ledger, yes=False)
+    assert any("retained at" in event["message"] for event in events)
+    assert not ledger.exists()
+
+    compared = RUNNER.invoke(
+        cli.app,
+        ["compare", "https://example.test/a", "https://example.test/b"],
+    )
+    assert compared.exit_code == 0
+    assert "URL-only" in compared.stdout

@@ -1968,11 +1968,11 @@ def batch_reset(
 
 
 def _load_workflow_state(path: Path) -> WorkflowEngine:
-    try:
-        return WorkflowEngine.load(path)
-    except FileNotFoundError:
+    if not path.exists():
         emit("error", f"Workflow state not found: {path}")
         raise typer.Exit(2)
+    try:
+        return WorkflowEngine.load(path)
     except WorkflowError as error:
         emit("error", str(error), state_path=str(path))
         raise typer.Exit(2)
@@ -2026,7 +2026,7 @@ def workflow_apply(
 ):
     """Apply one auditable workflow command and persist the resulting state.
 
-    Example: pocarchitect workflow-apply --command confirm_scope --payload '{}'
+    Example: pocarchitect workflow-apply --command decide --payload '{"key":"scope_defined","value":true}'
     """
     engine = _load_workflow_state(state_path)
     try:

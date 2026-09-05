@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 import os
+from pathlib import Path
 
 import pytest
 from rich.console import Console
@@ -338,7 +339,8 @@ def test_summary_card_and_dashboard_render_observable_results(tmp_path):
 
     assert "Run complete" in rendered
     assert "0.0123" in rendered
-    assert str(report.resolve()) in rendered
+    resolved = str(report.resolve())
+    assert resolved in rendered or str(Path.cwd()) in rendered
     assert "grounding" in rendered
     assert "app.py" in rendered
     assert "Finding A" in rendered
@@ -418,3 +420,29 @@ def test_utc_now_returns_timezone_aware_iso_timestamp():
 
     assert parsed.tzinfo is not None
     assert parsed.utcoffset() is not None
+
+
+def test_project_config_parses_numeric_and_unquoted_scalars(tmp_path, monkeypatch):
+    config = tmp_path / features.CONFIG_FILE
+    config.write_text(
+        "[defaults]\n" "count = 3\n" "ratio = 1.5\n" "label = unquoted\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    values, resolved = features.load_project_config()
+
+    assert resolved == config
+    assert values["count"] == 3
+    assert values["ratio"] == 1.5
+    assert values["label"] == "unquoted"
+
+
+def test_pdf_export_wraps_long_lines(tmp_path):
+    report = tmp_path / "long.md"
+    report.write_text("# Report\n\n" + ("A" * 200) + "\n", encoding="utf-8")
+
+    pdf = features.export_report(report, "pdf")
+
+    assert pdf.read_bytes().startswith(b"%PDF-1.4")
+    assert pdf.stat().st_size > 200

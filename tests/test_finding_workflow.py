@@ -432,3 +432,76 @@ def test_workflow_loader_wraps_invalid_json_and_invalid_integrity(tmp_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(WorkflowError, match="Invalid workflow state"):
         WorkflowEngine.load(path)
+
+
+def test_correlate_links_findings_and_apply_rejects_invalid_payload():
+    engine = WorkflowEngine()
+    first = engine.add_finding(title="One", severity=4)
+    second = engine.add_finding(title="Two", severity=5)
+
+    linked = engine.correlate(first.id, [second.id, first.id, second.id])
+
+    assert linked.related_finding_ids == [second.id]
+    assert engine.state.findings[first.id].related_finding_ids == [second.id]
+
+    before = engine.snapshot()
+    with pytest.raises(WorkflowCommandError, match="Invalid payload"):
+        engine.apply("decide", unexpected=True)
+    assert engine.snapshot() == before
+
+
+def test_blockers_cover_scope_validation_actions_and_closure():
+    engine = WorkflowEngine()
+    assert engine.blockers("discover") == ["Record a scope_defined=true decision."]
+
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+    finding = engine.add_finding(title="Open observation", severity=8, confidence=80)
+    engine.complete_step("discover")
+    assert engine.blockers("validate") == [
+        "Validate or explicitly reject every open finding."
+    ]
+    assert engine.blockers("assess-impact") == [
+        "Validate all open findings before continuing."
+    ]
+
+    engine.update_finding_status(finding.id, FindingStatus.VALIDATED)
+    engine.complete_step("validate")
+    assert "Resolve required finding actions" in engine.blockers("plan-remediation")[0]
+    engine.resolve_action(f"impact:{finding.id}")
+    engine.complete_step("assess-impact")
+    assert (
+        "Resolve required finding actions" in engine.blockers("verify-remediation")[0]
+    )
+
+    engine.resolve_action(f"remediate:{finding.id}")
+    engine.update_finding_status(finding.id, FindingStatus.MITIGATED)
+    engine.complete_step("plan-remediation")
+    engine.complete_step("verify-remediation")
+    engine.complete_step("report")
+    engine.decide("closure_approved", True)
+    assert engine.blockers("close") == ["Complete all required pending actions."]
+
+    engine.resolve_action(f"verify:{finding.id}")
+    assert engine.blockers("close") == ["Close or explicitly waive every finding."]
+
+
+def test_archived_workflow_recommends_completion():
+    engine = WorkflowEngine()
+    engine.decide("scope_defined", True)
+    engine.complete_step("scope")
+    engine.decide("authorized", True)
+    engine.complete_step("authorize")
+    engine.complete_step("discover")
+    engine.complete_step("report")
+    engine.complete_step("close")
+    engine.complete_step("archive")
+
+    assert engine.state.terminal is True
+    kinds = [item["kind"] for item in engine.recommendations()]
+    assert "complete" in kinds
+    assert "step" not in kinds
+    assert engine.next_recommendation()["kind"] == "complete"
+    assert engine.next_recommendation()["title"] == "No action is pending."
