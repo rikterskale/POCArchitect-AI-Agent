@@ -6,7 +6,7 @@
 | Guide purpose | Beginner installation, first use, verification, recovery, and common operations |
 | Status | **PARTIALLY VERIFIED** |
 | Reviewed branch | <code>main</code> |
-| Detected project version | <code>0.2.0</code> |
+| Detected project version | <code>0.3.0</code> |
 | Last documentation update | 2026-09-05 |
 | CI-gated platforms | Linux wheels on Python 3.10/3.14, Linux sdist on 3.12, and Windows/macOS wheels on 3.12; unit tests cover Python 3.10–3.14; Docker CI builds the image and runs <code>--help</code> |
 | Validation limitations | No live cloud-provider request, live Ollama request, interactive setup session, WSL/Git Bash run, or native Docker Desktop run is automated |
@@ -252,10 +252,10 @@ Run the built-in demo after installation:
 python -m pocarchitect --format json --no-color demo
 ~~~
 
-The demo uses a temporary in-process OpenAI-compatible endpoint, creates a real
-Markdown report under <code>reports/demo/</code>, and makes no network request or
-billable provider call. Delete that demonstration folder whenever it is no
-longer useful.
+The deterministic demo creates a real Markdown report under
+<code>reports/demo/</code> without starting a provider endpoint, making a
+network request, or incurring provider cost. Delete that demonstration folder
+whenever it is no longer useful.
 
 ## 17. If Verification Fails: Diagnose and Fix It
 
@@ -266,7 +266,7 @@ python -m pip install -e '.[all]'
 python -m pocarchitect --version
 ~~~
 
-Expected result: <code>POCArchitect v0.2.0</code>.
+Expected result: <code>POCArchitect v0.3.0</code>.
 
 If offline preflight reports a missing dependency, rerun the same install
 command and then repeat the offline preflight. If it reports an output-directory

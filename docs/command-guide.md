@@ -1,6 +1,6 @@
 # POCArchitect Command Guide
 
-This reference documents POCArchitect 0.2.0. Run commands from the repository
+This reference documents POCArchitect 0.3.0. Run commands from the repository
 root and analyze only targets you are authorized to inspect. Never put provider
 credentials on a command line or commit `.env`.
 

@@ -1,4 +1,4 @@
-# POCArchitect AI Agent - Dockerfile (v0.2.0) - Reliable saving on Windows
+# POCArchitect AI Agent - production container image
 FROM python:3.14.7-slim-bookworm AS builder
 
 ENV VIRTUAL_ENV=/opt/venv \

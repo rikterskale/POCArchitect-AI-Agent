@@ -222,4 +222,4 @@ service must be supplied through `local` and `--base-url`.
 - Provider output and copied commands require operator review.
 - The tool does not execute cloned source and supplies no sandbox for report content.
 
-**Documented version:** 0.2.0
+**Documented version:** 0.3.0

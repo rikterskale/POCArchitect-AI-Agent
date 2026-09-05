@@ -1,6 +1,8 @@
 # Docker Guide - POCArchitect AI Agent
 
-This guide covers the repository Dockerfile reviewed with POCArchitect 0.2.0. The image uses Python 3.12, installs Git for GitHub grounding, runs as the non-root `pocuser` user, and exposes `/reports` as a writable volume.
+This guide covers the repository Dockerfile reviewed with POCArchitect 0.3.0.
+The image uses Python 3.14.7, installs Git for GitHub grounding, runs as the
+non-root `pocuser` user, and exposes `/reports` as a writable volume.
 
 ## Prerequisites
 
@@ -49,8 +51,8 @@ This does not clone the URL, call a provider, require a key, or write a report. 
 
 ### Credential-free report smoke test
 
-This exercises the container's provider boundary and verifies that the report
-volume is usable without a cloud credential:
+This exercises deterministic report creation and verifies that the report
+volume is usable without a provider endpoint or cloud credential:
 
 ```bash
 docker volume create pocarchitect-smoke

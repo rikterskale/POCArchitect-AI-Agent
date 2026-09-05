@@ -63,7 +63,7 @@ approval.
    ```bash
    python -m pocarchitect --version
    ```
-   Observable: a line `POCArchitect v0.2.0` (or the installed package version)
+   Observable: a line `POCArchitect v0.3.0` (or the installed package version)
    and exit 0.
 
 4. **Prove the install without credentials.**
